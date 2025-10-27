@@ -1408,27 +1408,14 @@ class HomepageDataService extends GetxController {
         // Permissions are now requested in background, not blocking UI
         print('🏥 [HOMEPAGE_DATA] Checking health permissions...');
 
-        // Check if permissions already granted (don't request if not needed)
-        if (!_healthSyncService!.hasPermissions.value) {
-          print('🏥 [HOMEPAGE_DATA] Requesting health permissions in background...');
-          // ✅ FIX: Skip onboarding for background sync on cold start
-          // Onboarding will be shown when user explicitly enables health sync via UI
-          final granted = await _healthSyncService!.requestPermissions(skipOnboarding: true);
-          if (!granted) {
-            print('🏥 [HOMEPAGE_DATA] Health permissions denied by user');
-            return;
-          }
-          print('🏥 [HOMEPAGE_DATA] ✅ Health permissions granted successfully');
-        }
-
-        // Now check if health services are available
+        // Check if health services are available first
         if (!_healthSyncService!.isHealthAvailable.value) {
           print('🏥 [HOMEPAGE_DATA] Health services not available on this device');
           return;
         }
 
-        // ✅ Show sync dialog using Get.dialog to avoid context.mounted issues
-        // Get.dialog doesn't require context.mounted check as it uses Get's navigation
+        // ✅ Show sync dialog immediately - it will handle permission requests internally
+        // The dialog will show different states: requesting permissions, syncing, error, etc.
         print('🏥 [HOMEPAGE_DATA] Showing health sync dialog...');
         Get.dialog(
           HealthSyncDialog(
@@ -1446,8 +1433,21 @@ class HomepageDataService extends GetxController {
           barrierColor: Colors.black.withOpacity(0.7),
         );
 
+        // Request permissions if needed (this will happen while dialog is visible)
+        if (!_healthSyncService!.hasPermissions.value) {
+          print('🏥 [HOMEPAGE_DATA] Requesting health permissions...');
+          // ✅ FIX: Skip onboarding for background sync on cold start
+          // Onboarding will be shown when user explicitly enables health sync via UI
+          final granted = await _healthSyncService!.requestPermissions(skipOnboarding: true);
+          if (!granted) {
+            print('🏥 [HOMEPAGE_DATA] Health permissions denied by user - dialog will show error state');
+            return;
+          }
+          print('🏥 [HOMEPAGE_DATA] ✅ Health permissions granted successfully');
+        }
+
         // Perform sync with forceSync=true on cold start
-        print('🏥 [HOMEPAGE_DATA] Starting background health sync (non-blocking)...');
+        print('🏥 [HOMEPAGE_DATA] Starting health sync...');
         final syncResult = await _healthSyncService!.syncHealthData(forceSync: true);
 
         if (syncResult.isSuccess && syncResult.data != null) {

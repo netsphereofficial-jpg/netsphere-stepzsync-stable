@@ -261,9 +261,18 @@ class HealthSyncService extends GetxController {
   /// Fetch today's health data
   Future<DailyHealthData> _fetchTodayData() async {
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
+    // ✅ FIX: Query for the FULL calendar day, not just from midnight to now
+    // Health Connect aggregates data by calendar day, so we need to query the entire day
+    // Using end-of-day ensures we capture all steps recorded today
+    final startOfDay = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
 
-    return await _fetchDataForPeriod(startOfDay, now);
+    print('${HealthConfig.logPrefix} 📅 Querying health data for today (full day):');
+    print('   Start: $startOfDay (${startOfDay.toIso8601String()})');
+    print('   End: $endOfDay (${endOfDay.toIso8601String()})');
+    print('   Duration: ${endOfDay.difference(startOfDay).inHours}h ${endOfDay.difference(startOfDay).inMinutes % 60}m');
+
+    return await _fetchDataForPeriod(startOfDay, endOfDay);
   }
 
 
@@ -282,9 +291,14 @@ class HealthSyncService extends GetxController {
       // Build platform-specific health data types list
       final List<HealthDataType> otherDataTypes = [
         HealthDataType.ACTIVE_ENERGY_BURNED,
-        HealthDataType.EXERCISE_TIME,
         HealthDataType.HEART_RATE,
       ];
+
+      // ✅ FIX: EXERCISE_TIME is only available on HealthKit (iOS), not Health Connect (Android)
+      // Without this check, Health Connect throws an error that discards successfully fetched steps
+      if (Platform.isIOS) {
+        otherDataTypes.add(HealthDataType.EXERCISE_TIME);
+      }
 
       // Add platform-specific distance type
       if (Platform.isIOS) {
@@ -349,7 +363,8 @@ class HealthSyncService extends GetxController {
       // Convert units
       final distanceKm = distanceMeters * HealthConfig.metersToKilometers;
 
-      // ✅ Android: Estimate active minutes from steps (no EXERCISE_TIME in Health Connect)
+      // ✅ Android: Estimate active minutes from steps
+      // Health Connect doesn't support EXERCISE_TIME, so we estimate from steps
       // Average walking pace: 100 steps/minute
       // Only count active minutes if we have significant steps
       if (Platform.isAndroid && activeMinutes == 0 && steps > 0) {
