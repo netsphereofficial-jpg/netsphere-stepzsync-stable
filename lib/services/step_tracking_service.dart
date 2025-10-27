@@ -575,7 +575,11 @@ class StepTrackingService extends GetxService {
         // Save to repository (syncs to Firebase)
         await _repository.saveDailyData(todayData, syncToFirebase: true);
 
-        // Update overall summary
+        // ✅ Reload overall statistics from Firebase after sync
+        // This ensures overall stats reflect the latest Firebase aggregation
+        await _loadOverallStatistics();
+
+        // Update overall summary with the refreshed stats
         final summary = StepSummary(
           totalDays: overallDays.value,
           totalSteps: overallSteps.value,
