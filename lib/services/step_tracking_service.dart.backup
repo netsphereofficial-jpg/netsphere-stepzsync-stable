@@ -1,0 +1,3237 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:pedometer/pedometer.dart';
+
+import '../core/models/race_data_model.dart';
+import '../models/step_models.dart';
+import '../models/step_metrics.dart';
+import '../models/step_history.dart';
+import '../models/user_overall_stats.dart';
+import 'race_service.dart';
+import 'database_controller.dart';
+
+class StepTrackingService extends GetxController {
+  // Observable data
+  final RxInt overallSteps = 0.obs;
+  final RxDouble overallDistance = 0.0.obs;
+  final RxInt overallDays = 1.obs;
+  final RxInt todaySteps = 0.obs;
+  final RxDouble todayDistance = 0.0.obs;
+  final RxInt todayCalories = 0.obs;
+  final RxInt todayActiveTime = 0.obs;
+  final RxString pedestrianStatus = 'unknown'.obs;
+  final RxBool isInitialized = false.obs;
+  final RxBool isTracking = false.obs;
+
+  // Walking session tracking for accurate active time
+  DateTime? _walkingSessionStart;
+  int _cumulativeActiveTimeSeconds = 0;
+  Timer? _walkingSessionTimer;
+
+  // Internal tracking variables
+  int _deviceBaseline = 0;
+  int _todayDeviceBaseline = 0;
+  int _previousDaysTotal = 0;
+  int _lastDeviceReading = 0;
+  DateTime? _installDate;
+  DateTime? _lastSyncTime;
+  bool _baselineInitialized = false; // ✅ NEW: Track if baseline is properly set
+
+  // Race-specific tracking
+  final RxMap<String, RaceSession> activeRaceSessions =
+      <String, RaceSession>{}.obs;
+  final RxInt todayBaselineBeforeFirstRace = 0.obs;
+  final RxBool hasActiveRaces = false.obs;
+  int? _todayStepsBeforeFirstRace;
+
+  // Stream subscriptions
+  StreamSubscription<StepCount>? _stepCountSubscription;
+  StreamSubscription<PedestrianStatus>? _pedestrianStatusSubscription;
+
+  // Firebase batch operations
+  Timer? _syncTimer;
+  bool _pendingSync = false;
+  bool _hasRunCleanup = false; // Track if cleanup has already run
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Constants
+  static const double _averageStepLength = 0.78; // meters per step
+  static const double _caloriesPerStep = 0.05; // calories per step
+  static const int _syncIntervalSeconds = 10; // Batch sync every 10 seconds
+
+  // Database controller getter
+  DatabaseController get _databaseController => Get.find<DatabaseController>();
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Initialize asynchronously to avoid blocking the UI
+    Future.microtask(() => _initializeStepTracking());
+  }
+
+  Future<void> _initializeStepTracking() async {
+    try {
+      print('🚀 Starting step tracking initialization...');
+
+      // ✅ STEP 1: Load user data from Firebase (source of truth)
+      await _loadUserStepData();
+
+      // ✅ STEP 2: Early validation BEFORE starting pedometer
+      // This prevents corrupted baselines from persisting
+      await _validateAndCorrectBaselineEarly();
+
+      // ✅ STEP 3: Check for day change and handle it properly
+      await handleDayChange();
+
+      // ✅ STEP 4: CRITICAL - Ensure baseline is saved to Firebase atomically
+      // This prevents the race condition where baseline is lost if app crashes
+      await _ensureBaselinePersistedToFirebase();
+
+      // ✅ STEP 5: NOW safe to initialize pedometer
+      await _initializePedometer();
+
+      // Mark as initialized to ensure other services can access step data
+      isInitialized.value = true;
+
+      // Small delay to ensure pedometer has fired at least once
+      await Future.delayed(Duration(milliseconds: 1000));
+
+      // Now load active race sessions when step service is ready
+      await loadActiveRaceSessions();
+
+      // Start syncing (Firebase-first, DB as cache)
+      _startSyncTimer();
+
+      print('✅ StepTrackingService fully initialized and ready');
+      print(
+        '📊 Current state: Steps=${todaySteps.value}, Distance=${todayDistance.value}km, Tracking=${isTracking.value}',
+      );
+    } catch (e) {
+      print('❌ Error initializing step tracking: $e');
+      // Even on error, try to start pedometer to avoid complete failure
+      try {
+        await _initializePedometer();
+        isInitialized.value = true;
+      } catch (pedometerError) {
+        print('❌ Failed to start pedometer: $pedometerError');
+      }
+    }
+  }
+
+  /// ✅ NEW: Ensure service is fully initialized before starting race tracking
+  /// Waits up to 5 seconds for initialization to complete
+  Future<void> ensureInitialized() async {
+    if (isInitialized.value) {
+      print('✅ StepTrackingService already initialized');
+      return;
+    }
+
+    print('⏳ Waiting for StepTrackingService to initialize...');
+
+    // Wait for initialization with timeout
+    int attempts = 0;
+    while (!isInitialized.value && attempts < 50) {
+      await Future.delayed(Duration(milliseconds: 100));
+      attempts++;
+    }
+
+    if (isInitialized.value) {
+      print('✅ StepTrackingService initialized after ${attempts * 100}ms');
+    } else {
+      print('⚠️ StepTrackingService initialization timeout');
+    }
+  }
+
+  /// ✅ NEW: Force immediate pedometer sync to get current step count
+  /// Ensures accurate baseline before starting race tracking
+  Future<void> forcePedometerSync() async {
+    if (!isTracking.value) {
+      print('⚠️ Pedometer not tracking, cannot force sync');
+      return;
+    }
+
+    print('🔄 Forcing pedometer sync for race baseline...');
+
+    // Wait for next step count event (max 2 seconds)
+    final completer = Completer<void>();
+    int currentSteps = todaySteps.value;
+
+    Timer? timeout;
+    StreamSubscription? tempSubscription;
+
+    timeout = Timer(Duration(seconds: 2), () {
+      if (!completer.isCompleted) {
+        print(
+          '⏱️ Pedometer sync timeout, using current value: $currentSteps steps',
+        );
+        tempSubscription?.cancel();
+        completer.complete();
+      }
+    });
+
+    tempSubscription = todaySteps.listen((steps) {
+      if (!completer.isCompleted && steps > 0) {
+        print('✅ Pedometer synced: $steps steps');
+        timeout?.cancel();
+        tempSubscription?.cancel();
+        completer.complete();
+      }
+    });
+
+    await completer.future;
+    print('📊 Current step baseline: ${todaySteps.value} steps');
+  }
+
+  Future<void> _loadUserStepData() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        print('🔍 [FIREBASE_LOAD] Loading user data for: $userId');
+        print(
+          '📄 [FIREBASE_LOAD] Full document data keys: ${data.keys.toList()}',
+        );
+
+        // Load step tracking data
+        final stepTracking = data['step_tracking'] as Map<String, dynamic>?;
+        if (stepTracking != null) {
+          _deviceBaseline = stepTracking['device_baseline'] ?? 0;
+          _previousDaysTotal = stepTracking['previous_days_total'] ?? 0;
+          _lastDeviceReading = stepTracking['last_device_reading'] ?? 0;
+          _baselineInitialized = stepTracking['baseline_initialized'] ?? true; // ✅ Load baseline state (default true for existing users)
+
+          // Handle both Timestamp and String for install_date
+          final installDateValue = stepTracking['install_date'];
+          if (installDateValue is Timestamp) {
+            _installDate = installDateValue.toDate();
+          } else if (installDateValue is String) {
+            _installDate = DateTime.tryParse(installDateValue);
+          }
+
+          // Handle both Timestamp and String for last_sync
+          final lastSyncValue =
+              stepTracking['last_sync'] ?? stepTracking['last_sync_time'];
+          if (lastSyncValue is Timestamp) {
+            _lastSyncTime = lastSyncValue.toDate();
+          } else if (lastSyncValue is String) {
+            _lastSyncTime = DateTime.tryParse(lastSyncValue);
+          }
+
+          print('📊 Loaded baseline_initialized: $_baselineInitialized');
+        }
+
+        // Load overall stats
+        final overallStats = data['overall_stats'] as Map<String, dynamic>?;
+        final dailyStats = data['daily_stats'] as Map<String, dynamic>?;
+
+        // Count days from daily_stats nested map (clean structure)
+        final dailyStatsCount = dailyStats?.length ?? 1;
+
+        print(
+          '🔍 [OVERALL_STATS] Raw Firebase data for overall_stats: $overallStats',
+        );
+        print('🔍 [DAILY_STATS] Daily stats count: $dailyStatsCount days');
+
+        if (overallStats != null) {
+          final firebaseSteps = overallStats['total_steps'] ?? 0;
+          final firebaseDistance = (overallStats['total_distance'] ?? 0.0)
+              .toDouble();
+
+          print('📊 [OVERALL_STATS] Firebase values:');
+          print('   Steps: $firebaseSteps');
+          print('   Distance: $firebaseDistance');
+          print('   Days Active: $dailyStatsCount');
+
+          overallSteps.value = firebaseSteps;
+          overallDistance.value = firebaseDistance;
+          overallDays.value = dailyStatsCount;
+
+          print('✅ [OVERALL_STATS] Updated local observables:');
+          print('   overallSteps.value: ${overallSteps.value}');
+          print('   overallDistance.value: ${overallDistance.value}');
+          print('   overallDays.value: ${overallDays.value}');
+        } else {
+          // ✅ FIX: Calculate overall stats from daily_stats when overall_stats field is missing
+          print(
+            '⚠️ [OVERALL_STATS] No overall_stats found, calculating from daily_stats...',
+          );
+
+          int calculatedTotalSteps = 0;
+          double calculatedTotalDistance = 0.0;
+
+          // Sum all historical days from daily_stats
+          if (dailyStats != null) {
+            for (final entry in dailyStats.entries) {
+              final dayData = entry.value as Map<String, dynamic>?;
+              if (dayData != null) {
+                calculatedTotalSteps +=
+                    (dayData['steps'] as num?)?.toInt() ?? 0;
+                calculatedTotalDistance +=
+                    (dayData['distance'] as num?)?.toDouble() ?? 0.0;
+              }
+            }
+          }
+
+          overallSteps.value = calculatedTotalSteps;
+          overallDistance.value = calculatedTotalDistance;
+          overallDays.value = dailyStatsCount;
+
+          print('✅ [OVERALL_STATS] Calculated from daily_stats:');
+          print('   Total Steps: $calculatedTotalSteps');
+          print('   Total Distance: ${calculatedTotalDistance}km');
+          print('   Days Active: $dailyStatsCount');
+        }
+
+        // Load today's stats
+        await _loadTodayStats();
+
+        // Calculate today's baseline
+        await _calculateTodayBaseline();
+
+        // Calculate initial today steps from current device reading
+        await _calculateInitialTodaySteps();
+
+        // ✅ NEW: Validate baseline after loading data
+        // This catches issues like multi-device conflicts or corrupted baselines
+        await _validateAndCorrectBaseline();
+      } else {
+        // First time user - initialize
+        await _initializeNewUser();
+      }
+    } catch (e) {
+      print('Error loading user step data: $e');
+      // Initialize as new user on error
+      await _initializeNewUser();
+    }
+  }
+
+  Future<void> _initializeNewUser() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      print('📊 Initializing new user with deferred baseline setup...');
+
+      // ✅ CRITICAL FIX: Don't set baseline until AFTER permission is granted
+      // On iOS, pedometer returns 0 or times out before permission is granted
+      // We need the FIRST real reading after permission to set the baseline
+
+      // Stop any existing pedometer subscriptions
+      await _stepCountSubscription?.cancel();
+      await _pedestrianStatusSubscription?.cancel();
+
+      // ✅ Set baseline to -1 to indicate "not initialized yet"
+      _deviceBaseline = -1;
+      _todayDeviceBaseline = -1;
+      _previousDaysTotal = 0;
+      _lastDeviceReading = 0;
+      _installDate = DateTime.now();
+      _lastSyncTime = DateTime.now();
+      _baselineInitialized = false; // Mark baseline as not initialized
+
+      // Set initial UI values BEFORE pedometer starts
+      overallSteps.value = 0;
+      overallDistance.value = 0.0;
+      overallDays.value = 1;
+      todaySteps.value = 0;
+      todayDistance.value = 0.0;
+      todayCalories.value = 0;
+      todayActiveTime.value = 0;
+
+      print('✅ Initial values set - baseline will be set on first pedometer reading');
+      print('   This ensures only steps after installation are counted');
+
+      // ✅ Create initial Firebase doc with uninitialized baseline
+      await _createInitialFirebaseDoc();
+      _pendingSync = true;
+
+      // Save the uninitialized state to Firebase
+      try {
+        await _syncToFirebaseWithRetry(maxRetries: 3);
+        print('✅ Initial state saved to Firebase');
+      } catch (e) {
+        print('⚠️ Failed to save initial state after retries: $e');
+        print('   Will retry in background sync timer');
+        // Don't throw - allow pedometer to start
+      }
+
+      // ✅ NOW start pedometer - first reading will set the baseline
+      await _initializePedometer();
+      print('✅ Pedometer started - waiting for first reading to set baseline');
+    } catch (e) {
+      print('❌ Error initializing new user: $e');
+      // Even on error, try to start pedometer
+      try {
+        await _initializePedometer();
+      } catch (pedometerError) {
+        print('❌ Failed to start pedometer: $pedometerError');
+      }
+    }
+  }
+
+  /// Migrate local database data to Firebase (market standard: preserve user data)
+  Future<void> _migrateLocalDataToFirebase(String userId) async {
+    try {
+      print('🔄 Attempting to migrate local data to Firebase...');
+      final localHistory = await _databaseController.getAllStepHistory(
+        userId.hashCode.abs(),
+      );
+
+      if (localHistory.isEmpty) {
+        print('ℹ️ No local data to migrate');
+        return;
+      }
+
+      // Prepare migration data
+      Map<String, dynamic> dailyStats = {};
+      int totalSteps = 0;
+      double totalDistance = 0.0;
+
+      for (var day in localHistory) {
+        final dayKey = day.date.toIso8601String().split('T')[0];
+        dailyStats[dayKey] = {
+          'steps': day.steps,
+          'distance': day.distance,
+          'calories': day.calories.round(),
+          'active_time': day.activeTime,
+          'timestamp': day.date.toIso8601String(),
+        };
+        totalSteps += day.steps;
+        totalDistance += day.distance;
+      }
+
+      // Upload to Firebase with merge
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'daily_stats': dailyStats,
+        'overall_stats': {
+          'total_steps': totalSteps,
+          'total_distance': totalDistance,
+          'days_active': localHistory.length,
+          'last_updated': DateTime.now().toIso8601String(),
+        },
+      }, SetOptions(merge: true));
+
+      print('✅ Migrated ${localHistory.length} days of local data to Firebase');
+    } catch (e) {
+      print('⚠️ Failed to migrate local data (will retry later): $e');
+      // Don't throw - keep local data even if Firebase sync fails
+    }
+  }
+
+  Future<int> _getCurrentDeviceSteps() async {
+    final completer = Completer<int>();
+
+    // Get first pedometer reading
+    StreamSubscription? subscription;
+    subscription = Pedometer.stepCountStream.listen(
+      (StepCount event) {
+        subscription?.cancel();
+        completer.complete(event.steps);
+      },
+      onError: (error) {
+        subscription?.cancel();
+        completer.complete(0);
+      },
+    );
+
+    // Timeout after 5 seconds
+    return completer.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => 0,
+    );
+  }
+
+  /// ✅ NEW: Validate and correct baseline if corrupted
+  /// This is critical for handling edge cases like:
+  /// - Device with 30k+ cumulative steps
+  /// - Multi-device login scenarios
+  /// - Corrupted Firebase data
+  Future<void> _validateAndCorrectBaseline() async {
+    try {
+      // ✅ Skip validation if baseline not initialized yet (new user setup)
+      if (!_baselineInitialized) {
+        print('⏭️ Skipping baseline validation - baseline not initialized yet');
+        return;
+      }
+
+      print('🔍 Validating baseline integrity...');
+
+      final currentDeviceSteps = await _getCurrentDeviceSteps();
+      final todayString = _getTodayDateString();
+
+      // Check 1: Is baseline impossibly high? (>100k steps/day is impossible)
+      if (_todayDeviceBaseline > 100000) {
+        print(
+          '⚠️ Baseline too high ($_todayDeviceBaseline), resetting to current device steps',
+        );
+        _todayDeviceBaseline = currentDeviceSteps;
+        _deviceBaseline = currentDeviceSteps;
+        todaySteps.value = 0;
+        _pendingSync = true;
+      }
+
+      // Check 2: Is current < baseline? (device rebooted)
+      if (currentDeviceSteps < _todayDeviceBaseline) {
+        print(
+          '📱 Device reboot detected: current=$currentDeviceSteps < baseline=$_todayDeviceBaseline',
+        );
+        return; // _handleDeviceReboot handles everything
+      }
+
+      // Check 3: Is baseline from a different day?
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          final stepTracking = data['step_tracking'] as Map<String, dynamic>?;
+          final lastBaselineDate =
+              stepTracking?['last_baseline_date'] as String?;
+
+          if (lastBaselineDate != null && lastBaselineDate != todayString) {
+            print(
+              '📅 Baseline from old day ($lastBaselineDate), triggering day change',
+            );
+            await handleDayChange();
+            return; // handleDayChange resets everything
+          }
+        }
+      }
+
+      // Check 4: Unreasonable step count for today
+      final calculatedTodaySteps = currentDeviceSteps - _todayDeviceBaseline;
+      if (calculatedTodaySteps > 50000) {
+        print(
+          '⚠️ Unrealistic today steps ($calculatedTodaySteps), baseline likely wrong',
+        );
+        print(
+          '   Current device: $currentDeviceSteps, Baseline: $_todayDeviceBaseline',
+        );
+
+        // Reset baseline to current device steps
+        _todayDeviceBaseline = currentDeviceSteps;
+        todaySteps.value = 0;
+        _pendingSync = true;
+
+        print('✅ Reset baseline to $currentDeviceSteps, today steps to 0');
+      }
+
+      print('✅ Baseline validation complete');
+    } catch (e) {
+      print('❌ Error validating baseline: $e');
+      // Don't throw - allow app to continue with current values
+    }
+  }
+
+  /// ✅ NEW: Early baseline validation BEFORE pedometer starts
+  /// This prevents corrupted baselines from being used
+  Future<void> _validateAndCorrectBaselineEarly() async {
+    try {
+      // ✅ Skip validation if baseline not initialized yet (new user setup)
+      if (!_baselineInitialized) {
+        print('⏭️ [EARLY] Skipping baseline validation - baseline not initialized yet');
+        return;
+      }
+
+      print('🔍 [EARLY] Validating baseline before pedometer starts...');
+
+      final currentDeviceSteps = await _getCurrentDeviceSteps();
+      final todayString = _getTodayDateString();
+
+      bool baselineWasCorrected = false;
+
+      // Check 1: Is baseline impossibly high? (>100k steps/day is impossible)
+      if (_todayDeviceBaseline > 100000) {
+        print(
+          '⚠️ [EARLY] Baseline too high ($_todayDeviceBaseline), resetting to current device steps',
+        );
+        _todayDeviceBaseline = currentDeviceSteps;
+        _deviceBaseline = currentDeviceSteps;
+        todaySteps.value = 0;
+        baselineWasCorrected = true;
+      }
+
+      // Check 2: Is current < baseline? (device rebooted)
+      else if (currentDeviceSteps < _todayDeviceBaseline) {
+        print(
+          '📱 [EARLY] Device reboot detected: current=$currentDeviceSteps < baseline=$_todayDeviceBaseline',
+        );
+        // Reset baseline to current device reading
+        _todayDeviceBaseline = currentDeviceSteps;
+        _deviceBaseline = currentDeviceSteps;
+        _lastDeviceReading = currentDeviceSteps;
+        todaySteps.value = 0;
+        baselineWasCorrected = true;
+      }
+
+      // Check 3: Unreasonable step count for today
+      else if (_todayDeviceBaseline > 0) {
+        final calculatedTodaySteps = currentDeviceSteps - _todayDeviceBaseline;
+        if (calculatedTodaySteps > 50000) {
+          print(
+            '⚠️ [EARLY] Unrealistic today steps ($calculatedTodaySteps), baseline likely wrong',
+          );
+          print(
+            '   Current device: $currentDeviceSteps, Baseline: $_todayDeviceBaseline',
+          );
+
+          // Reset baseline to current device steps
+          _todayDeviceBaseline = currentDeviceSteps;
+          todaySteps.value = 0;
+          baselineWasCorrected = true;
+        }
+      }
+
+      // Check 4: Baseline date validation
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null && !baselineWasCorrected) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          final stepTracking = data['step_tracking'] as Map<String, dynamic>?;
+          final lastBaselineDate =
+              stepTracking?['last_baseline_date'] as String?;
+
+          if (lastBaselineDate != null && lastBaselineDate != todayString) {
+            print(
+              '📅 [EARLY] Baseline from old day ($lastBaselineDate vs $todayString)',
+            );
+            // This will be handled by handleDayChange() later in initialization
+            print('   Will be corrected by day change handler');
+          }
+        }
+      }
+
+      if (baselineWasCorrected) {
+        print('⚠️ [EARLY] Baseline was corrected, marking for immediate Firebase save');
+        _pendingSync = true;
+      } else {
+        print('✅ [EARLY] Baseline validation passed - no corrections needed');
+      }
+    } catch (e) {
+      print('❌ [EARLY] Error validating baseline: $e');
+      // Don't throw - allow initialization to continue
+    }
+  }
+
+  /// ✅ NEW: Ensure baseline is persisted to Firebase atomically with retry
+  /// This prevents baseline loss if app crashes during initialization
+  Future<void> _ensureBaselinePersistedToFirebase() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      print('⚠️ No user ID, skipping baseline persistence');
+      return;
+    }
+
+    try {
+      print('💾 Ensuring baseline is persisted to Firebase...');
+
+      // Check if baseline exists in Firebase
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      final todayString = _getTodayDateString();
+      bool needsSync = false;
+
+      if (!userDoc.exists) {
+        print('📝 No Firebase document exists, will create initial doc');
+        needsSync = true;
+      } else {
+        final data = userDoc.data()!;
+        final stepTracking = data['step_tracking'] as Map<String, dynamic>?;
+
+        if (stepTracking == null) {
+          print('📝 No step_tracking field, will create it');
+          needsSync = true;
+        } else {
+          // Verify critical baseline fields exist and are valid
+          final storedBaseline = stepTracking['today_baseline'];
+          final storedDate = stepTracking['last_baseline_date'];
+
+          if (storedBaseline == null || storedDate == null) {
+            print('📝 Missing baseline fields, will sync');
+            needsSync = true;
+          } else if (storedDate != todayString) {
+            print('📝 Baseline date mismatch ($storedDate vs $todayString), will sync');
+            needsSync = true;
+          } else if (storedBaseline != _todayDeviceBaseline) {
+            print(
+              '📝 Baseline value mismatch (Firebase: $storedBaseline, Local: $_todayDeviceBaseline), will sync',
+            );
+            needsSync = true;
+          } else {
+            print(
+              '✅ Baseline already persisted correctly (baseline: $_todayDeviceBaseline, date: $todayString)',
+            );
+          }
+        }
+      }
+
+      // Perform sync if needed with retry logic
+      if (needsSync) {
+        _pendingSync = true;
+        await _syncToFirebaseWithRetry(maxRetries: 3);
+      }
+    } catch (e) {
+      print('❌ Error ensuring baseline persistence: $e');
+      // Set pending sync to retry later
+      _pendingSync = true;
+    }
+  }
+
+  /// ✅ NEW: Sync to Firebase with retry logic and exponential backoff
+  /// Ensures critical baseline data is never lost
+  Future<void> _syncToFirebaseWithRetry({int maxRetries = 3}) async {
+    int attempt = 0;
+    Duration delay = Duration(milliseconds: 500);
+
+    while (attempt < maxRetries) {
+      try {
+        attempt++;
+        print('💾 Syncing to Firebase (attempt $attempt/$maxRetries)...');
+
+        await _syncToFirebase();
+
+        print('✅ Baseline successfully persisted to Firebase');
+        return; // Success!
+      } catch (e) {
+        print('❌ Sync attempt $attempt failed: $e');
+
+        if (attempt < maxRetries) {
+          print('⏳ Retrying in ${delay.inMilliseconds}ms...');
+          await Future.delayed(delay);
+          delay *= 2; // Exponential backoff
+        } else {
+          print('❌ All sync attempts failed, will retry in background');
+          _pendingSync = true; // Ensure it retries in the sync timer
+          rethrow;
+        }
+      }
+    }
+  }
+
+  Future<void> _createInitialFirebaseDoc() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    final initialData = {
+      'step_tracking': {
+        'install_date': _installDate!.toIso8601String(),
+        'device_baseline': _deviceBaseline,
+        'previous_days_total': _previousDaysTotal,
+        'last_device_reading': _lastDeviceReading,
+        'last_sync': _lastSyncTime!.toIso8601String(),
+        'today_baseline': _todayDeviceBaseline,
+      },
+      'overall_stats': {
+        'total_steps': 0,
+        'total_distance': 0.0,
+        'days_active': 1,
+        'last_updated': DateTime.now().toIso8601String(),
+      },
+      'daily_stats': {
+        _getTodayDateString(): {
+          'steps': 0,
+          'distance': 0.0,
+          'calories': 0,
+          'active_time': 0,
+          'last_updated': DateTime.now().toIso8601String(),
+        },
+      },
+    };
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .set(initialData, SetOptions(merge: true));
+  }
+
+  Future<void> _loadTodayStats() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final todayString = _getTodayDateString();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        final dailyStats = data['daily_stats'] as Map<String, dynamic>?;
+        final todayData = dailyStats?[todayString] as Map<String, dynamic>?;
+
+        if (todayData != null) {
+          todaySteps.value = todayData['steps'] ?? 0;
+          todayDistance.value = (todayData['distance'] ?? 0.0).toDouble();
+          todayCalories.value = todayData['calories'] ?? 0;
+          todayActiveTime.value =
+              todayData['active_time_minutes'] ?? todayData['active_time'] ?? 0;
+
+          print(
+            '📊 [TODAY_STATS] Loaded today\'s data: ${todaySteps.value} steps, ${todayDistance.value}km',
+          );
+        } else {
+          print('⚠️ [TODAY_STATS] No data found for today: $todayString');
+        }
+      }
+    } catch (e) {
+      print('Error loading today stats: $e');
+    }
+  }
+
+  Future<void> _calculateTodayBaseline() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        final stepTracking = data['step_tracking'] as Map<String, dynamic>?;
+
+        if (stepTracking != null) {
+          final storedBaseline =
+              stepTracking['today_baseline'] ?? _deviceBaseline;
+          final lastBaselineDate =
+              stepTracking['last_baseline_date'] as String?;
+          final todayString = _getTodayDateString();
+
+          // ✅ NEW: Validate baseline date
+          if (lastBaselineDate != null && lastBaselineDate != todayString) {
+            print(
+              '⚠️ Baseline from old day ($lastBaselineDate vs $todayString)',
+            );
+            print('   Triggering day change to recalculate baseline');
+            await handleDayChange();
+          } else {
+            _todayDeviceBaseline = storedBaseline;
+            print(
+              '✅ Loaded today baseline: $_todayDeviceBaseline (date: $lastBaselineDate)',
+            );
+
+            // ✅ SMART BASELINE RECALIBRATION ON LOGIN
+            // If baseline is 0 or unrealistic AND we have step history, recalibrate for current device
+            // This handles: login on new device, Android after reinstall, or device change
+            // if (_baselineInitialized && todaySteps.value > 0) {
+            //   // Get current device reading
+            //   final currentDeviceSteps = await _getCurrentDeviceSteps();
+            //
+            //   // Check if baseline needs recalibration
+            //   // Case 1: Baseline is 0 (fresh install/new device with existing account)
+            //   // Case 2: Baseline is unrealistic for current device (would give negative or huge steps)
+            //   final calculatedSteps = currentDeviceSteps - _todayDeviceBaseline;
+            //   final needsRecalibration =
+            //       _todayDeviceBaseline == 0 ||
+            //       calculatedSteps < 0 ||
+            //       calculatedSteps > 50000 ||
+            //       (calculatedSteps - todaySteps.value).abs() > 10000; // More than 10k difference
+            //
+            //   if (needsRecalibration) {
+            //     print('🔧 [SMART_BASELINE] Recalibrating baseline for current device:');
+            //     print('   Stored baseline: $_todayDeviceBaseline');
+            //     print('   Saved today steps: ${todaySteps.value}');
+            //     print('   Current device steps: $currentDeviceSteps');
+            //     print('   Calculated steps with old baseline: $calculatedSteps');
+            //
+            //     // Recalculate baseline to preserve step history on this device
+            //     // Formula: new_baseline = current_device_reading - saved_today_steps
+            //     final newBaseline = math.max(0, currentDeviceSteps - todaySteps.value);
+            //     _todayDeviceBaseline = newBaseline;
+            //     _deviceBaseline = newBaseline;
+            //     _lastDeviceReading = currentDeviceSteps;
+            //
+            //     print('   ✅ New baseline: $_todayDeviceBaseline');
+            //     print('   This preserves your ${todaySteps.value} steps while calibrating for this device');
+            //
+            //     // Mark for immediate sync to persist the corrected baseline
+            //     _pendingSync = true;
+            //   } else {
+            //     print('✅ [SMART_BASELINE] Baseline valid, no recalibration needed');
+            //   }
+            // }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error calculating today baseline: $e');
+    }
+  }
+
+  /// Calculate initial today steps from current device reading during initialization
+  Future<void> _calculateInitialTodaySteps() async {
+    try {
+      // ✅ CRITICAL FIX: Skip calculation if baseline not initialized yet
+      // This prevents incorrect calculations during new user setup
+      if (!_baselineInitialized) {
+        print('⏭️ Skipping initial step calculation - baseline not initialized yet');
+        return;
+      }
+
+      // Get current device steps
+      final currentDeviceSteps = await _getCurrentDeviceSteps();
+
+      if (currentDeviceSteps > 0 && _todayDeviceBaseline > 0) {
+        // Calculate today's steps using the same logic as _onStepCount
+        final calculatedTodaySteps = math.max(
+          0,
+          currentDeviceSteps - _todayDeviceBaseline,
+        );
+
+        // Update today steps if calculated value is greater than stored value
+        if (calculatedTodaySteps > todaySteps.value) {
+          todaySteps.value = calculatedTodaySteps;
+          todayDistance.value =
+              (calculatedTodaySteps * _averageStepLength / 1000);
+          todayCalories.value = (calculatedTodaySteps * _caloriesPerStep)
+              .round();
+
+          // Update overall steps as well
+          overallSteps.value = _previousDaysTotal + calculatedTodaySteps;
+          overallDistance.value =
+              (overallSteps.value * _averageStepLength / 1000);
+
+          _lastDeviceReading = currentDeviceSteps;
+
+          print(
+            '✅ Initial step calculation: Device=$currentDeviceSteps, Today=$calculatedTodaySteps, Overall=${overallSteps.value}',
+          );
+        }
+      }
+    } catch (e) {
+      print('Error calculating initial today steps: $e');
+    }
+  }
+
+  /// Handle day change detection and processing
+  /// This handles both single day changes and multiple missed days (when app was closed)
+  Future<void> handleDayChange() async {
+    try {
+      final lastSyncDate = _lastSyncTime?.toIso8601String().split('T')[0];
+      final todayDate = _getTodayDateString();
+
+      if (lastSyncDate != null && lastSyncDate != todayDate) {
+        print('🗓️ Day change detected: $lastSyncDate → $todayDate');
+
+        // Check if multiple days were missed (app was closed for multiple days)
+        final lastSync = DateTime.parse(lastSyncDate);
+        final today = DateTime.parse(todayDate);
+        final daysDifference = today.difference(lastSync).inDays;
+
+        if (daysDifference > 1) {
+          print('⚠️ Multiple days missed: $daysDifference days');
+          await _processMultipleMissedDays(lastSyncDate, daysDifference);
+        } else {
+          print('✅ Single day change: $lastSyncDate → $todayDate');
+          await _processDayChange(lastSyncDate);
+        }
+      } else {
+        print('📅 Same day: $todayDate (no day change processing needed)');
+      }
+    } catch (e) {
+      print('❌ Error handling day change: $e');
+    }
+  }
+
+  /// Process day change by updating baselines and preserving history
+  Future<void> _processDayChange(String previousDate) async {
+    try {
+      print(
+        '🔄 Processing day change from $previousDate to ${_getTodayDateString()}',
+      );
+
+      // Get yesterday's final step count
+      final yesterdaySteps = todaySteps.value;
+
+      // Update _previousDaysTotal to include yesterday's steps
+      _previousDaysTotal += yesterdaySteps;
+
+      // ✅ CRITICAL: Get FRESH device reading for today's baseline
+      // Don't use _lastDeviceReading which might be stale
+      final currentDeviceReading = await _getCurrentDeviceSteps();
+      print('📱 Fresh device reading for new day: $currentDeviceReading');
+
+      // Reset today's baseline to current device reading
+      _todayDeviceBaseline = currentDeviceReading;
+      _lastDeviceReading = currentDeviceReading;
+
+      // Reset today's counters
+      todaySteps.value = 0;
+      todayDistance.value = 0.0;
+      todayCalories.value = 0;
+      todayActiveTime.value = 0;
+
+      // Reset walking session tracking
+      _cumulativeActiveTimeSeconds = 0;
+      _walkingSessionStart = null;
+      _walkingSessionTimer?.cancel();
+
+      // Update overall steps to reflect the new baseline
+      overallSteps.value = _previousDaysTotal;
+      overallDistance.value = (overallSteps.value * _averageStepLength / 1000);
+
+      // Update days active
+      if (_installDate != null) {
+        final daysSinceInstall =
+            DateTime.now().difference(_installDate!).inDays + 1;
+        overallDays.value = daysSinceInstall;
+      }
+
+      print('✅ Day change processed:');
+      print('   Yesterday steps: $yesterdaySteps');
+      print('   Previous days total: $_previousDaysTotal');
+      print('   New today baseline: $_todayDeviceBaseline');
+      print('   Overall steps: ${overallSteps.value}');
+
+      // Save yesterday's data to local database before resetting
+      await _saveYesterdayDataToDatabase(yesterdaySteps, previousDate);
+
+      // Handle active race sessions - reset their baselines for the new day
+      await _handleRaceSessionsOnDayChange();
+
+      // Force immediate sync to Firebase
+      _pendingSync = true;
+      await _syncToFirebase();
+    } catch (e) {
+      print('❌ Error processing day change: $e');
+      rethrow;
+    }
+  }
+
+  /// Process multiple missed days (when app was closed overnight or for multiple days)
+  Future<void> _processMultipleMissedDays(
+    String lastSyncDate,
+    int daysMissed,
+  ) async {
+    try {
+      print('🔄 Processing $daysMissed missed days from $lastSyncDate');
+
+      // Load yesterday's final data from Firebase to preserve it
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          final dailyStats = data['daily_stats'] as Map<String, dynamic>?;
+
+          // Save each missed day with 0 steps (days when app was closed)
+          DateTime currentDate = DateTime.parse(lastSyncDate);
+          for (int i = 1; i < daysMissed; i++) {
+            currentDate = currentDate.add(Duration(days: 1));
+            final dateString = currentDate.toIso8601String().split('T')[0];
+
+            // Check if we have data for this missed day
+            final missedDayData =
+                dailyStats?[dateString] as Map<String, dynamic>?;
+            final missedDaySteps =
+                (missedDayData?['steps'] as num?)?.toInt() ?? 0;
+
+            print('📅 Missed day $dateString: $missedDaySteps steps');
+
+            // Add to previous days total
+            _previousDaysTotal += missedDaySteps;
+
+            // Save to local database
+            if (missedDaySteps > 0) {
+              await _saveYesterdayDataToDatabase(missedDaySteps, dateString);
+            }
+          }
+        }
+      }
+
+      // Now process today as a fresh day
+      // ✅ CRITICAL: Get FRESH device reading for today's baseline
+      final currentDeviceReading = await _getCurrentDeviceSteps();
+      print('📱 Fresh device reading after missed days: $currentDeviceReading');
+
+      // Reset today's baseline to current device reading
+      _todayDeviceBaseline = currentDeviceReading;
+      _lastDeviceReading = currentDeviceReading;
+
+      // Reset today's counters
+      todaySteps.value = 0;
+      todayDistance.value = 0.0;
+      todayCalories.value = 0;
+      todayActiveTime.value = 0;
+
+      // Reset walking session tracking
+      _cumulativeActiveTimeSeconds = 0;
+      _walkingSessionStart = null;
+      _walkingSessionTimer?.cancel();
+
+      // Update overall steps to reflect all missed days
+      overallSteps.value = _previousDaysTotal;
+      overallDistance.value = (overallSteps.value * _averageStepLength / 1000);
+
+      // Update days active
+      if (_installDate != null) {
+        final daysSinceInstall =
+            DateTime.now().difference(_installDate!).inDays + 1;
+        overallDays.value = daysSinceInstall;
+      }
+
+      print('✅ Multiple missed days processed:');
+      print('   Days missed: $daysMissed');
+      print('   Previous days total: $_previousDaysTotal');
+      print('   New today baseline: $_todayDeviceBaseline');
+      print('   Overall steps: ${overallSteps.value}');
+
+      // Handle active race sessions - they need to be checked for expiry
+      await _handleRaceSessionsAfterMultipleMissedDays(daysMissed);
+
+      // Force immediate sync to Firebase
+      _pendingSync = true;
+      await _syncToFirebase();
+    } catch (e) {
+      print('❌ Error processing multiple missed days: $e');
+      rethrow;
+    }
+  }
+
+  /// Handle race sessions when a single day change occurs
+  Future<void> _handleRaceSessionsOnDayChange() async {
+    if (activeRaceSessions.isEmpty) return;
+
+    try {
+      print('🏁 Handling race sessions for day change...');
+
+      final now = DateTime.now();
+      final updatedSessions = <String, RaceSession>{};
+      final sessionsToRemove = <String>[];
+
+      for (final entry in activeRaceSessions.entries) {
+        final raceId = entry.key;
+        final session = entry.value;
+
+        if (!session.isActive) continue;
+
+        // Check if race should still be active after day change
+        // Races older than 24 hours should be checked for completion
+        final raceAge = now.difference(session.startTime);
+        if (raceAge.inHours > 24) {
+          print('⚠️ Race $raceId is older than 24 hours, checking status...');
+          // Mark for removal - will be handled by race service
+          sessionsToRemove.add(raceId);
+          continue;
+        }
+
+        // Reset race baseline for the new day
+        // The race continues but we need to recalibrate based on new day's baseline
+        final updatedSession = session.copyWith(
+          stepsAtStart: 0, // Reset to 0 since today's steps reset
+          lastUpdated: now,
+          metadata: {
+            ...session.metadata ?? {},
+            'dayChangeRecalibration': {
+              'timestamp': now.toIso8601String(),
+              'previousStepsAtStart': session.stepsAtStart,
+              'previousRaceSteps': session.currentRaceSteps,
+              'reason': 'day_change_baseline_reset',
+            },
+          },
+        );
+
+        updatedSessions[raceId] = updatedSession;
+        print('✅ Recalibrated race $raceId for new day');
+      }
+
+      // Update active race sessions
+      activeRaceSessions.addAll(updatedSessions);
+
+      // Remove old races
+      for (final raceId in sessionsToRemove) {
+        activeRaceSessions.remove(raceId);
+        print('🗑️ Removed old race session: $raceId');
+      }
+
+      hasActiveRaces.value = activeRaceSessions.isNotEmpty;
+
+      // Sync updated sessions to Firebase
+      for (final entry in updatedSessions.entries) {
+        await _syncRaceSessionToFirebase(entry.key, entry.value);
+      }
+
+      print(
+        '✅ Race sessions handled for day change: ${updatedSessions.length} updated, ${sessionsToRemove.length} removed',
+      );
+    } catch (e) {
+      print('❌ Error handling race sessions on day change: $e');
+    }
+  }
+
+  /// Handle race sessions after multiple missed days
+  Future<void> _handleRaceSessionsAfterMultipleMissedDays(
+    int daysMissed,
+  ) async {
+    if (activeRaceSessions.isEmpty) return;
+
+    try {
+      print('🏁 Handling race sessions after $daysMissed missed days...');
+
+      final now = DateTime.now();
+      final sessionsToRemove = <String>[];
+
+      for (final entry in activeRaceSessions.entries) {
+        final raceId = entry.key;
+        final session = entry.value;
+
+        // All races that are more than a day old should be considered expired
+        // after multiple missed days (app was closed)
+        final raceAge = now.difference(session.startTime);
+        if (raceAge.inDays >= daysMissed || raceAge.inHours > 24) {
+          print(
+            '⏰ Race $raceId expired during missed days (age: ${raceAge.inHours}h)',
+          );
+
+          // Stop the race session
+          await stopRaceStepTracking(raceId, status: 'expired');
+          sessionsToRemove.add(raceId);
+        }
+      }
+
+      // Remove expired races
+      for (final raceId in sessionsToRemove) {
+        activeRaceSessions.remove(raceId);
+        print('🗑️ Removed expired race session: $raceId');
+      }
+
+      hasActiveRaces.value = activeRaceSessions.isNotEmpty;
+
+      print(
+        '✅ Race sessions cleaned up after missed days: ${sessionsToRemove.length} expired',
+      );
+    } catch (e) {
+      print('❌ Error handling race sessions after missed days: $e');
+    }
+  }
+
+  Future<void> _initializePedometer() async {
+    try {
+      // Platform-agnostic pedometer initialization
+      // On iOS: CoreMotion will show permission dialog automatically
+      // On Android: Uses built-in step counter sensor (no permission needed)
+      print('🏃 Initializing pedometer with native platform sensors...');
+
+      if (Platform.isIOS) {
+        print('📱 iOS: CoreMotion will prompt for Motion & Fitness permission if needed');
+      } else if (Platform.isAndroid) {
+        print('🤖 Android: Using built-in step counter sensor');
+      }
+
+      // Start pedometer streams
+      _stepCountSubscription = Pedometer.stepCountStream.listen(
+        _onStepCount,
+        onError: _onStepCountError,
+      );
+
+      _pedestrianStatusSubscription = Pedometer.pedestrianStatusStream.listen(
+        _onPedestrianStatusChanged,
+        onError: _onPedestrianStatusError,
+      );
+
+      isTracking.value = true;
+      print('✅ Pedometer initialized successfully');
+
+      if (Platform.isIOS) {
+        print(
+            'ℹ️  Note: Step counting only works on real iOS devices, not simulator');
+      }
+    } catch (e) {
+      print('❌ Error initializing pedometer: $e');
+      isTracking.value = false;
+    }
+  }
+
+  /// Calculate overall steps from database + today's steps
+  /// This is the single source of truth for overall steps
+  Future<int> _calculateOverallStepsFromDatabase() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return todaySteps.value;
+
+      final userIdHash = userId.hashCode.abs();
+
+      // Get all historical steps (excluding today to avoid stale database data)
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      final allHistory = await _databaseController.getStepHistoryByDateRange(
+        userId: userIdHash,
+        startDate: DateTime(2000, 1, 1), // Far past date to get all history
+        endDate: yesterday,
+      );
+
+      // Sum historical steps
+      final historicalSteps = allHistory.fold<int>(
+        0,
+        (sum, h) => sum + h.steps,
+      );
+
+      // Add today's real-time steps
+      return historicalSteps + todaySteps.value;
+    } catch (e) {
+      print('❌ Error calculating overall steps from database: $e');
+      // Fallback to old calculation to prevent crashes
+      return _previousDaysTotal + todaySteps.value;
+    }
+  }
+
+  /// Calculate overall days from database + today
+  /// This is the single source of truth for overall days
+  Future<int> _calculateOverallDaysFromDatabase() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return 1;
+
+      final userIdHash = userId.hashCode.abs();
+
+      // Get all historical steps
+      final allHistory = await _databaseController.getAllStepHistory(
+        userIdHash,
+      );
+
+      // Count unique days with steps > 0
+      final uniqueDaysWithSteps = allHistory.where((h) => h.steps > 0).length;
+
+      // Add today if today has steps
+      final todayCount = todaySteps.value > 0 ? 1 : 0;
+
+      return uniqueDaysWithSteps + todayCount;
+    } catch (e) {
+      print('❌ Error calculating overall days from database: $e');
+      // Fallback to current value to prevent crashes
+      return overallDays.value;
+    }
+  }
+
+  void _onStepCount(StepCount event) {
+    final deviceSteps = event.steps;
+    final now = DateTime.now();
+
+    // ✅ CRITICAL FIX: Handle first reading for new users
+    // If baseline is not initialized (-1), use this first reading as the baseline
+    if (!_baselineInitialized) {
+      print('🎯 First pedometer reading received: $deviceSteps steps');
+      print('   Setting this as baseline (steps before installation)');
+
+      _deviceBaseline = deviceSteps;
+      _todayDeviceBaseline = deviceSteps;
+      _lastDeviceReading = deviceSteps;
+      _baselineInitialized = true;
+
+      // Keep today steps at 0 - these are pre-installation steps
+      todaySteps.value = 0;
+      todayDistance.value = 0.0;
+      todayCalories.value = 0;
+
+      // Mark for immediate sync to persist the baseline
+      _pendingSync = true;
+      _syncToFirebase();
+
+      print('✅ Baseline initialized: $deviceSteps');
+      print('   Only NEW steps from now on will be counted');
+      return; // Don't count these steps
+    }
+
+    // // Handle device reboot detection
+    // if (deviceSteps < _lastDeviceReading) {
+    //   _handleDeviceReboot(deviceSteps);
+    //   return;
+    // }
+
+    // Calculate today's steps
+    final newTodaySteps = math.max(0, deviceSteps - _todayDeviceBaseline);
+    final stepDelta = newTodaySteps - todaySteps.value;
+
+    // ✅ Enhanced logging for debugging (only log if steps changed or every 10 events)
+    if (stepDelta != 0) {
+      print('🚶 [PEDOMETER] ${now.hour}:${now.minute}:${now.second} - NEW STEPS DETECTED!');
+      print('   Device steps: $deviceSteps');
+      print('   Today baseline: $_todayDeviceBaseline');
+      print('   Calculated today steps: $newTodaySteps');
+      print('   Previous today steps: ${todaySteps.value}');
+      print('   ✨ Step delta: +$stepDelta steps');
+    } else {
+      // Silent update - just log timestamp to confirm pedometer is active
+      print('🔄 [PEDOMETER] ${now.hour}:${now.minute}:${now.second} - Event received (no new steps: $newTodaySteps)');
+    }
+
+    // Update today's steps immediately
+    todaySteps.value = newTodaySteps;
+
+    // Calculate derived values for today
+    todayDistance.value = (newTodaySteps * _averageStepLength / 1000); // km
+    todayCalories.value = (newTodaySteps * _caloriesPerStep).round();
+
+    // Update last reading
+    _lastDeviceReading = deviceSteps;
+
+    // Update race steps if any races are active
+    _updateActiveRaceSteps(newTodaySteps);
+
+    // Mark for sync
+    _pendingSync = true;
+
+    // Calculate overall steps from database (async - don't block step counting)
+    // This is more accurate than using _previousDaysTotal which can accumulate errors
+    _calculateOverallStepsFromDatabase()
+        .then((overall) {
+          overallSteps.value = overall;
+          overallDistance.value = (overall * _averageStepLength / 1000); // km
+          if (stepDelta != 0) {
+            print('📊 Overall steps updated from DB: $overall');
+          }
+        })
+        .catchError((e) {
+          print('⚠️ Failed to update overall steps from DB: $e');
+        });
+
+    // Calculate overall days from database (async - don't block step counting)
+    _calculateOverallDaysFromDatabase()
+        .then((days) {
+          overallDays.value = days;
+          if (stepDelta != 0) {
+            print('📊 Overall days updated from DB: $days');
+          }
+        })
+        .catchError((e) {
+          print('⚠️ Failed to update overall days from DB: $e');
+        });
+
+    if (stepDelta != 0) {
+      print('✅ [PEDOMETER] Updated - Device: $deviceSteps, Today: $newTodaySteps');
+    }
+  }
+
+  // void _handleDeviceReboot(int currentDeviceSteps) {
+  //   print('Device reboot detected: $currentDeviceSteps < $_lastDeviceReading');
+  //
+  //   // Adjust baselines to preserve user progress
+  //   final todayStepsBeforeReboot = todaySteps.value;
+  //   _todayDeviceBaseline = currentDeviceSteps - todayStepsBeforeReboot;
+  //   _deviceBaseline = currentDeviceSteps - overallSteps.value;
+  //   _lastDeviceReading = currentDeviceSteps;
+  //
+  //   // Handle active race sessions during device reboot
+  //   _handleRaceSessionsOnDeviceReboot(
+  //     currentDeviceSteps,
+  //     todayStepsBeforeReboot,
+  //   );
+  //
+  //   // Mark for immediate sync
+  //   _pendingSync = true;
+  //   _syncToFirebase();
+  // }
+
+  /// Handle race sessions when device reboots
+  void _handleRaceSessionsOnDeviceReboot(
+    int newDeviceSteps,
+    int preservedTodaySteps,
+  ) {
+    if (activeRaceSessions.isEmpty) return;
+
+    print('🔄 Handling race sessions during device reboot...');
+
+    // Update race session baselines to account for device reboot
+    final updatedSessions = <String, RaceSession>{};
+
+    for (final entry in activeRaceSessions.entries) {
+      final raceId = entry.key;
+      final session = entry.value;
+
+      if (!session.isActive) continue;
+
+      // Calculate how many race steps were accumulated before reboot
+      final raceStepsBeforeReboot = session.currentRaceSteps;
+
+      // Update the session's stepsAtStart to account for the new device baseline
+      // The new baseline should preserve the race progress
+      final newStepsAtStart = newDeviceSteps - raceStepsBeforeReboot;
+
+      final updatedSession = session.copyWith(
+        stepsAtStart: newStepsAtStart,
+        lastUpdated: DateTime.now(),
+        metadata: {
+          ...session.metadata ?? {},
+          'deviceRebootHandled': DateTime.now().toIso8601String(),
+          'previousStepsAtStart': session.stepsAtStart,
+          'raceStepsPreserved': raceStepsBeforeReboot,
+        },
+      );
+
+      updatedSessions[raceId] = updatedSession;
+
+      print(
+        '📱 Race $raceId: Updated stepsAtStart from ${session.stepsAtStart} to $newStepsAtStart',
+      );
+      print('   Preserved race steps: $raceStepsBeforeReboot');
+
+      // Sync updated session to Firebase
+      _syncRaceSessionToFirebase(raceId, updatedSession);
+    }
+
+    // Update local race sessions
+    activeRaceSessions.addAll(updatedSessions);
+
+    print(
+      '✅ Updated ${updatedSessions.length} race sessions for device reboot',
+    );
+  }
+
+  void _onPedestrianStatusChanged(PedestrianStatus event) {
+    final previousStatus = pedestrianStatus.value;
+    pedestrianStatus.value = event.status;
+
+    print('🚶 Pedestrian status changed: $previousStatus → ${event.status}');
+
+    // Start walking session timer
+    if (event.status == 'walking' && previousStatus != 'walking') {
+      _startWalkingSession();
+    }
+
+    // Stop walking session timer
+    if (event.status == 'stopped' && previousStatus == 'walking') {
+      _stopWalkingSession();
+    }
+
+    // Update active time continuously while walking
+    if (event.status == 'walking') {
+      _updateActiveTime();
+    }
+  }
+
+  void _onStepCountError(dynamic error) {
+    print('❌ Step count error: $error');
+
+    if (error is PlatformException) {
+      if (Platform.isIOS && error.code == '3') {
+        print('ℹ️  Step counting is not available (likely running on iOS Simulator)');
+        print('ℹ️  Motion & Fitness permission dialog only appears on real iOS devices');
+      } else if (Platform.isAndroid) {
+        print('ℹ️  Android step counter error - check device compatibility');
+        print('ℹ️  Some emulators and older devices may not support step counting');
+      }
+    }
+
+    isTracking.value = false;
+  }
+
+  void _onPedestrianStatusError(dynamic error) {
+    print('⚠️ Pedestrian status error: $error');
+
+    if (error is PlatformException) {
+      if (Platform.isIOS && error.code == '2') {
+        print('ℹ️  Pedometer detection is not available (likely running on iOS Simulator)');
+      } else if (Platform.isAndroid) {
+        print('ℹ️  Android pedestrian detection not available - this is normal');
+      }
+    }
+  }
+
+  void _updateActiveTime() {
+    // Use actual walking session duration if available
+    if (_walkingSessionStart != null && pedestrianStatus.value == 'walking') {
+      final sessionDuration = DateTime.now().difference(_walkingSessionStart!);
+      final totalSeconds = _cumulativeActiveTimeSeconds + sessionDuration.inSeconds;
+      todayActiveTime.value = (totalSeconds / 60).round();
+    } else {
+      // Fallback to step-based estimation only if no session data
+      todayActiveTime.value = (todaySteps.value / 100).round();
+    }
+  }
+
+  void _startWalkingSession() {
+    print('🟢 Walking session started');
+    _walkingSessionStart = DateTime.now();
+
+    // Update active time every second while walking
+    _walkingSessionTimer?.cancel();
+    _walkingSessionTimer = Timer.periodic(Duration(seconds: 1), (_) {
+      if (pedestrianStatus.value == 'walking') {
+        _updateActiveTime();
+      }
+    });
+  }
+
+  void _stopWalkingSession() {
+    print('🔴 Walking session stopped');
+
+    // Add session duration to cumulative total
+    if (_walkingSessionStart != null) {
+      final sessionDuration = DateTime.now().difference(_walkingSessionStart!);
+      _cumulativeActiveTimeSeconds += sessionDuration.inSeconds;
+      print('   Session duration: ${sessionDuration.inSeconds}s');
+      print('   Cumulative active time: ${_cumulativeActiveTimeSeconds}s');
+    }
+
+    _walkingSessionStart = null;
+    _walkingSessionTimer?.cancel();
+
+    // Final update to reflect total active time
+    _updateActiveTime();
+  }
+
+  void _startSyncTimer() {
+    _syncTimer = Timer.periodic(const Duration(seconds: _syncIntervalSeconds), (
+      timer,
+    ) {
+      if (_pendingSync) {
+        _syncToFirebase();
+      }
+    });
+  }
+
+  /// Force immediate sync to Firebase (for background operations)
+  Future<void> forceSyncToFirebase() async {
+    if (!isInitialized.value) {
+      print('Step tracking service not initialized, skipping sync');
+      return;
+    }
+
+    try {
+      // Add multiple layers of protection
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        print('No authenticated user, skipping sync');
+        return;
+      }
+
+      // Check network connectivity before attempting sync
+      if (!await _hasNetworkConnection()) {
+        print('No network connection, skipping sync');
+        return;
+      }
+
+      await _syncToFirebase();
+      print('Force sync completed successfully');
+    } catch (e) {
+      print('Force sync failed: $e');
+
+      // Log more details for debugging but don't crash
+      if (e.toString().contains('permission-denied')) {
+        print('Firebase permission denied - check security rules');
+      } else if (e.toString().contains('network')) {
+        print('Network error during sync - will retry later');
+      } else if (e.toString().contains('quota')) {
+        print('Firebase quota exceeded - reducing sync frequency');
+      } else {
+        print('Unexpected sync error: ${e.runtimeType}');
+      }
+
+      // Don't rethrow - let the app continue
+    }
+  }
+
+  /// Simple network connectivity check
+  Future<bool> _hasNetworkConnection() async {
+    try {
+      // Simple check - if we can create a FirebaseFirestore instance, we likely have network
+      FirebaseFirestore.instance.settings;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// ✅ OPTIMIZED: Sync all active race sessions using Firestore batch (99% fewer writes)
+  /// Batches all race updates into a SINGLE Firestore write operation
+  Future<void> syncAllActiveRaceSessions() async {
+    if (activeRaceSessions.isEmpty) return;
+
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      // ✅ NEW: Use Firestore batch for all races (single write instead of N writes)
+      final batch = _firestore.batch();
+      int updateCount = 0;
+
+      for (final entry in activeRaceSessions.entries) {
+        final raceId = entry.key;
+        final session = entry.value;
+
+        if (!session.isActive) continue;
+
+        // Calculate distance and calories for the race
+        final distanceKm =
+            session.currentRaceSteps * _averageStepLength / 1000.0;
+        final calories = (session.currentRaceSteps * _caloriesPerStep).round();
+
+        // Calculate average speed
+        final elapsedHours =
+            DateTime.now().difference(session.startTime).inMilliseconds /
+            (1000 * 60 * 60);
+        final avgSpeed = elapsedHours > 0 ? distanceKm / elapsedHours : 0.0;
+
+        // ✅ NEW: Add to batch instead of individual write
+        final participantRef = _firestore
+            .collection('races')
+            .doc(raceId)
+            .collection('participants')
+            .doc(userId);
+
+        batch.update(participantRef, {
+          'distance': distanceKm,
+          'steps': session.currentRaceSteps,
+          'calories': calories,
+          'avgSpeed': avgSpeed,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        updateCount++;
+      }
+
+      // ✅ NEW: Single batch commit for ALL races (was: N individual writes)
+      if (updateCount > 0) {
+        final now = DateTime.now();
+
+        // ✅ DEBOUNCE: Don't sync more than once per 2 seconds for the same race set
+        // Check if any race was synced recently
+        bool shouldSkipDueToDebounce = false;
+        for (final raceId in activeRaceSessions.keys) {
+          final lastSyncTime = _lastRaceSyncTime[raceId];
+          if (lastSyncTime != null &&
+              now.difference(lastSyncTime).inSeconds < 2) {
+            shouldSkipDueToDebounce = true;
+            print(
+              '⏭️ Skipping sync - debounced (${now.difference(lastSyncTime).inSeconds}s since last sync)',
+            );
+            break;
+          }
+        }
+
+        if (!shouldSkipDueToDebounce) {
+          await batch.commit();
+
+          // Update last sync time for all races
+          for (final raceId in activeRaceSessions.keys) {
+            _lastRaceSyncTime[raceId] = now;
+          }
+
+          print('✅ Batched $updateCount race updates in single Firebase write');
+        }
+      }
+    } catch (e) {
+      print('❌ Error syncing active race sessions: $e');
+      // Don't throw - allow main sync to continue
+    }
+  }
+
+  Future<void> _syncToFirebase() async {
+    // Sync active race sessions whenever home screen data syncs
+    await syncAllActiveRaceSessions();
+    if (!_pendingSync) return;
+
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      print('No user ID available for sync');
+      return;
+    }
+
+    try {
+      final now = DateTime.now();
+      final todayString = _getTodayDateString();
+
+      // ✅ FIREBASE-FIRST ARCHITECTURE
+      // Firebase is the single source of truth
+      // Local DB is used only for offline caching and quick reads
+      final updateData = {
+        'step_tracking': {
+          'device_baseline': _deviceBaseline,
+          'last_device_reading': _lastDeviceReading,
+          'last_sync': now.toIso8601String(),
+          'today_baseline': _todayDeviceBaseline,
+          'last_baseline_date': todayString,
+          'baseline_initialized': _baselineInitialized, // ✅ NEW: Track baseline state
+        },
+        // Store only daily_stats (best practice: single source of truth)
+        // Overall stats calculated from: SUM(daily_stats) + today's real-time data
+        'daily_stats': {
+          todayString: {
+            'steps': todaySteps.value,
+            'distance': todayDistance.value,
+            'calories': todayCalories.value,
+            'active_time': todayActiveTime.value,
+            'baseline_used': _todayDeviceBaseline,
+            'last_updated': now.toIso8601String(),
+          },
+        },
+      };
+
+      // ✅ STEP 1: Save to Firebase FIRST (source of truth)
+      // This is critical - Firebase must succeed before DB
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .set(updateData, SetOptions(merge: true));
+
+      print('✅ Data synced to Firebase (source of truth)');
+
+      // ✅ STEP 2: Update local DB cache asynchronously (non-blocking)
+      // Don't wait for this - it's just a cache for offline reads
+      // If it fails, Firebase still has the data
+      _syncToLocalDatabaseAsync(userId, now);
+
+      // Cleanup old top-level daily_stats fields (one-time migration only)
+      if (!_hasRunCleanup) {
+        final didMigrate = await _cleanupOldDailyStatsFields(userId);
+        _hasRunCleanup = true; // Mark cleanup as completed
+
+        // If we migrated data, reload the stats to reflect the changes
+        if (didMigrate) {
+          print('🔄 Reloading stats after migration...');
+          await _loadUserStepData();
+        }
+      }
+
+      _pendingSync = false;
+      _lastSyncTime = now;
+
+      print('✅ Firebase sync completed successfully');
+    } catch (e) {
+      print('❌ Error syncing to Firebase: $e');
+      // Keep pending sync flag to retry
+      _pendingSync = true;
+    }
+  }
+
+  /// ✅ NEW: Async local database sync (non-blocking cache update)
+  /// Firebase is source of truth, DB is just a cache for offline reads
+  void _syncToLocalDatabaseAsync(String userId, DateTime now) {
+    // Run asynchronously without waiting - don't block Firebase sync
+    Future.microtask(() async {
+      try {
+        await _syncToLocalDatabase(userId, now);
+        print('📱 Local DB cache updated successfully');
+      } catch (e) {
+        print('⚠️ Local DB cache update failed (non-critical): $e');
+        // Don't retry - Firebase has the data, DB will sync next time
+      }
+    });
+  }
+
+  /// Sync step data to local SQLite database (cache only, non-blocking)
+  Future<void> _syncToLocalDatabase(String userId, DateTime now) async {
+    try {
+      // Convert Firebase UID to integer hash for database compatibility
+      final userIdHash = userId.hashCode.abs();
+
+      // Create StepMetrics object for today
+      final stepMetrics = StepMetrics(
+        userId: userIdHash,
+        date: now,
+        steps: todaySteps.value,
+        calories: todayCalories.value.toDouble(),
+        distance: todayDistance.value,
+        avgSpeed: averageSpeed,
+        activeTime: todayActiveTime.value,
+        duration: _formatDuration(todayActiveTime.value),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      // Update daily step metrics in database
+      await _databaseController.insertOrUpdateDailyStepMetrics(stepMetrics);
+
+      // Create step history record
+      final stepHistory = StepHistory.fromStepMetrics(stepMetrics);
+      await _databaseController.insertStepHistory(stepHistory);
+
+      // Update overall stats if needed (not every sync to avoid accumulation bug)
+      final shouldUpdateOverallStats =
+          _lastSyncTime == null ||
+          now.difference(_lastSyncTime!).inMinutes >
+              5; // Update every 5 minutes max
+
+      if (shouldUpdateOverallStats) {
+        await _databaseController.updateDailyStepDataAndSync(
+          userId: userIdHash,
+          date: now,
+          steps: todaySteps.value,
+          distance: todayDistance.value,
+          calories: todayCalories.value.toDouble(),
+          activeTime: todayActiveTime.value,
+          avgSpeed: averageSpeed,
+          updateOverallStats: true,
+        );
+      }
+
+      print('📊 Local DB cache synced');
+    } catch (e) {
+      print('❌ Error syncing to local database cache: $e');
+      // Don't rethrow - database is just a cache, Firebase has the data
+    }
+  }
+
+  /// Format active time in minutes to HH:mm format
+  String _formatDuration(int activeTimeMinutes) {
+    final hours = activeTimeMinutes ~/ 60;
+    final minutes = activeTimeMinutes % 60;
+    return "${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}";
+  }
+
+  /// Get current average speed (calculated based on distance and time)
+  double get averageSpeed {
+    if (todayActiveTime.value > 0) {
+      final hours = todayActiveTime.value / 60.0;
+      return todayDistance.value / hours;
+    }
+    return 0.0;
+  }
+
+  /// Save yesterday's final data to local database before day change
+  Future<void> _saveYesterdayDataToDatabase(
+    int yesterdaySteps,
+    String previousDateString,
+  ) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      final userIdHash = userId.hashCode.abs();
+      final yesterdayDate = DateTime.parse(previousDateString);
+
+      // Calculate yesterday's metrics based on final step count
+      final yesterdayDistance = yesterdaySteps * _averageStepLength / 1000;
+      final yesterdayCalories = (yesterdaySteps * _caloriesPerStep).round();
+
+      // Create StepMetrics for yesterday
+      final stepMetrics = StepMetrics(
+        userId: userIdHash,
+        date: yesterdayDate,
+        steps: yesterdaySteps,
+        calories: yesterdayCalories.toDouble(),
+        distance: yesterdayDistance,
+        avgSpeed: 0.0, // We don't have yesterday's time data
+        activeTime: 0, // We don't have yesterday's time data
+        duration: "00:00",
+        createdAt: yesterdayDate,
+        updatedAt: DateTime.now(),
+      );
+
+      // Save yesterday's data to step history
+      final stepHistory = StepHistory.fromStepMetrics(stepMetrics);
+      await _databaseController.insertStepHistory(stepHistory);
+
+      print(
+        '✅ Saved yesterday ($previousDateString) data: $yesterdaySteps steps',
+      );
+    } catch (e) {
+      print('❌ Error saving yesterday data to database: $e');
+      // Don't rethrow - day change should continue
+    }
+  }
+
+  Future<void> resetTodayStats() async {
+    // For testing or daily reset functionality
+    final currentDeviceSteps = _lastDeviceReading;
+    _todayDeviceBaseline = currentDeviceSteps;
+    _previousDaysTotal = overallSteps.value;
+
+    todaySteps.value = 0;
+    todayDistance.value = 0.0;
+    todayCalories.value = 0;
+    todayActiveTime.value = 0;
+
+    // Reset walking session tracking
+    _cumulativeActiveTimeSeconds = 0;
+    _walkingSessionStart = null;
+    _walkingSessionTimer?.cancel();
+
+    _pendingSync = true;
+    await _syncToFirebase();
+  }
+
+  String _getTodayDateString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Migrate historical data from Firebase to local database
+  Future<void> migrateHistoricalDataToDatabase() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        print('❌ No user ID available for migration');
+        return;
+      }
+
+      final userIdHash = userId.hashCode.abs();
+      print('🔄 Starting historical data migration for user: $userId');
+
+      // Get user document from Firebase
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        print('⚠️ No user document found in Firebase');
+        return;
+      }
+
+      final data = userDoc.data()!;
+      final dailyStats = data['daily_stats'] as Map<String, dynamic>?;
+
+      if (dailyStats == null || dailyStats.isEmpty) {
+        print('⚠️ No daily_stats found in Firebase');
+        return;
+      }
+
+      print('🔍 [MIGRATION] Found ${dailyStats.length} days to migrate');
+
+      int migratedCount = 0;
+      int skippedCount = 0;
+
+      // Migrate each day's data from nested map
+      for (final entry in dailyStats.entries) {
+        try {
+          final dateString = entry.key;
+          final dayData = entry.value;
+
+          // Skip today's data (it's handled by real-time sync)
+          if (dateString == _getTodayDateString()) {
+            print(
+              '⏭️ Skipping $dateString (today - handled by real-time sync)',
+            );
+            skippedCount++;
+            continue;
+          }
+
+          // Parse date
+          final date = DateTime.parse(dateString);
+
+          // Check if this date already exists in local database
+          final existingHistory = await _databaseController
+              .getStepHistoryByDateRange(
+                userId: userIdHash,
+                startDate: date,
+                endDate: date,
+              );
+
+          if (existingHistory.isNotEmpty) {
+            print('⏭️ Skipping $dateString (already exists in database)');
+            skippedCount++;
+            continue;
+          }
+
+          // Create StepMetrics from Firebase data
+          final stepMetrics = StepMetrics(
+            userId: userIdHash,
+            date: date,
+            steps: dayData['steps'] ?? 0,
+            calories: (dayData['calories'] ?? 0).toDouble(),
+            distance: (dayData['distance'] ?? 0.0).toDouble(),
+            avgSpeed: 0.0, // Not available in historical data
+            activeTime: dayData['active_time'] ?? 0,
+            duration: _formatDuration(dayData['active_time'] ?? 0),
+            createdAt: date,
+            updatedAt: DateTime.now(),
+          );
+
+          // Insert into local database
+          await _databaseController.insertOrUpdateDailyStepMetrics(stepMetrics);
+
+          // Create step history record
+          final stepHistory = StepHistory.fromStepMetrics(stepMetrics);
+          await _databaseController.insertStepHistory(stepHistory);
+
+          migratedCount++;
+          print('✅ Migrated $dateString: ${stepMetrics.steps} steps');
+        } catch (e) {
+          print('❌ Error migrating date ${entry.key}: $e');
+        }
+      }
+
+      // Update overall stats to match Firebase data
+      final overallStats = data['overall_stats'] as Map<String, dynamic>?;
+      if (overallStats != null) {
+        final userOverallStats = UserOverallStats(
+          userId: userIdHash,
+          firstInstallDate: _installDate ?? DateTime.now(),
+          totalDays: overallStats['days_active'] ?? 1,
+          totalSteps: overallStats['total_steps'] ?? 0,
+          totalDistance: (overallStats['total_distance'] ?? 0.0).toDouble(),
+          totalCalories: 0.0, // Not available in Firebase data
+          avgSpeed: 0.0, // Not available in Firebase data
+          lastUpdated: DateTime.now(),
+        );
+
+        await _databaseController.insertOrUpdateUserOverallStats(
+          userOverallStats,
+        );
+        print('✅ Updated overall stats in database');
+      }
+
+      print(
+        '🎉 Migration completed: $migratedCount days migrated, $skippedCount skipped',
+      );
+    } catch (e) {
+      print('❌ Error during historical data migration: $e');
+      rethrow;
+    }
+  }
+
+  /// Check for migration needs and perform it automatically
+  Future<void> _checkAndPerformMigration() async {
+    try {
+      // First check if local database has stale data (Firebase is empty but local DB has old data)
+      final hasStaleData = await _hasStaleLocalData();
+      if (hasStaleData) {
+        print(
+          '🗑️ Detected stale local data (Firebase empty but local DB has data)',
+        );
+        print('🧹 Clearing local database to sync with Firebase state...');
+        await _databaseController.deleteDatabase();
+        print('✅ Stale local data cleared successfully');
+        return; // No need to migrate if we just cleared the database
+      }
+
+      // Check if migration is needed (Firebase has data but local DB doesn't)
+      final needsMigration = await needsHistoricalDataMigration();
+      if (needsMigration) {
+        print('🔄 Historical data migration needed, starting...');
+        await migrateHistoricalDataToDatabase();
+        print('✅ Historical data migration completed');
+      } else {
+        print('ℹ️ No historical data migration needed');
+      }
+    } catch (e) {
+      print('❌ Error during migration check/execution: $e');
+      // Don't rethrow - app should continue even if migration fails
+    }
+  }
+
+  /// Check if local database has stale data (Firebase is empty but local DB has old data)
+  Future<bool> _hasStaleLocalData() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return false;
+
+      final userIdHash = userId.hashCode.abs();
+
+      // Check if local database has any data
+      final last30DaysHistory = await _databaseController.getLast30DaysStats(
+        userIdHash,
+      );
+      final localDaysCount = last30DaysHistory['totalDays'] ?? 0;
+
+      // If local DB has no data, no stale data issue
+      if (localDaysCount == 0) return false;
+
+      // Check Firebase state
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        // Firebase doesn't exist but local DB has data = stale data
+        print('⚠️ Firebase: no document | Local DB: $localDaysCount days');
+        return true;
+      }
+
+      final data = userDoc.data()!;
+      final dailyStats = data['daily_stats'] as Map<String, dynamic>?;
+      final firebaseDaysCount = dailyStats?.length ?? 0;
+
+      // If Firebase has only 1 day (today) but local DB has multiple days = stale data
+      if (firebaseDaysCount == 1 && localDaysCount > 1) {
+        print(
+          '⚠️ Firebase: $firebaseDaysCount day | Local DB: $localDaysCount days (mismatch)',
+        );
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      print('❌ Error checking for stale local data: $e');
+      return false;
+    }
+  }
+
+  /// Check if historical data migration is needed
+  Future<bool> needsHistoricalDataMigration() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return false;
+
+      final userIdHash = userId.hashCode.abs();
+
+      // Check if there's any step history in local database
+      final last30DaysHistory = await _databaseController.getLast30DaysStats(
+        userIdHash,
+      );
+
+      // If no local history, check if Firebase has data
+      if ((last30DaysHistory['totalDays'] ?? 0) < 2) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          final dailyStats = data['daily_stats'] as Map<String, dynamic>?;
+          final dailyStatsCount = dailyStats?.length ?? 0;
+
+          print(
+            '🔍 [MIGRATION_CHECK] Firebase daily_stats count: $dailyStatsCount',
+          );
+          print(
+            '🔍 [MIGRATION_CHECK] Local database has ${last30DaysHistory['totalDays'] ?? 0} days',
+          );
+
+          // Return true if Firebase has multiple days of data but local database doesn't
+          return dailyStatsCount > 1;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      print('❌ Error checking migration need: $e');
+      return false;
+    }
+  }
+
+  /// Clean up old top-level daily_stats fields (legacy structure)
+  /// This migrates data from top-level fields to nested structure, then deletes old fields
+  /// Returns true if data was migrated, false otherwise
+  Future<bool> _cleanupOldDailyStatsFields(String userId) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) return false;
+
+      final data = userDoc.data()!;
+
+      // Find all top-level daily_stats fields
+      final oldFields = data.keys
+          .where((key) => key.toString().startsWith('daily_stats.'))
+          .toList();
+
+      if (oldFields.isEmpty) {
+        print('✅ No old daily_stats fields to clean up');
+        return false;
+      }
+
+      print(
+        '🧹 Migrating and cleaning up ${oldFields.length} old daily_stats fields',
+      );
+
+      // Get existing nested daily_stats
+      final existingDailyStats =
+          data['daily_stats'] as Map<String, dynamic>? ?? {};
+      final updatedDailyStats = Map<String, dynamic>.from(existingDailyStats);
+
+      bool didMigrate = false;
+
+      // Migrate data from top-level fields to nested structure
+      for (final field in oldFields) {
+        final dateString = field.toString().substring('daily_stats.'.length);
+        final dayData = data[field] as Map<String, dynamic>?;
+
+        if (dayData != null && !updatedDailyStats.containsKey(dateString)) {
+          updatedDailyStats[dateString] = dayData;
+          print('   Migrated $dateString to nested structure');
+          didMigrate = true;
+        }
+      }
+
+      // Create update data: update nested map and delete old fields
+      final Map<String, dynamic> updateData = {
+        'daily_stats': updatedDailyStats,
+      };
+
+      for (final field in oldFields) {
+        updateData[field] = FieldValue.delete();
+      }
+
+      // Apply updates
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update(updateData);
+
+      print(
+        '✅ Successfully migrated ${oldFields.length} days and cleaned up old fields',
+      );
+      return didMigrate;
+    } catch (e) {
+      print('⚠️ Error cleaning up old fields: $e');
+      return false;
+    }
+  }
+
+  // Method to initialize user step tracking (call after profile creation)
+  static Future<void> initializeUserStepTracking() async {
+    try {
+      if (Get.isRegistered<StepTrackingService>()) {
+        final service = Get.find<StepTrackingService>();
+        await service._initializeStepTracking();
+      } else {
+        // Register as permanent singleton if not already registered
+        final service = Get.put(StepTrackingService(), permanent: true);
+        await service._initializeStepTracking();
+      }
+    } catch (e) {
+      print('Error in initializeUserStepTracking: $e');
+    }
+  }
+
+  // Method to manually trigger initialization for new users
+  static Future<void> createNewUserProfile() async {
+    try {
+      final service = Get.isRegistered<StepTrackingService>()
+          ? Get.find<StepTrackingService>()
+          : Get.put(StepTrackingService(), permanent: true);
+
+      await service._initializeNewUser();
+      print('New user step tracking profile created');
+    } catch (e) {
+      print('Error creating new user profile: $e');
+    }
+  }
+
+  // ================== RACE SESSION TRACKING METHODS ==================
+
+  /// Start tracking steps for a specific race
+  Future<String?> startRaceStepTracking(String raceId) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        print('❌ No authenticated user for race step tracking');
+        return null;
+      }
+
+      // Check if we're already tracking this race
+      if (activeRaceSessions.containsKey(raceId)) {
+        print('🔍 Race already tracked - validating session health...');
+
+        // Validate and recalibrate if needed
+        final isHealthy = await _validateAndRecalibrateRaceSessionById(raceId);
+
+        if (isHealthy) {
+          print('✅ Race session validated and recalibrated');
+          return raceId;
+        } else {
+          print('⚠️ Race session unhealthy - resetting...');
+          activeRaceSessions.remove(raceId);
+          // Fall through to create new session
+        }
+      }
+
+      // Wait for step service to be ready
+      await _waitForStepServiceReady();
+
+      final currentTodaySteps = todaySteps.value;
+      final now = DateTime.now();
+
+      print('🏁 Starting race step tracking for $raceId');
+      print('   Current today steps: $currentTodaySteps');
+
+      // Set baseline before first race if this is the first race today
+      if (_todayStepsBeforeFirstRace == null) {
+        _todayStepsBeforeFirstRace = currentTodaySteps;
+        todayBaselineBeforeFirstRace.value = currentTodaySteps;
+        print('🏁 Set today baseline before first race: $currentTodaySteps');
+      }
+
+      // Check if there's an existing race session in Firebase
+      final existingSessionDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('race_sessions')
+          .doc(raceId)
+          .get();
+
+      RaceSession raceSession;
+
+      if (existingSessionDoc.exists) {
+        // Restore existing session
+        raceSession = RaceSession.fromFirestore(existingSessionDoc);
+        print('📋 Restored existing race session from Firebase');
+        print('   Steps at start: ${raceSession.stepsAtStart}');
+        print('   Current race steps: ${raceSession.currentRaceSteps}');
+
+        // Update the session to be active
+        raceSession = raceSession.copyWith(
+          isActive: true,
+          status: 'active',
+          lastUpdated: now,
+        );
+      } else {
+        // Create new race session
+        raceSession = RaceSession(
+          raceId: raceId,
+          userId: userId,
+          startTime: now,
+          stepsAtStart: currentTodaySteps,
+          currentRaceSteps: 0,
+          lastUpdated: now,
+          isActive: true,
+          status: 'active',
+          metadata: {
+            'todayStepsWhenStarted': currentTodaySteps,
+            'deviceReadingWhenStarted': _lastDeviceReading,
+          },
+        );
+        print('🆕 Created new race session');
+      }
+
+      // Store in local cache
+      activeRaceSessions[raceId] = raceSession;
+      hasActiveRaces.value = activeRaceSessions.isNotEmpty;
+
+      // Store/update in Firebase
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('race_sessions')
+          .doc(raceId)
+          .set(raceSession.toFirestore());
+
+      print('✅ Started race step tracking for race $raceId');
+      print('   Steps at start: ${raceSession.stepsAtStart}');
+      print('   Baseline before first race: ${_todayStepsBeforeFirstRace}');
+      print('   Service initialized: ${isInitialized.value}');
+      print('   Service tracking: ${isTracking.value}');
+      print('   Active race sessions: ${activeRaceSessions.length}');
+
+      return raceId;
+    } catch (e) {
+      print('❌ Error starting race step tracking: $e');
+      return null;
+    }
+  }
+
+  // Step validation cache per race
+  final Map<String, int> _lastSyncedSteps = {};
+  final Map<String, DateTime> _lastRaceSyncTime = {};
+  static const int _minStepIncrement =
+      1; // Minimum step increment to consider valid
+  static const Duration _debounceTime = Duration(
+    seconds: 2,
+  ); // Debounce time for rapid updates
+
+  /// Update race step progress with validation
+  Future<void> updateRaceSteps(String raceId, int currentTotalSteps) async {
+    try {
+      final raceSession = activeRaceSessions[raceId];
+      if (raceSession == null || !raceSession.isActive) {
+        return;
+      }
+
+      // Calculate race steps: steps since this specific race started
+      final raceSteps = math.max(
+        0,
+        currentTotalSteps - raceSession.stepsAtStart,
+      );
+
+      // Step validation: Only proceed if steps increased meaningfully
+      final lastSyncedSteps = _lastSyncedSteps[raceId] ?? 0;
+      final stepIncrement = raceSteps - lastSyncedSteps;
+
+      // Validation 1: Only allow forward progress (no backwards movement)
+      if (raceSteps < raceSession.currentRaceSteps) {
+        print(
+          '⚠️ Race $raceId: Ignoring backwards step movement ${raceSteps} < ${raceSession.currentRaceSteps}',
+        );
+        return;
+      }
+
+      // Validation 2: Require minimum step increment for Firebase sync
+      final shouldSyncToFirebase = stepIncrement >= _minStepIncrement;
+
+      // Validation 3: Debounce rapid successive updates
+      final lastSyncTime = _lastRaceSyncTime[raceId];
+      final now = DateTime.now();
+      final timeSinceLastSync = lastSyncTime != null
+          ? now.difference(lastSyncTime)
+          : Duration(hours: 1);
+      final isDebouncePeriod = timeSinceLastSync < _debounceTime;
+
+      // Only update if there's a meaningful change
+      if (raceSteps != raceSession.currentRaceSteps) {
+        // Update race session locally
+        final updatedSession = raceSession.copyWith(
+          currentRaceSteps: raceSteps,
+          lastUpdated: now,
+        );
+
+        activeRaceSessions[raceId] = updatedSession;
+
+        // Enhanced Firebase sync criteria with validation
+        final shouldSync =
+            shouldSyncToFirebase &&
+            !isDebouncePeriod &&
+            (raceSteps % 5 == 0 ||
+                raceSteps < 20 ||
+                stepIncrement >= 3 ||
+                timeSinceLastSync >
+                    Duration(seconds: 10)); // Force sync every 10 seconds
+
+        if (shouldSync) {
+          await _syncRaceSessionToFirebase(raceId, updatedSession);
+          _lastSyncedSteps[raceId] = raceSteps;
+          _lastRaceSyncTime[raceId] = now;
+        }
+
+        print(
+          '🏃 Race $raceId: $raceSteps steps (${(raceSteps * 0.78 / 1000).toStringAsFixed(2)}km) [Updated from ${raceSession.currentRaceSteps}]',
+        );
+        print(
+          '   📤 Will sync to Firebase: $shouldSync (increment: $stepIncrement, debounce: $isDebouncePeriod)',
+        );
+      }
+    } catch (e) {
+      print('Error updating race steps: $e');
+    }
+  }
+
+  /// Get race steps for a specific race
+  int getRaceSteps(String raceId) {
+    final raceSession = activeRaceSessions[raceId];
+    return raceSession?.currentRaceSteps ?? 0;
+  }
+
+  /// Get pre-race steps (steps taken before any races today)
+  int getPreRaceSteps() {
+    return _todayStepsBeforeFirstRace ?? todaySteps.value;
+  }
+
+  /// Get all active race sessions
+  Map<String, RaceSession> getActiveRaceSessions() {
+    return Map<String, RaceSession>.from(activeRaceSessions);
+  }
+
+  /// Stop tracking for a specific race (only for completed or cancelled races)
+  Future<void> stopRaceStepTracking(
+    String raceId, {
+    String status = 'completed',
+  }) async {
+    try {
+      final raceSession = activeRaceSessions[raceId];
+      if (raceSession == null) {
+        print('⚠️ No active race session found for $raceId to stop');
+        return;
+      }
+
+      print('🛑 Stopping race tracking for $raceId (Status: $status)');
+
+      // Only truly stop tracking for completed, cancelled, or left races
+      if (status == 'completed' || status == 'cancelled' || status == 'left') {
+        // Update final race session
+        final finalSession = raceSession.copyWith(
+          isActive: false,
+          status: status,
+          lastUpdated: DateTime.now(),
+        );
+
+        // Remove from active sessions
+        activeRaceSessions.remove(raceId);
+        hasActiveRaces.value = activeRaceSessions.isNotEmpty;
+
+        // Archive in Firebase
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          await _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('race_sessions')
+              .doc(raceId)
+              .update({
+                'isActive': false,
+                'status': status,
+                'lastUpdated': FieldValue.serverTimestamp(),
+                'currentRaceSteps': finalSession.currentRaceSteps,
+              });
+        }
+
+        print('✅ Stopped race tracking for $raceId (Status: $status)');
+        print('   Final race steps: ${finalSession.currentRaceSteps}');
+      } else {
+        // For 'paused' status, just update the status but keep session active
+        final pausedSession = raceSession.copyWith(
+          status: status,
+          lastUpdated: DateTime.now(),
+        );
+
+        activeRaceSessions[raceId] = pausedSession;
+
+        // Update in Firebase but keep active
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          await _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('race_sessions')
+              .doc(raceId)
+              .update({
+                'status': status,
+                'lastUpdated': FieldValue.serverTimestamp(),
+                'currentRaceSteps': pausedSession.currentRaceSteps,
+              });
+        }
+
+        print('⏸️ Paused race tracking for $raceId (keeping session active)');
+        print('   Current race steps: ${pausedSession.currentRaceSteps}');
+      }
+    } catch (e) {
+      print('❌ Error stopping race step tracking: $e');
+    }
+  }
+
+  Future<void> loadActiveRaceSessions() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      final now = DateTime.now();
+
+      print('🔄 Loading active race sessions for app restart recovery...');
+
+      // Query for races where the current user is a participant and the race is active
+      // Include 'ending' status to support "keep racing" after first finisher
+      final querySnapshot = await _firestore
+          .collection('races')
+          .where('status', whereIn: ['active', 'scheduled', 'paused', 'ending'])
+          .get();
+
+      print('📊 Found ${querySnapshot.docs.length} potential active races');
+
+      int restoredSessions = 0;
+      int expiredSessions = 0;
+
+      for (final doc in querySnapshot.docs) {
+        try {
+          final raceData = RaceData.fromFirestore(doc);
+          print('📋 Processing race: ${raceData.id}');
+
+          // Check if current user is a participant in this race
+          final userParticipant = raceData.participants?.firstWhereOrNull(
+            (participant) => participant.userId == userId,
+          );
+
+          if (userParticipant == null) {
+            print('⏭️ User not a participant in race: ${raceData.id}');
+            continue;
+          }
+
+          // Check if the race is still valid (more lenient timeframe)
+          DateTime? raceStartTime;
+          if (raceData.raceScheduleTime != null) {
+            raceStartTime = DateTime.tryParse(raceData.raceScheduleTime!);
+          }
+
+          if (raceStartTime != null) {
+            final sessionAge = now.difference(raceStartTime);
+            if (sessionAge.inDays > 3) {
+              // Mark old races as expired
+              await doc.reference.update({
+                'status': 'expired',
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+              expiredSessions++;
+              print(
+                '⏰ Expired old race: ${raceData.id} (${sessionAge.inDays} days old)',
+              );
+              continue;
+            }
+          }
+
+          print('🏁 Race ${raceData.id} status: ${raceData.status}');
+
+          // Check if race is completed or cancelled
+          if (raceData.status == 'completed' ||
+              raceData.status == 'cancelled') {
+            print('🏁 Race ended: ${raceData.id} (status: ${raceData.status})');
+            continue;
+          }
+
+          // CRITICAL FIX: Detect if current step count is significantly lower than stored baseline
+          // This happens when user joins late or after hot restart
+          final currentTodaySteps = todaySteps.value;
+          final storedStepsAtStart = userParticipant.steps;
+          final isBaselineMismatch =
+              currentTodaySteps > 0 &&
+              storedStepsAtStart > currentTodaySteps &&
+              (storedStepsAtStart - currentTodaySteps) > 100;
+
+          // For races in ending phase (statusId=6) or if there's a baseline mismatch,
+          // reset to current step count to allow "keep racing" functionality
+          int adjustedStepsAtStart = storedStepsAtStart;
+          if (isBaselineMismatch || raceData.statusId == 6) {
+            adjustedStepsAtStart = currentTodaySteps;
+            print('🔄 Resetting race baseline for ${raceData.id}:');
+            print('   Old baseline: $storedStepsAtStart');
+            print('   New baseline: $adjustedStepsAtStart');
+            print(
+              '   Reason: ${isBaselineMismatch ? "baseline mismatch" : "race in ending phase"}',
+            );
+          }
+
+          // Create a race session object from the race data
+          final raceSession = RaceSession(
+            raceId: raceData.id!,
+            userId: userId,
+            startTime: raceStartTime ?? now,
+            stepsAtStart: adjustedStepsAtStart,
+            // Reset current race steps to 0 if we adjusted the baseline
+            currentRaceSteps: isBaselineMismatch || raceData.statusId == 6
+                ? 0
+                : userParticipant.steps,
+            status: userParticipant.status,
+            isActive:
+                userParticipant.status == 'active' ||
+                userParticipant.status == 'joined',
+            lastUpdated: userParticipant.lastUpdated ?? now,
+          );
+
+          // Restore the race session
+          activeRaceSessions[raceData.id!] = raceSession;
+
+          // Restore baseline if this was the first race today
+          if (_todayStepsBeforeFirstRace == null ||
+              raceSession.stepsAtStart < _todayStepsBeforeFirstRace!) {
+            _todayStepsBeforeFirstRace = raceSession.stepsAtStart;
+            todayBaselineBeforeFirstRace.value = raceSession.stepsAtStart;
+            print(
+              '🏁 Set baseline from restored session: ${raceSession.stepsAtStart}',
+            );
+          }
+
+          restoredSessions++;
+          print('✅ Restored race session: ${raceData.id}');
+          print('   Steps at start: ${raceSession.stepsAtStart}');
+          print('   Current race steps: ${raceSession.currentRaceSteps}');
+          print('   Status: ${raceSession.status}');
+
+          // Validate and potentially recalibrate race session data
+          await _validateAndRecalibrateRaceSession(raceSession);
+        } catch (e) {
+          print('❌ Error parsing race ${doc.id}: $e');
+        }
+      }
+
+      hasActiveRaces.value = activeRaceSessions.isNotEmpty;
+
+      print('✅ App restart recovery complete:');
+      print('   Restored: $restoredSessions active race sessions');
+      print('   Expired: $expiredSessions old races');
+    } catch (e) {
+      print('Error loading active race sessions: $e');
+    }
+  }
+
+  // Helper method to get user's active races if you add a participantIds field
+  Future<void> loadActiveRaceSessionsWithParticipantIds() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      print('🔄 Loading active race sessions for app restart recovery...');
+
+      // This assumes you add a participantIds array field to race documents
+      final querySnapshot = await _firestore
+          .collection('races')
+          .where('participantIds', arrayContains: userId)
+          .where('status', whereIn: ['active', 'scheduled', 'paused'])
+          .get();
+
+      print('📊 Found ${querySnapshot.docs.length} potential active races');
+
+      int restoredSessions = 0;
+      int expiredSessions = 0;
+
+      for (final doc in querySnapshot.docs) {
+        try {
+          final raceData = RaceData.fromFirestore(doc);
+
+          // Find the user's participant data
+          final userParticipant = raceData.participants?.firstWhere(
+            (participant) => participant.userId == userId,
+          );
+
+          if (userParticipant == null) continue;
+
+          // Process similar to the main method
+          // ... (rest of the processing logic)
+        } catch (e) {
+          print('❌ Error parsing race ${doc.id}: $e');
+        }
+      }
+
+      hasActiveRaces.value = activeRaceSessions.isNotEmpty;
+
+      print('✅ App restart recovery complete:');
+      print('   Restored: $restoredSessions active race sessions');
+      print('   Expired: $expiredSessions old races');
+    } catch (e) {
+      print('Error loading active race sessions: $e');
+    }
+  }
+
+  /// Validate and recalibrate race session data after app restart
+  Future<void> _validateAndRecalibrateRaceSession(RaceSession session) async {
+    try {
+      // Check if current device steps are reasonable compared to session data
+      final currentTodaySteps = todaySteps.value;
+      final expectedMinSteps = session.stepsAtStart + session.currentRaceSteps;
+
+      print('🔍 Validating race session ${session.raceId}:');
+      print('   Current today steps: $currentTodaySteps');
+      print('   Session steps at start: ${session.stepsAtStart}');
+      print('   Session race steps: ${session.currentRaceSteps}');
+      print('   Expected minimum: $expectedMinSteps');
+
+      // Be more lenient with step discrepancies - only flag major issues
+      final discrepancy = expectedMinSteps - currentTodaySteps;
+      if (discrepancy > 100) {
+        // Only worry about large discrepancies
+        print(
+          '⚠️ Large step discrepancy detected for race ${session.raceId}: $discrepancy steps',
+        );
+        print('   This could mean:');
+        print('   - Device steps were reset (reboot/day change)');
+        print('   - Database was cleared but races collection was not');
+        print('   - Race data needs recalibration');
+
+        // Try to recalibrate if the discrepancy is reasonable
+        if (discrepancy < 1000) {
+          // If discrepancy is less than 1000 steps, try to preserve race progress
+          final adjustedRaceSteps = math.max(
+            0,
+            currentTodaySteps - session.stepsAtStart,
+          );
+          final updatedSession = session.copyWith(
+            currentRaceSteps: adjustedRaceSteps,
+            lastUpdated: DateTime.now(),
+            metadata: {
+              ...session.metadata ?? {},
+              'appRestartRecalibration': {
+                'timestamp': DateTime.now().toIso8601String(),
+                'originalRaceSteps': session.currentRaceSteps,
+                'adjustedRaceSteps': adjustedRaceSteps,
+                'reason': 'step_discrepancy_correction',
+              },
+            },
+          );
+
+          activeRaceSessions[session.raceId] = updatedSession;
+          await _syncRaceSessionToFirebase(session.raceId, updatedSession);
+          print(
+            '✅ Recalibrated race session ${session.raceId}: ${session.currentRaceSteps} → $adjustedRaceSteps steps',
+          );
+        } else {
+          print(
+            '⚠️ Large discrepancy (${discrepancy} steps) - will recalibrate on next step update',
+          );
+        }
+      } else {
+        print('✅ Race session ${session.raceId} validation passed');
+      }
+    } catch (e) {
+      print('❌ Error validating race session ${session.raceId}: $e');
+    }
+  }
+
+  /// Validate race session and recalibrate baseline if needed (for screen re-entry)
+  /// Returns true if session is healthy, false if needs reset
+  Future<bool> _validateAndRecalibrateRaceSessionById(String raceId) async {
+    try {
+      final session = activeRaceSessions[raceId];
+      if (session == null) return false;
+
+      final currentSteps = todaySteps.value;
+      final now = DateTime.now();
+
+      // Check 1: Time since last update
+      final timeSinceUpdate = now.difference(session.lastUpdated);
+      final isStale = timeSinceUpdate.inSeconds > 10;
+
+      // Check 2: Baseline sanity check
+      final expectedRaceSteps = currentSteps - session.stepsAtStart;
+      final baselineSeemsBroken =
+          expectedRaceSteps < 0 || expectedRaceSteps > 100000;
+
+      // Check 3: Steps not incrementing
+      final stepsStuck =
+          session.currentRaceSteps == 0 &&
+          currentSteps > session.stepsAtStart + 10;
+
+      if (isStale || baselineSeemsBroken || stepsStuck) {
+        print('⚠️ Race session validation failed:');
+        print('   Stale: $isStale (${timeSinceUpdate.inSeconds}s ago)');
+        print(
+          '   Broken baseline: $baselineSeemsBroken (expected: $expectedRaceSteps)',
+        );
+        print(
+          '   Steps stuck: $stepsStuck (race: ${session.currentRaceSteps}, current: $currentSteps)',
+        );
+
+        // RECALIBRATE: Reset baseline to current steps
+        final recalibratedSession = session.copyWith(
+          stepsAtStart: currentSteps,
+          currentRaceSteps: 0, // Reset to 0 from this point
+          lastUpdated: now,
+          metadata: {
+            ...session.metadata ?? {},
+            'recalibration': {
+              'timestamp': now.toIso8601String(),
+              'reason': isStale
+                  ? 'stale'
+                  : baselineSeemsBroken
+                  ? 'broken_baseline'
+                  : 'steps_stuck',
+              'oldBaseline': session.stepsAtStart,
+              'newBaseline': currentSteps,
+            },
+          },
+        );
+
+        activeRaceSessions[raceId] = recalibratedSession;
+
+        // Sync recalibration to Firebase immediately
+        await _syncRaceSessionToFirebase(raceId, recalibratedSession);
+
+        print('✅ Recalibrated race session:');
+        print('   Old baseline: ${session.stepsAtStart}');
+        print('   New baseline: $currentSteps');
+
+        return true;
+      }
+
+      print('✅ Race session is healthy');
+      return true;
+    } catch (e) {
+      print('❌ Error validating race session: $e');
+      return false;
+    }
+  }
+
+  /// Dump race session state for debugging
+  void dumpRaceSessionState(String raceId) {
+    final session = activeRaceSessions[raceId];
+    if (session == null) {
+      print('❌ No active session for race $raceId');
+      return;
+    }
+
+    print('📊 Race Session State Dump:');
+    print('   Race ID: $raceId');
+    print('   Steps at start: ${session.stepsAtStart}');
+    print('   Current race steps: ${session.currentRaceSteps}');
+    print('   Last updated: ${session.lastUpdated}');
+    print('   Status: ${session.status}');
+    print('   Is active: ${session.isActive}');
+    print('   Current today steps: ${todaySteps.value}');
+    print('   Expected race steps: ${todaySteps.value - session.stepsAtStart}');
+    print('   Metadata: ${session.metadata}');
+  }
+
+  /// Wait for step service to be ready
+  Future<void> _waitForStepServiceReady() async {
+    int attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+      if (isInitialized.value && isTracking.value) {
+        print('✅ Step service ready for race tracking');
+        return;
+      }
+
+      print(
+        '⏳ Waiting for step service to be ready... Attempt ${attempts + 1}/$maxAttempts',
+      );
+      await Future.delayed(Duration(milliseconds: 100));
+      attempts++;
+    }
+
+    print('⚠️ Step service not ready after waiting, proceeding anyway');
+  }
+
+  /// Sync race session to Firebase
+  Future<void> _syncRaceSessionToFirebase(
+    String raceId,
+    RaceSession session,
+  ) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      // Note: race_sessions collection syncing removed - using RaceService.updateParticipantRealTimeData instead
+
+      // Calculate distance from steps
+      final distanceKm = session.currentRaceSteps * _averageStepLength / 1000.0;
+      final calories = (session.currentRaceSteps * _caloriesPerStep).round();
+
+      // Calculate average speed (rough estimate based on time)
+      final elapsedHours =
+          DateTime.now().difference(session.startTime).inMilliseconds /
+          (1000 * 60 * 60);
+      final avgSpeed = elapsedHours > 0 ? distanceKm / elapsedHours : 0.0;
+
+      // ✅ FIX: Get race totalDistance to cap the distance and prevent over-counting
+      final raceDoc = await _firestore
+          .collection('races')
+          .doc(raceId)
+          .get();
+
+      if (!raceDoc.exists) {
+        print('⚠️ Race document not found, skipping sync');
+        return;
+      }
+
+      final raceData = raceDoc.data() as Map<String, dynamic>;
+      final totalDistance = (raceData['totalDistance'] ?? 0.0).toDouble();
+
+      // ✅ Cap distance at race totalDistance to prevent over-counting
+      final cappedDistance = distanceKm > totalDistance ? totalDistance : distanceKm;
+      final isCompleted = distanceKm >= totalDistance;
+
+      // If user has exceeded the total distance, stop tracking this race
+      if (isCompleted && session.status != 'completed') {
+        print('🏁 Distance cap reached ($distanceKm km >= $totalDistance km), marking race as completed');
+        await stopRaceStepTracking(raceId, status: 'completed');
+      }
+
+      // Update the main race document participants array via RaceService
+      await RaceService.updateParticipantRealTimeData(
+        raceId: raceId,
+        userId: userId,
+        distance: cappedDistance, // Use capped distance
+        steps: session.currentRaceSteps,
+        calories: calories,
+        avgSpeed: avgSpeed,
+        isCompleted: isCompleted,
+      );
+
+      print(
+        '✅ Updated race progress: ${session.currentRaceSteps} steps (${cappedDistance.toStringAsFixed(3)}km / ${totalDistance}km)${isCompleted ? ' [COMPLETED]' : ''}',
+      );
+    } catch (e) {
+      print('❌ Error syncing race session to Firebase: $e');
+      // Note: removed local race_sessions fallback syncing - relying on RaceService.updateParticipantRealTimeData
+    }
+  }
+
+  /// Handle race step updates when overall steps change
+  void _updateActiveRaceSteps(int newTodaySteps) {
+    if (activeRaceSessions.isEmpty) return;
+
+    for (final raceId in activeRaceSessions.keys) {
+      updateRaceSteps(raceId, newTodaySteps);
+    }
+  }
+
+  // ================== END RACE SESSION TRACKING METHODS ==================
+
+  /// ✅ NEW: Public method to get current device steps for diagnostics
+  Future<int> getCurrentDeviceStepsForDiagnostics() async {
+    return await _getCurrentDeviceSteps();
+  }
+
+  /// ✅ NEW: Public method to manually trigger baseline validation
+  Future<void> validateBaselineManually() async {
+    await _validateAndCorrectBaseline();
+  }
+
+  /// Clean up legacy Firebase data structure (one-time operation)
+  /// Removes overall_stats and previous_days_total which are now calculated on-demand
+  Future<void> _cleanupLegacyFirebaseData() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      print('🧹 Cleaning up legacy Firebase data structure...');
+
+      // Remove overall_stats (now calculated on-demand from daily_stats)
+      // Remove previous_days_total (now calculated from database)
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'overall_stats': FieldValue.delete(),
+        'step_tracking.previous_days_total': FieldValue.delete(),
+      });
+
+      print('✅ Legacy Firebase data cleaned up successfully');
+      print('   - Removed overall_stats (now calculated on-demand)');
+      print('   - Removed previous_days_total (now from database)');
+    } catch (e) {
+      // Don't throw - this is not critical
+      print('⚠️ Error cleaning up legacy Firebase data: $e');
+      print('   This is not critical - continuing...');
+    }
+  }
+
+  // ================== HEALTH SYNC INTEGRATION ==================
+
+  /// Update step tracking data from external health sync (HealthKit/Health Connect)
+  ///
+  /// This method is called by HealthSyncService after syncing data from
+  /// HealthKit (iOS) or Health Connect (Android). It updates all observables
+  /// atomically and recalculates the baseline to align pedometer readings.
+  ///
+  /// This allows the hybrid approach:
+  /// - HealthKit/Health Connect: Authoritative source for historical data
+  /// - Pedometer: Real-time tracking during active session
+  Future<void> updateFromHealthSync({
+    required int todayStepsFromHealth,
+    required double todayDistanceFromHealth,
+    required int todayCaloriesFromHealth,
+    required int todayActiveTimeFromHealth,
+    required int overallStepsFromHealth,
+    required double overallDistanceFromHealth,
+    required int overallDaysFromHealth,
+  }) async {
+    try {
+      print('🏥 [HEALTH_SYNC] Updating step tracking from health sync...');
+      print('   HealthKit today steps: $todayStepsFromHealth');
+      print('   Current today steps: ${todaySteps.value}');
+      print('   HealthKit overall steps: $overallStepsFromHealth');
+      print('   HealthKit overall days: $overallDaysFromHealth');
+
+      // ✅ SMART SYNC: Only update if HealthKit has MORE steps than current
+      // This prevents overwriting real-time pedometer data with stale HealthKit data
+      if (todayStepsFromHealth <= todaySteps.value) {
+        print('⏭️ [HEALTH_SYNC] Skipping sync - current steps (${todaySteps.value}) >= HealthKit steps ($todayStepsFromHealth)');
+        print('   Keeping current real-time pedometer data');
+        print('   ❌ NOT updating overall stats from HealthKit (will recalculate from DB)');
+        return;
+      }
+
+      print('✅ [HEALTH_SYNC] HealthKit has more steps - updating TODAY\'S data only');
+
+      // ✅ ONLY UPDATE TODAY'S DATA from HealthKit
+      todaySteps.value = todayStepsFromHealth;
+      todayDistance.value = todayDistanceFromHealth;
+      todayCalories.value = todayCaloriesFromHealth;
+      todayActiveTime.value = todayActiveTimeFromHealth;
+
+      // ❌ DO NOT update overall stats from HealthKit!
+      // Overall stats will be recalculated from database after baseline recalculation
+      print('   Updated today: $todayStepsFromHealth steps, $todayDistanceFromHealth km');
+      print('   ❌ Ignoring HealthKit overall stats: $overallStepsFromHealth steps, $overallDaysFromHealth days');
+      print('   ✅ Overall stats will be recalculated from database in _onStepCount');
+
+      // Recalculate previous days total for internal tracking
+      _previousDaysTotal = math.max(0, overallStepsFromHealth - todayStepsFromHealth);
+
+      print('   Previous days total: $_previousDaysTotal');
+
+      // CRITICAL: Recalculate baseline to align pedometer with health data
+      // This ensures future pedometer readings continue from the correct baseline
+      await _recalculateBaselineAfterHealthSync(todayStepsFromHealth);
+
+      // Sync updated data to Firebase
+      await _syncToFirebase();
+
+      print('✅ [HEALTH_SYNC] Step tracking updated successfully from health sync');
+      print('   Pedometer will now continue from: $todayStepsFromHealth steps');
+    } catch (e, stackTrace) {
+      print('❌ [HEALTH_SYNC] Error updating from health sync: $e');
+      print('📍 Stack trace: $stackTrace');
+      // Don't throw - fallback to existing pedometer data
+    }
+  }
+
+  /// Recalculate pedometer baseline after health sync
+  ///
+  /// Formula: new_baseline = current_device_reading - health_today_steps
+  /// This ensures pedometer continues from health-synced value
+  Future<void> _recalculateBaselineAfterHealthSync(int healthTodaySteps) async {
+    try {
+      final currentDeviceSteps = await _getCurrentDeviceSteps();
+
+      if (currentDeviceSteps > 0) {
+        // Calculate new baseline to align with health data
+        final newBaseline = math.max(0, currentDeviceSteps - healthTodaySteps);
+
+        final oldBaseline = _todayDeviceBaseline;
+        _todayDeviceBaseline = newBaseline;
+        _deviceBaseline = newBaseline;
+        _lastDeviceReading = currentDeviceSteps;
+
+        // Mark baseline as initialized
+        _baselineInitialized = true;
+
+        print('🔧 [HEALTH_SYNC] Recalculated baseline after health sync:');
+        print('   Old baseline: $oldBaseline');
+        print('   New baseline: $newBaseline');
+        print('   Current device steps: $currentDeviceSteps');
+        print('   Health today steps: $healthTodaySteps');
+        print('   Calculated from formula: $currentDeviceSteps - $healthTodaySteps = $newBaseline');
+        print('   Next pedometer event should show: Device=$currentDeviceSteps, Baseline=$newBaseline, Today=$healthTodaySteps');
+
+        // Persist new baseline to Firebase
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          await FirebaseFirestore.instance.collection('users').doc(userId).update({
+            'step_tracking.today_device_baseline': _todayDeviceBaseline,
+            'step_tracking.device_baseline': _deviceBaseline,
+          });
+          print('✅ [HEALTH_SYNC] New baseline persisted to Firebase');
+        }
+
+        // ✅ CRITICAL: Manually trigger step calculation to ensure UI updates
+        print('🔄 [HEALTH_SYNC] Manually recalculating steps with new baseline...');
+        final recalculatedTodaySteps = math.max(0, currentDeviceSteps - newBaseline);
+        todaySteps.value = recalculatedTodaySteps;
+        todayDistance.value = (recalculatedTodaySteps * _averageStepLength / 1000);
+        todayCalories.value = (recalculatedTodaySteps * _caloriesPerStep).round();
+        print('✅ [HEALTH_SYNC] Recalculated today steps: $recalculatedTodaySteps (should match HealthKit: $healthTodaySteps)');
+      }
+    } catch (e) {
+      print('❌ [HEALTH_SYNC] Error recalculating baseline: $e');
+    }
+  }
+
+  // ================== END HEALTH SYNC INTEGRATION ==================
+
+  @override
+  void onClose() {
+    _syncTimer?.cancel();
+    _stepCountSubscription?.cancel();
+    _pedestrianStatusSubscription?.cancel();
+    _walkingSessionTimer?.cancel();
+
+    // Final sync before closing
+    if (_pendingSync) {
+      _syncToFirebase();
+    }
+
+    super.onClose();
+  }
+}

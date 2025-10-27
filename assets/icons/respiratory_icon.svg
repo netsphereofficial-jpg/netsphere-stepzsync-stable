@@ -1,0 +1,25 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Lungs/respiratory icon representing breathing rate -->
+  <!-- Left lung -->
+  <path d="M7 6 C5 6, 4 7, 4 9 L4 15 C4 17, 5 18, 7 18 C8 18, 9 17, 9 16 L9 8 C9 7, 8 6, 7 6Z"
+        stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+
+  <!-- Right lung -->
+  <path d="M17 6 C19 6, 20 7, 20 9 L20 15 C20 17, 19 18, 17 18 C16 18, 15 17, 15 16 L15 8 C15 7, 16 6, 17 6Z"
+        stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+
+  <!-- Trachea (windpipe) connecting the lungs -->
+  <line x1="12" y1="2" x2="12" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="12" y1="8" x2="9" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="12" y1="8" x2="15" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Breathing flow lines (representing air movement) -->
+  <path d="M6 11 Q5.5 12, 6 13" stroke="currentColor" stroke-width="1" fill="none" opacity="0.6"/>
+  <path d="M18 11 Q18.5 12, 18 13" stroke="currentColor" stroke-width="1" fill="none" opacity="0.6"/>
+
+  <!-- Small dots for visual effect (air particles) -->
+  <circle cx="7" cy="10" r="0.8" fill="currentColor" opacity="0.5"/>
+  <circle cx="17" cy="10" r="0.8" fill="currentColor" opacity="0.5"/>
+  <circle cx="7" cy="14" r="0.8" fill="currentColor" opacity="0.5"/>
+  <circle cx="17" cy="14" r="0.8" fill="currentColor" opacity="0.5"/>
+</svg>

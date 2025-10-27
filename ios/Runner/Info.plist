@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>BGTaskSchedulerPermittedIdentifiers</key>
+		<array>
+			<string>com.stepzsync.refresh</string>
+			<string>com.stepzsync.sync</string>
+			<string>com.stepzsync.step_sync</string>
+			<string>com.stepzsync.background_sync</string>
+		</array>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>StepzSync</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>stepzsync</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLName</key>
+				<string>googleauth</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>app-1-1061746314202-ios-e762f516999c770008cee3</string>
+				</array>
+			</dict>
+		</array>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>NSCameraUsageDescription</key>
+		<string>StepzSync needs camera access to take profile pictures and capture photos for your fitness journey.</string>
+		<key>NSHealthClinicalHealthRecordsShareUsageDescription</key>
+		<string>StepzSync needs access to your health data to track steps, distance, and calories for accurate fitness monitoring.</string>
+		<key>NSHealthShareUsageDescription</key>
+		<string>StepzSync needs access to your health data to track steps, distance, and calories for accurate fitness monitoring.</string>
+		<key>NSHealthUpdateUsageDescription</key>
+		<string>StepzSync needs to update your health data to record workout sessions and fitness activities.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>StepzSync needs location access to track your outdoor workouts and calculate accurate distances even when the app is in the background.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>StepzSync needs location access to track your outdoor workouts and calculate accurate distances even when the app is in the background.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>StepzSync needs location access to track your outdoor workouts and calculate accurate distances.</string>
+		<key>NSMotionUsageDescription</key>
+		<string>StepzSync needs motion access to count your steps and track physical activities throughout the day.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>StepzSync needs access to your photo library to select profile pictures and images for your fitness journey.</string>
+		<key>NSUserNotificationsUsageDescription</key>
+		<string>StepzSync sends you motivational notifications and fitness goal reminders to keep you on track.</string>
+		<key>FirebaseAppDelegateProxyEnabled</key>
+		<false/>
+		<key>GADApplicationIdentifier</key>
+		<string>ca-app-pub-3940256099942544~1458002511</string>
+		<key>SKAdNetworkItems</key>
+		<array>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>cstr6suwn9.skadnetwork</string>
+			</dict>
+		</array>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>location</string>
+			<string>fetch</string>
+			<string>processing</string>
+			<string>remote-notification</string>
+		</array>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<key>UIRequiredDeviceCapabilities</key>
+		<array>
+			<string>healthkit</string>
+		</array>
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		</array>
+		<key>UISupportedPlatforms</key>
+		<array>
+			<string>iPhoneOS</string>
+		</array>
+		<key>UIStatusBarHidden</key>
+		<true/>
+		<key>UIViewControllerBasedStatusBarAppearance</key>
+		<false/>
+	</dict>
+</plist>

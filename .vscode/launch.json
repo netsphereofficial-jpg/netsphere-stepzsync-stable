@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Mobile App (main.dart)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Admin Panel (admin_main.dart)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/admin_main.dart"
+    },
+    {
+      "name": "Admin Panel - Chrome",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/admin_main.dart",
+      "deviceId": "chrome"
+    }
+  ]
+}

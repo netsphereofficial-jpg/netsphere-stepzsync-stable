@@ -1,0 +1,63 @@
+# Flutter build outputs
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/xcuserdata/
+ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Android
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/.idea/
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+android/app/google-services.json
+android/key.properties
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+*.config.dart
+**/generated_plugin_registrant.dart
+
+# Firebase secrets (keep structure files only)
+ios/firebase_app_id_file.json
+ios/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Coverage and test reports
+coverage/
+test/.test_coverage.dart
+*.lcov
+
+# Documentation (keep only essential docs)
+BUILD_SUMMARY_*.md
+*_GUIDE.md
+*_SUMMARY.md
+*_REPORT.md
+*_PLAN.md
+
+# Other
+.DS_Store
+.idea/
+*.iml
+*.lock
+pubspec.lock
+.fvm/
+.vscode/
+*.swp
+*.swo
+*~
