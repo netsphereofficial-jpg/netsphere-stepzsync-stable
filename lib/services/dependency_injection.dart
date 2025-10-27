@@ -73,10 +73,6 @@ class DependencyInjection {
     // The service will be initialized when first accessed, after PedometerService is ready
     Get.lazyPut<RaceStepSyncService>(() => RaceStepSyncService(), fenix: true);
 
-    // Register DatabaseController as lazy permanent singleton (market standard: Twitter, Facebook)
-    // Only initialize when first accessed to improve startup performance
-    Get.lazyPut<DatabaseController>(() => DatabaseController(), fenix: true);
-
     // Register HomepageDataService as lazy permanent singleton
     // Will be initialized on first access (dashboard screen)
     // This prevents duplicate StepTrackingService instances during navigation
