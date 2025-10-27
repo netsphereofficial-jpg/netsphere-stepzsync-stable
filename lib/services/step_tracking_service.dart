@@ -221,26 +221,10 @@ class StepTrackingService extends GetxService {
           print('📝 No Firebase data for today yet - will sync after pedometer updates');
         }
 
-        // ✅ FIX: Calculate delta and update overall stats atomically
-        // Protect from concurrent access using state update lock
+        // Update today's display with baseline (before pedometer starts)
         await _stateUpdateLock.synchronized(() async {
-          final previousTodaySteps = todaySteps.value;
-
-          // Update display with baseline (before pedometer starts)
-          // Use internal version since we're already inside the lock
           _updateTodayDisplayInternal();
-
-          // Apply delta to overall stats
-          final stepsDelta = todaySteps.value - previousTodaySteps;
-          if (stepsDelta != 0) {
-            overallSteps.value += stepsDelta;
-            final distanceDelta = (_healthKitBaselineDistance - (previousTodaySteps * _stepsToKmFactor));
-            overallDistance.value += distanceDelta;
-
-            print('✅ Overall stats updated after HealthKit baseline fetch');
-            print('   Today delta: $stepsDelta steps');
-            print('   Overall steps: ${overallSteps.value}');
-          }
+          print('✅ Today\'s baseline updated from HealthKit: ${todaySteps.value} steps');
         });
       } else {
         print('⚠️ No HealthKit data available for today, using local fallback');
@@ -380,24 +364,27 @@ class StepTrackingService extends GetxService {
       int firebaseDays = firebaseStats['totalDays'] as int;
 
       if (todayInFirebase != null) {
-        // Subtract today's Firebase data (we'll add real-time data instead)
-        firebaseSteps -= todayInFirebase.steps;
-        firebaseDistance -= todayInFirebase.distance;
-        // Don't subtract day count - today is still a valid day
-        print('   📅 Today exists in Firebase with ${todayInFirebase.steps} steps - subtracting to avoid double count');
+        // Today exists in Firebase - don't count it as a new day
+        print('   📅 Today exists in Firebase with ${todayInFirebase.steps} steps');
       } else {
-        // Today is not in Firebase yet, so we need to count it as a new day
+        // Today is not in Firebase yet, so count it as a new day
         firebaseDays += 1;
         print('   📅 Today not in Firebase yet - counting as new day');
       }
 
-      // Add today's real-time data
-      overallSteps.value = firebaseSteps + todaySteps.value;
-      overallDistance.value = firebaseDistance + todayDistance.value;
+      // ✅ FIX: Overall stats = Firebase total (no adjustment needed)
+      // Firebase aggregation already includes all steps, including today
+      // We don't subtract and re-add because it causes the "0 steps" bug
+      overallSteps.value = firebaseSteps;
+      overallDistance.value = firebaseDistance;
       overallDays.value = firebaseDays;
 
+      print('🔍 DEBUG: Overall stats from Firebase:');
+      print('   Firebase total steps: $firebaseSteps');
+      print('   Firebase total distance: ${firebaseDistance}km');
+      print('   Total days: $firebaseDays');
+
       print('✅ Overall stats loaded: ${overallSteps.value} steps, ${overallDays.value} days');
-      print('   (Firebase adjusted: $firebaseSteps steps, Today real-time: ${todaySteps.value} steps)');
     } catch (e) {
       print('❌ Error loading overall statistics: $e');
     }
@@ -638,20 +625,13 @@ class StepTrackingService extends GetxService {
         // Update display directly (we're already inside the lock, so don't call the synchronized version)
         _updateTodayDisplayInternal();
 
-        // ✅ FIX: Manually update overall stats instead of querying Firebase
-        // Firebase write hasn't completed yet, so query would return stale data
-        // Calculate the delta and apply it to overall stats
-        final stepsDelta = todayStepsFromHealth - previousTodaySteps;
-
-        overallSteps.value += stepsDelta;
-        overallDistance.value = (overallDistance.value - (previousTodaySteps * _stepsToKmFactor)) + todayDistanceFromHealth;
-
         print('✅ HealthKit sync applied successfully');
         print('   Today: ${todaySteps.value} steps (was $previousTodaySteps)');
-        print('   Overall: ${overallSteps.value} steps (delta: $stepsDelta)');
 
-        // ✅ NEW: Propagate health sync delta to active races
-        // This ensures races get the same health-synced steps as the home screen
+        // Calculate delta for race sync
+        final stepsDelta = todayStepsFromHealth - previousTodaySteps;
+
+        // Propagate health sync delta to active races
         if (stepsDelta > 0 && Get.isRegistered<RaceStepSyncService>()) {
           try {
             final raceService = Get.find<RaceStepSyncService>();
@@ -661,6 +641,8 @@ class StepTrackingService extends GetxService {
             print('⚠️ Could not update RaceStepSyncService: $e');
           }
         }
+
+        print('   Overall: ${overallSteps.value} steps');
       } catch (e) {
         print('❌ Error applying HealthKit sync: $e');
       }
