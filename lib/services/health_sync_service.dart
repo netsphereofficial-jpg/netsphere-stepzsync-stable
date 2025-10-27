@@ -40,6 +40,13 @@ class HealthSyncService extends GetxController {
   // Last sync data cache
   HealthSyncData? _lastSyncData;
 
+  // Initialization signaling - use Completer instead of polling/delays
+  final Completer<bool> _initCompleter = Completer<bool>();
+
+  /// Future that completes when initialization is done
+  /// Returns true if health services are available, false otherwise
+  Future<bool> get initializationComplete => _initCompleter.future;
+
   @override
   void onInit() {
     super.onInit();
@@ -48,6 +55,12 @@ class HealthSyncService extends GetxController {
 
   /// Initialize health service
   Future<void> _initializeHealthService() async {
+    // Check if already initialized
+    if (_initCompleter.isCompleted) {
+      print('${HealthConfig.logPrefix} Already initialized');
+      return;
+    }
+
     try {
       print('${HealthConfig.logPrefix} Initializing health sync service...');
 
@@ -55,6 +68,7 @@ class HealthSyncService extends GetxController {
       if (GuestUtils.isGuest()) {
         print('${HealthConfig.logPrefix} Skipping health sync for guest user');
         isHealthAvailable.value = false;
+        _initCompleter.complete(false);
         return;
       }
 
@@ -64,6 +78,7 @@ class HealthSyncService extends GetxController {
 
       if (!available) {
         print('${HealthConfig.logPrefix} Health services not available');
+        _initCompleter.complete(false);
         return;
       }
 
@@ -76,8 +91,13 @@ class HealthSyncService extends GetxController {
       } else {
         print('${HealthConfig.logPrefix} ✅ Health sync service initialized successfully');
       }
+
+      // Complete initialization (successful even without permissions)
+      _initCompleter.complete(available);
     } catch (e) {
       print('${HealthConfig.logPrefix} ❌ Error initializing health service: $e');
+      isHealthAvailable.value = false;
+      _initCompleter.complete(false);
     }
   }
 

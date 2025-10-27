@@ -25,6 +25,13 @@ class PedometerService extends GetxService {
   DateTime? _sessionStartTime;
   bool _hasPermission = false;
 
+  // Initialization signaling - use Completer instead of polling/delays
+  final Completer<bool> _initCompleter = Completer<bool>();
+
+  /// Future that completes when initialization is done
+  /// Returns true if pedometer is available, false otherwise
+  Future<bool> get initializationComplete => _initCompleter.future;
+
   /// Get incremental steps since app start (session-based)
   int get incrementalSteps => _incrementalSteps;
 
@@ -43,9 +50,19 @@ class PedometerService extends GetxService {
 
   /// Initialize the pedometer service
   Future<bool> initialize() async {
-    if (isInitialized.value) {
+    // Check if initialization is already in progress or completed
+    if (_initCompleter.isCompleted) {
       print('⏭️ PedometerService: Already initialized');
-      return true;
+      return isAvailable.value;
+    }
+
+    // Check if already initialized (redundant check but safe)
+    if (isInitialized.value) {
+      print('⏭️ PedometerService: Already initialized (flag check)');
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.complete(isAvailable.value);
+      }
+      return isAvailable.value;
     }
 
     try {
@@ -54,6 +71,7 @@ class PedometerService extends GetxService {
         print('⚠️ PedometerService: Pedometer not available on web');
         isAvailable.value = false;
         isInitialized.value = true;
+        _initCompleter.complete(false);
         return false;
       }
 
@@ -67,6 +85,7 @@ class PedometerService extends GetxService {
         errorMessage.value = 'Activity recognition permission not granted';
         isAvailable.value = false;
         isInitialized.value = true;
+        _initCompleter.complete(false);
 
         // Listen to permission changes and auto-start when granted
         _listenToPermissionChanges();
@@ -81,6 +100,7 @@ class PedometerService extends GetxService {
 
       print('✅ PedometerService: Initialized successfully');
       isInitialized.value = true;
+      _initCompleter.complete(isAvailable.value);
       return isAvailable.value;
     } catch (e, stackTrace) {
       print('❌ PedometerService: Initialization error: $e');
@@ -88,6 +108,7 @@ class PedometerService extends GetxService {
       errorMessage.value = 'Failed to initialize pedometer: $e';
       isAvailable.value = false;
       isInitialized.value = true;
+      _initCompleter.complete(false);
       return false;
     }
   }

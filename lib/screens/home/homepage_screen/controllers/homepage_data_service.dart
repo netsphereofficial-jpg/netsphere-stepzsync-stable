@@ -1524,135 +1524,15 @@ class HomepageDataService extends GetxController {
         return;
       }
 
-      // Wait a bit for sync dialog to close
-      await Future.delayed(const Duration(milliseconds: 300));
+
 
       if (!context.mounted) return;
 
-      // Show explanation dialog first
-      final shouldRequest = await _showLocationPermissionExplanation(context);
 
-      // Mark dialog as shown regardless of user's choice
-      await prefsService.setBackgroundLocationDialogShown(true);
-      print('✅ [HOMEPAGE_DATA] Background location dialog marked as shown');
-
-      if (!shouldRequest) {
-        print('ℹ️ [HOMEPAGE_DATA] User declined to grant location permission');
-        return;
-      }
-
-      if (!context.mounted) return;
-
-      // Request location permission for background tracking
-      print('📍 [HOMEPAGE_DATA] Requesting location permission for background tracking...');
-      final granted = await PermissionService.requestAlwaysLocationPermission();
-
-      if (granted) {
-        print('✅ [HOMEPAGE_DATA] Location permission granted - starting background location service');
-
-        // Start background location tracking to show location icon and keep app alive
-        final locationService = BackgroundLocationService();
-        final started = await locationService.startBackgroundTracking();
-
-        if (started) {
-          print('✅ [HOMEPAGE_DATA] Background location tracking started - location icon should appear');
-        } else {
-          print('⚠️ [HOMEPAGE_DATA] Failed to start background location tracking');
-        }
-      } else {
-        print('⚠️ [HOMEPAGE_DATA] Location permission denied - background step tracking may not work');
-      }
     } catch (e, stackTrace) {
       print('❌ [HOMEPAGE_DATA] Error requesting location permission: $e');
       print('📍 Stack trace: $stackTrace');
     }
-  }
-
-  /// Show explanation dialog for location permission
-  Future<bool> _showLocationPermissionExplanation(BuildContext context) async {
-    final result = await Get.dialog<bool>(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2759FF).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: Color(0xFF2759FF),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Enable Background Tracking',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'StepzSync needs location permission to track your steps in the background.',
-              style: TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2759FF).withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF2759FF).withOpacity(0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF2759FF), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'This allows the app to continue tracking even when minimized. Your location data is not shared or stored.',
-                      style: TextStyle(fontSize: 12, color: Colors.black87),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey,
-            ),
-            child: const Text('Not Now'),
-          ),
-          TextButton(
-            onPressed: () => Get.back(result: true),
-            style: TextButton.styleFrom(
-              backgroundColor: const Color(0xFF2759FF),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Enable'),
-          ),
-        ],
-      ),
-      barrierDismissible: true,
-    );
-
-    return result ?? false;
   }
 
   // ================== END HEALTH SYNC INTEGRATION ==================

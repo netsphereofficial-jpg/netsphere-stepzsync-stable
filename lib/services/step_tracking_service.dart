@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:synchronized/synchronized.dart';
 import '../models/daily_step_data.dart';
 import '../models/step_summary.dart';
 import '../repositories/step_data_repository.dart';
@@ -66,6 +67,16 @@ class StepTrackingService extends GetxService {
   Timer? _periodicSyncTimer;
   Timer? _midnightCheckTimer;
   bool _isInitializing = false;
+
+  // ================== CONCURRENCY CONTROL ==================
+  /// Lock for state updates to prevent race conditions
+  final Lock _stateUpdateLock = Lock();
+
+  /// Lock for midnight rollover to prevent concurrent execution
+  final Lock _midnightRolloverLock = Lock();
+
+  /// Lock for sync operations
+  final Lock _syncLock = Lock();
 
   // ================== CONSTANTS ==================
   static const Duration _syncInterval = Duration(seconds: 30);
@@ -215,7 +226,7 @@ class StepTrackingService extends GetxService {
         final previousTodaySteps = todaySteps.value;
 
         // Update display with baseline (before pedometer starts)
-        _updateTodayDisplay();
+        await _updateTodayDisplay();
 
         // Apply delta to overall stats
         final stepsDelta = todaySteps.value - previousTodaySteps;
@@ -251,7 +262,7 @@ class StepTrackingService extends GetxService {
         _healthKitBaselineActiveTime = localData.activeMinutes;
 
         print('📦 Loaded from local: $_healthKitBaselineSteps steps');
-        _updateTodayDisplay();
+        await _updateTodayDisplay();
       } else {
         print('📦 No local data found for today, starting fresh');
         _healthKitBaselineSteps = 0;
@@ -287,6 +298,8 @@ class StepTrackingService extends GetxService {
   void _setupPedometerListeners() {
     // Listen to pedometer incremental steps
     ever(_pedometerService.currentStepCount, (_) {
+      // Call async method without await to avoid blocking the callback
+      // The synchronized block inside will handle proper ordering
       _updateTodayDisplay();
     });
 
@@ -298,8 +311,8 @@ class StepTrackingService extends GetxService {
     print('✅ Pedometer listeners configured');
   }
 
-  /// Update today's display with combined data
-  void _updateTodayDisplay() {
+  /// Internal method to update display (must be called inside _stateUpdateLock)
+  void _updateTodayDisplayInternal() {
     try {
       // Combine HealthKit baseline + Pedometer increments
       final incrementalSteps = _pedometerService.incrementalSteps;
@@ -334,6 +347,14 @@ class StepTrackingService extends GetxService {
     } catch (e) {
       print('❌ Error updating display: $e');
     }
+  }
+
+  /// Update today's display with combined data
+  /// Uses lock to prevent race conditions during concurrent updates
+  Future<void> _updateTodayDisplay() async {
+    await _stateUpdateLock.synchronized(() {
+      _updateTodayDisplayInternal();
+    });
   }
 
   /// Load overall statistics from Firebase
@@ -410,26 +431,31 @@ class StepTrackingService extends GetxService {
   }
 
   /// Check if date has changed (midnight rollover)
+  /// Check for midnight rollover and handle day transition
+  /// Uses lock to prevent concurrent execution if timer fires multiple times
   Future<void> _checkForMidnightRollover() async {
-    final newDate = DailyStepData.getTodayDate();
+    await _midnightRolloverLock.synchronized(() async {
+      final newDate = DailyStepData.getTodayDate();
 
-    if (newDate != currentDate.value) {
-      print('🌙 Midnight rollover detected: ${currentDate.value} → $newDate');
+      // Double-check inside lock - another call might have already processed this
+      if (newDate != currentDate.value) {
+        print('🌙 Midnight rollover detected: ${currentDate.value} → $newDate');
 
-      // Finalize yesterday's data
-      await _finalizeYesterday();
+        // Finalize yesterday's data
+        await _finalizeYesterday();
 
-      // Reset for new day
-      currentDate.value = newDate;
-      await _fetchHealthKitBaseline();
-      _pedometerService.resetSession();
-      _updateTodayDisplay();
+        // Reset for new day
+        currentDate.value = newDate;
+        await _fetchHealthKitBaseline();
+        _pedometerService.resetSession();
+        await _updateTodayDisplay();
 
-      // Reload overall stats
-      await _loadOverallStatistics();
+        // Reload overall stats
+        await _loadOverallStatistics();
 
-      print('✅ New day initialized: $newDate');
-    }
+        print('✅ New day initialized: $newDate');
+      }
+    });
   }
 
   /// Finalize yesterday's data and sync to Firebase
@@ -516,113 +542,126 @@ class StepTrackingService extends GetxService {
   /// Sync current data to Firebase
   /// NEW APPROACH: Write to HealthKit first, then read back and sync to Firebase
   /// This ensures HealthKit is ALWAYS the source of truth
+  /// Uses lock to prevent concurrent sync operations
   Future<void> syncToFirebase() async {
+    // Early check without lock for performance
     if (isSyncing.value) {
       print('⏭️ Sync already in progress');
       return;
     }
 
-    try {
-      isSyncing.value = true;
-      print('☁️ Starting sync to Firebase...');
+    await _syncLock.synchronized(() async {
+      // Double-check inside lock
+      if (isSyncing.value) {
+        print('⏭️ Sync already in progress (double-check)');
+        return;
+      }
 
-      // STEP 1: Write pedometer incremental steps to HealthKit first
-      await _writePedometerStepsToHealth();
+      try {
+        isSyncing.value = true;
+        print('☁️ Starting sync to Firebase...');
 
-      // STEP 2: Re-fetch from HealthKit to get authoritative value
-      // This ensures any pedometer steps we just wrote are included
-      await _fetchHealthKitBaseline();
+        // STEP 1: Write pedometer incremental steps to HealthKit first
+        await _writePedometerStepsToHealth();
 
-      // STEP 3: Now sync the authoritative HealthKit value to Firebase
-      final todayData = DailyStepData(
-        date: currentDate.value,
-        steps: todaySteps.value, // This now reflects HealthKit authoritative value
-        distance: todayDistance.value,
-        calories: todayCalories.value,
-        activeMinutes: todayActiveTime.value,
-        syncedAt: DateTime.now(),
-        source: 'healthkit', // Always HealthKit as source of truth
-        isSynced: false,
-        pedometerSteps: 0, // Reset since we wrote to HealthKit
-        healthKitSteps: todaySteps.value,
-      );
+        // STEP 2: Re-fetch from HealthKit to get authoritative value
+        // This ensures any pedometer steps we just wrote are included
+        await _fetchHealthKitBaseline();
 
-      // Save to repository (syncs to Firebase)
-      await _repository.saveDailyData(todayData, syncToFirebase: true);
+        // STEP 3: Now sync the authoritative HealthKit value to Firebase
+        final todayData = DailyStepData(
+          date: currentDate.value,
+          steps: todaySteps.value, // This now reflects HealthKit authoritative value
+          distance: todayDistance.value,
+          calories: todayCalories.value,
+          activeMinutes: todayActiveTime.value,
+          syncedAt: DateTime.now(),
+          source: 'healthkit', // Always HealthKit as source of truth
+          isSynced: false,
+          pedometerSteps: 0, // Reset since we wrote to HealthKit
+          healthKitSteps: todaySteps.value,
+        );
 
-      // Update overall summary
-      final summary = StepSummary(
-        totalDays: overallDays.value,
-        totalSteps: overallSteps.value,
-        totalDistanceKm: overallDistance.value,
-        totalCalories: todayCalories.value,
-        totalActiveTimeMinutes: todayActiveTime.value,
-        lastUpdated: DateTime.now(),
-      );
+        // Save to repository (syncs to Firebase)
+        await _repository.saveDailyData(todayData, syncToFirebase: true);
 
-      await _repository.updateStepSummary(summary);
+        // Update overall summary
+        final summary = StepSummary(
+          totalDays: overallDays.value,
+          totalSteps: overallSteps.value,
+          totalDistanceKm: overallDistance.value,
+          totalCalories: todayCalories.value,
+          totalActiveTimeMinutes: todayActiveTime.value,
+          lastUpdated: DateTime.now(),
+        );
 
-      lastSyncTime.value = DateTime.now();
-      print('✅ Sync complete: HealthKit ($todaySteps steps) → Firebase');
-    } catch (e) {
-      print('❌ Sync error: $e');
-    } finally {
-      isSyncing.value = false;
-    }
+        await _repository.updateStepSummary(summary);
+
+        lastSyncTime.value = DateTime.now();
+        print('✅ Sync complete: HealthKit ($todaySteps steps) → Firebase');
+      } catch (e) {
+        print('❌ Sync error: $e');
+      } finally {
+        isSyncing.value = false;
+      }
+    });
   }
 
   /// Update from HealthKit sync (called by external sync trigger)
   /// Only updates today's baseline - overall stats come from Firebase aggregation
+  /// Uses lock to prevent concurrent state updates
   Future<void> updateFromHealthSync({
     required int todayStepsFromHealth,
     required double todayDistanceFromHealth,
     required int todayCaloriesFromHealth,
     required int todayActiveTimeFromHealth,
   }) async {
-    try {
-      print('🏥 Updating from HealthKit sync...');
+    await _stateUpdateLock.synchronized(() async {
+      try {
+        print('🏥 Updating from HealthKit sync...');
 
-      // Store previous today's steps before updating
-      final previousTodaySteps = todaySteps.value;
+        // Store previous today's steps before updating
+        final previousTodaySteps = todaySteps.value;
 
-      // Update today's baselines
-      _healthKitBaselineSteps = todayStepsFromHealth;
-      _healthKitBaselineDistance = todayDistanceFromHealth;
-      _healthKitBaselineCalories = todayCaloriesFromHealth;
-      _healthKitBaselineActiveTime = todayActiveTimeFromHealth;
+        // Update today's baselines
+        _healthKitBaselineSteps = todayStepsFromHealth;
+        _healthKitBaselineDistance = todayDistanceFromHealth;
+        _healthKitBaselineCalories = todayCaloriesFromHealth;
+        _healthKitBaselineActiveTime = todayActiveTimeFromHealth;
 
-      // Reset pedometer session to avoid double counting
-      _pedometerService.resetSession();
+        // Reset pedometer session to avoid double counting
+        _pedometerService.resetSession();
 
-      // Update display
-      _updateTodayDisplay();
+        // Update display directly (we're already inside the lock, so don't call the synchronized version)
+        _updateTodayDisplayInternal();
 
-      // ✅ FIX: Manually update overall stats instead of querying Firebase
-      // Firebase write hasn't completed yet, so query would return stale data
-      // Calculate the delta and apply it to overall stats
-      final stepsDelta = todayStepsFromHealth - previousTodaySteps;
+        // ✅ FIX: Manually update overall stats instead of querying Firebase
+        // Firebase write hasn't completed yet, so query would return stale data
+        // Calculate the delta and apply it to overall stats
+        final stepsDelta = todayStepsFromHealth - previousTodaySteps;
 
-      overallSteps.value += stepsDelta;
-      overallDistance.value = (overallDistance.value - (previousTodaySteps * _stepsToKmFactor)) + todayDistanceFromHealth;
+        overallSteps.value += stepsDelta;
+        overallDistance.value = (overallDistance.value - (previousTodaySteps * _stepsToKmFactor)) + todayDistanceFromHealth;
 
-      print('✅ HealthKit sync applied successfully');
-      print('   Today: ${todaySteps.value} steps (was $previousTodaySteps)');
-      print('   Overall: ${overallSteps.value} steps (delta: $stepsDelta)');
+        print('✅ HealthKit sync applied successfully');
+        print('   Today: ${todaySteps.value} steps (was $previousTodaySteps)');
+        print('   Overall: ${overallSteps.value} steps (delta: $stepsDelta)');
 
-      // ✅ NEW: Propagate health sync delta to active races
-      // This ensures races get the same health-synced steps as the home screen
-      if (stepsDelta > 0 && Get.isRegistered<RaceStepSyncService>()) {
-        try {
-          final raceService = Get.find<RaceStepSyncService>();
-          await raceService.addHealthSyncSteps(stepsDelta);
-          print('✅ Added $stepsDelta health-synced steps to active races');
-        } catch (e) {
-          print('⚠️ Could not update RaceStepSyncService: $e');
+        // ✅ NEW: Propagate health sync delta to active races
+        // This ensures races get the same health-synced steps as the home screen
+        if (stepsDelta > 0 && Get.isRegistered<RaceStepSyncService>()) {
+          try {
+            final raceService = Get.find<RaceStepSyncService>();
+            await raceService.addHealthSyncSteps(stepsDelta);
+            print('✅ Added $stepsDelta health-synced steps to active races');
+          } catch (e) {
+            print('⚠️ Could not update RaceStepSyncService: $e');
+          }
         }
+      } catch (e) {
+        print('❌ Error applying HealthKit sync: $e');
       }
-    } catch (e) {
-      print('❌ Error applying HealthKit sync: $e');
-    }
+    });
   }
 
   /// Force refresh from HealthKit
@@ -790,24 +829,37 @@ class StepTrackingService extends GetxService {
 
       print('✅ Manual sync completed successfully');
 
-      // Reset success flag after 2 seconds
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!isManualSyncing.value) {
-          syncSuccess.value = false;
-          syncProgress.value = 0.0;
-          syncStatusMessage.value = '';
-        }
-      });
+      // Schedule reset of success flag after showing it for 2 seconds
+      // Use unawaited to avoid blocking, but handle cleanup properly
+      _scheduleManualSyncReset();
 
       return true;
     } catch (e) {
       print('❌ Manual sync error: $e');
       syncError.value = true;
       syncStatusMessage.value = 'Sync error: ${e.toString()}';
+
+      // Schedule reset for error state too
+      _scheduleManualSyncReset();
+
       return false;
     } finally {
       isManualSyncing.value = false;
     }
+  }
+
+  /// Schedule reset of manual sync UI state
+  /// Separated into its own method to avoid race conditions
+  void _scheduleManualSyncReset() {
+    Future.delayed(const Duration(seconds: 2), () {
+      // Only reset if no new sync has started
+      if (!isManualSyncing.value) {
+        syncSuccess.value = false;
+        syncError.value = false;
+        syncProgress.value = 0.0;
+        syncStatusMessage.value = '';
+      }
+    });
   }
 
   /// Get diagnostics for debugging

@@ -68,8 +68,10 @@ class DependencyInjection {
 
     // Register RaceStepSyncService as lazy permanent singleton
     // Syncs live pedometer steps to active race participants in real-time
-    // Depends on: StepTrackingService (must be initialized first)
-    Get.put<RaceStepSyncService>(RaceStepSyncService(), permanent: true);
+    // Depends on: PedometerService (must be initialized first)
+    // FIXED: Changed from Get.put to Get.lazyPut to respect dependency order
+    // The service will be initialized when first accessed, after PedometerService is ready
+    Get.lazyPut<RaceStepSyncService>(() => RaceStepSyncService(), fenix: true);
 
     // Register DatabaseController as lazy permanent singleton (market standard: Twitter, Facebook)
     // Only initialize when first accessed to improve startup performance
