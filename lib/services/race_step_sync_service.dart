@@ -501,9 +501,11 @@ class RaceStepSyncService extends GetxService {
   Future<void> _performSync() async {
     if (!isRunning.value) return;
 
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) return;
+    // Protect entire sync operation with lock to prevent concurrent baseline modifications
+    await _baselineUpdateLock.synchronized(() async {
+      try {
+        final currentUser = _auth.currentUser;
+        if (currentUser == null) return;
 
       // ===== STEP 1: Update cumulative counter with delta from pedometer =====
       final currentPedometerReading = _pedometerService.incrementalSteps;
@@ -636,12 +638,13 @@ class RaceStepSyncService extends GetxService {
 
         dev.log('✅ [RACE_SYNC] Synced to $updateCount race(s) successfully');
       }
-    } catch (e, stackTrace) {
-      dev.log('❌ [RACE_SYNC] Sync error: $e');
-      dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
-      hasError.value = true;
-      errorMessage.value = e.toString();
-    }
+      } catch (e, stackTrace) {
+        dev.log('❌ [RACE_SYNC] Sync error: $e');
+        dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
+        hasError.value = true;
+        errorMessage.value = e.toString();
+      }
+    });
   }
 
   /// Format time for display

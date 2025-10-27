@@ -221,24 +221,27 @@ class StepTrackingService extends GetxService {
           print('📝 No Firebase data for today yet - will sync after pedometer updates');
         }
 
-        // ✅ FIX: Calculate delta and update overall stats BEFORE updating display
-        // This ensures overall stats include the HealthKit baseline
-        final previousTodaySteps = todaySteps.value;
+        // ✅ FIX: Calculate delta and update overall stats atomically
+        // Protect from concurrent access using state update lock
+        await _stateUpdateLock.synchronized(() async {
+          final previousTodaySteps = todaySteps.value;
 
-        // Update display with baseline (before pedometer starts)
-        await _updateTodayDisplay();
+          // Update display with baseline (before pedometer starts)
+          // Use internal version since we're already inside the lock
+          _updateTodayDisplayInternal();
 
-        // Apply delta to overall stats
-        final stepsDelta = todaySteps.value - previousTodaySteps;
-        if (stepsDelta != 0) {
-          overallSteps.value += stepsDelta;
-          final distanceDelta = (_healthKitBaselineDistance - (previousTodaySteps * _stepsToKmFactor));
-          overallDistance.value += distanceDelta;
+          // Apply delta to overall stats
+          final stepsDelta = todaySteps.value - previousTodaySteps;
+          if (stepsDelta != 0) {
+            overallSteps.value += stepsDelta;
+            final distanceDelta = (_healthKitBaselineDistance - (previousTodaySteps * _stepsToKmFactor));
+            overallDistance.value += distanceDelta;
 
-          print('✅ Overall stats updated after HealthKit baseline fetch');
-          print('   Today delta: $stepsDelta steps');
-          print('   Overall steps: ${overallSteps.value}');
-        }
+            print('✅ Overall stats updated after HealthKit baseline fetch');
+            print('   Today delta: $stepsDelta steps');
+            print('   Overall steps: ${overallSteps.value}');
+          }
+        });
       } else {
         print('⚠️ No HealthKit data available for today, using local fallback');
         await _loadTodayDataFromLocal();

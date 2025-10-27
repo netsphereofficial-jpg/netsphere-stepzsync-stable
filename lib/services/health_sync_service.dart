@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:health/health.dart';
+import 'package:synchronized/synchronized.dart';
 import 'package:stepzsync/services/step_tracking_service.dart';
 import 'package:stepzsync/services/race_step_sync_service.dart';
 import '../config/health_config.dart';
@@ -46,6 +47,9 @@ class HealthSyncService extends GetxController {
   /// Future that completes when initialization is done
   /// Returns true if health services are available, false otherwise
   Future<bool> get initializationComplete => _initCompleter.future;
+
+  // Concurrency control - protect sync operations from concurrent access
+  final Lock _syncLock = Lock();
 
   @override
   void onInit() {
@@ -128,19 +132,17 @@ class HealthSyncService extends GetxController {
   Future<HealthSyncResult> syncHealthData({
     bool forceSync = false,
   }) async {
-    // Guard: Already syncing
+    // Early guard checks (before acquiring lock for performance)
     if (isSyncing.value) {
       print('${HealthConfig.logPrefix} Sync already in progress, skipping');
       return HealthSyncResult.failure('Sync already in progress');
     }
 
-    // Guard: Guest user
     if (GuestUtils.isGuest()) {
       print('${HealthConfig.logPrefix} Skipping sync for guest user');
       return HealthSyncResult.notAvailable();
     }
 
-    // Guard: Check if sync is needed
     if (!forceSync && !await _shouldSync()) {
       print('${HealthConfig.logPrefix} Sync not needed yet');
       return HealthSyncResult.success(
@@ -149,7 +151,15 @@ class HealthSyncService extends GetxController {
       );
     }
 
-    isSyncing.value = true;
+    // Protect entire sync operation with lock
+    return await _syncLock.synchronized(() async {
+      // Double-check inside lock
+      if (isSyncing.value) {
+        print('${HealthConfig.logPrefix} Sync already in progress (double-check)');
+        return HealthSyncResult.failure('Sync already in progress');
+      }
+
+      isSyncing.value = true;
 
     try {
       // Phase 1: Connecting
@@ -237,14 +247,15 @@ class HealthSyncService extends GetxController {
       print('${HealthConfig.logPrefix} Today: ${syncData.todaySteps} steps');
 
       return HealthSyncResult.success(syncData, 1); // Only 1 day synced (today)
-    } catch (e, stackTrace) {
-      print('${HealthConfig.logPrefix} ❌ Sync failed: $e');
-      print('${HealthConfig.logPrefix} Stack trace: $stackTrace');
-      _updateSyncStatus(HealthSyncStatus.failed);
-      return HealthSyncResult.failure(e.toString());
-    } finally {
-      isSyncing.value = false;
-    }
+      } catch (e, stackTrace) {
+        print('${HealthConfig.logPrefix} ❌ Sync failed: $e');
+        print('${HealthConfig.logPrefix} Stack trace: $stackTrace');
+        _updateSyncStatus(HealthSyncStatus.failed);
+        return HealthSyncResult.failure(e.toString());
+      } finally {
+        isSyncing.value = false;
+      }
+    });
   }
 
   /// Fetch today's health data

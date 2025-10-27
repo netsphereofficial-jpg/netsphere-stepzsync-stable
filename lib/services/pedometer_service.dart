@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:synchronized/synchronized.dart';
 import 'dart:io' show Platform;
 import 'pedometer_permission_monitor.dart';
 
@@ -31,6 +32,9 @@ class PedometerService extends GetxService {
   /// Future that completes when initialization is done
   /// Returns true if pedometer is available, false otherwise
   Future<bool> get initializationComplete => _initCompleter.future;
+
+  // Concurrency control - protect session state from concurrent access
+  final Lock _pedLock = Lock();
 
   /// Get incremental steps since app start (session-based)
   int get incrementalSteps => _incrementalSteps;
@@ -189,25 +193,28 @@ class PedometerService extends GetxService {
     try {
       print('👣 Pedometer event: ${event.steps} steps at ${event.timeStamp}');
 
-      // Set baseline on first reading
-      if (_sessionStartSteps == null) {
-        _sessionStartSteps = event.steps;
-        _incrementalSteps = 0;
-        print('📊 Session baseline set: $_sessionStartSteps steps');
-      } else {
-        // Calculate incremental steps since session start
-        _incrementalSteps = event.steps - _sessionStartSteps!;
-
-        // Handle pedometer resets (negative values)
-        if (_incrementalSteps < 0) {
-          print('⚠️ Pedometer reset detected, resetting baseline');
+      // Protect session state from concurrent access
+      _pedLock.synchronized(() {
+        // Set baseline on first reading
+        if (_sessionStartSteps == null) {
           _sessionStartSteps = event.steps;
           _incrementalSteps = 0;
-        }
-      }
+          print('📊 Session baseline set: $_sessionStartSteps steps');
+        } else {
+          // Calculate incremental steps since session start
+          _incrementalSteps = event.steps - _sessionStartSteps!;
 
-      currentStepCount.value = event.steps;
-      print('📊 Incremental steps this session: $_incrementalSteps');
+          // Handle pedometer resets (negative values)
+          if (_incrementalSteps < 0) {
+            print('⚠️ Pedometer reset detected, resetting baseline');
+            _sessionStartSteps = event.steps;
+            _incrementalSteps = 0;
+          }
+        }
+
+        currentStepCount.value = event.steps;
+        print('📊 Incremental steps this session: $_incrementalSteps');
+      });
     } catch (e) {
       print('❌ Error processing step count: $e');
     }
@@ -247,10 +254,13 @@ class PedometerService extends GetxService {
   /// Reset session (useful for new day or after HealthKit sync)
   void resetSession() {
     print('🔄 Resetting pedometer session...');
-    _sessionStartSteps = currentStepCount.value;
-    _incrementalSteps = 0;
-    _sessionStartTime = DateTime.now();
-    print('✅ Session reset. New baseline: $_sessionStartSteps steps');
+    // Protect session state from concurrent access
+    _pedLock.synchronized(() {
+      _sessionStartSteps = currentStepCount.value;
+      _incrementalSteps = 0;
+      _sessionStartTime = DateTime.now();
+      print('✅ Session reset. New baseline: $_sessionStartSteps steps');
+    });
   }
 
   /// Manually adjust baseline (e.g., after HealthKit sync)
