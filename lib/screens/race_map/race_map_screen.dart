@@ -407,12 +407,20 @@ class RaceMapScreen extends StatelessWidget {
                     );
                   }),
 
-                  mapController.formattedTime.value != "00:00:00"
-                      ? countDownTimer(
-                          mapController.raceStatus.value,
-                          mapController.formattedTime.value,
-                        )
-                      : SizedBox(),
+                  // Race countdown timer - hide in view-only mode
+                  Obx(() {
+                    // Hide countdown for completed users in view-only mode
+                    if (mapController.isViewOnlyMode.value) {
+                      return SizedBox.shrink();
+                    }
+
+                    return mapController.formattedTime.value != "00:00:00"
+                        ? countDownTimer(
+                            mapController.raceStatus.value,
+                            mapController.formattedTime.value,
+                          )
+                        : SizedBox();
+                  }),
 
                   // Milestone Tracker for Marathon (top-right floating)
                   Positioned(
