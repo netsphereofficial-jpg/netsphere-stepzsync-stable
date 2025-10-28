@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
 import 'pedometer_service.dart';
+import 'race_service.dart';
 import '../utils/race_validation_utils.dart';
 
 /// Race Baseline - Dual-layer tracking for robust race step synchronization
@@ -347,6 +348,13 @@ class RaceStepSyncService extends GetxService {
             .get();
 
         if (participantDoc.exists) {
+          // ✅ Filter out races where user has already completed
+          final isCompleted = participantDoc.data()?['isCompleted'] as bool? ?? false;
+          if (isCompleted) {
+            dev.log('⏭️ [RACE_SYNC] Skipping completed race: ${raceDoc.data()?['title']}');
+            continue;
+          }
+
           newActiveRaceIds.add(raceId);
           raceTitles[raceId] = raceDoc.data()?['title'] as String? ?? 'Unknown Race';
           dev.log('✅ [RACE_SYNC] User is participant in race: $raceId');
@@ -407,22 +415,29 @@ class RaceStepSyncService extends GetxService {
         dev.log('⚠️ [RACE_SYNC] No actualStartTime found for race $raceId, using current time');
       }
 
-      // Fetch current server steps (source of truth)
-      final serverSteps = await _fetchServerSteps(raceId);
+      // Fetch participant data including completion status (source of truth)
+      final participantData = await _fetchParticipantData(raceId);
 
-      // Create baseline with dual-layer tracking
+      // Create baseline with dual-layer tracking and completion status
       final baseline = RaceBaseline(
         raceId: raceId,
         raceTitle: raceTitle,
         startTime: raceStartTime,  // ✅ FIXED: Use actual race start time
-        serverSteps: serverSteps,  // Server state (persistent)
+        serverSteps: participantData.steps,  // Server state (persistent)
         sessionRaceSteps: 0,       // Start counting from 0 in this session
+        isCompleted: participantData.isCompleted,  // ✅ Load completion status
+        completedAt: participantData.completedAt,  // ✅ Load completion time
       );
 
       _raceBaselines[raceId] = baseline;
       await _saveBaselines();
 
-      dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle": server=$serverSteps, sessionSteps=0, started=${raceStartTime.toIso8601String()}');
+      // Log completion status for completed races
+      if (baseline.isCompleted) {
+        dev.log('🏁 [RACE_SYNC] Loaded completed race: "$raceTitle" (finished ${baseline.completedAt})');
+      } else {
+        dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle": server=${participantData.steps}, sessionSteps=0, started=${raceStartTime.toIso8601String()}');
+      }
     } catch (e) {
       dev.log('❌ [RACE_SYNC] Error setting baseline for race $raceId: $e');
     }
@@ -441,12 +456,15 @@ class RaceStepSyncService extends GetxService {
     }
   }
 
-  /// Fetch current server steps for a race (SOURCE OF TRUTH)
+  /// Fetch current server participant data for a race (SOURCE OF TRUTH)
   /// This is called on startup and when creating new race baselines
-  Future<int> _fetchServerSteps(String raceId) async {
+  /// Returns steps, completion status, and completion time
+  Future<({int steps, bool isCompleted, DateTime? completedAt})> _fetchParticipantData(String raceId) async {
     try {
       final currentUser = _auth.currentUser;
-      if (currentUser == null) return 0;
+      if (currentUser == null) {
+        return (steps: 0, isCompleted: false, completedAt: null);
+      }
 
       final participantDoc = await _firestore
           .collection('races')
@@ -456,16 +474,22 @@ class RaceStepSyncService extends GetxService {
           .get();
 
       if (participantDoc.exists) {
-        final steps = participantDoc.data()?['steps'] as int? ?? 0;
-        dev.log('📥 [RACE_SYNC] Fetched server steps for race $raceId: $steps');
-        return steps;
+        final data = participantDoc.data()!;
+        final steps = data['steps'] as int? ?? 0;
+        final isCompleted = data['isCompleted'] as bool? ?? false;
+        final completedAt = data['completedAt'] != null
+            ? (data['completedAt'] as Timestamp).toDate()
+            : null;
+
+        dev.log('📥 [RACE_SYNC] Fetched participant data for race $raceId: $steps steps, completed=$isCompleted');
+        return (steps: steps, isCompleted: isCompleted, completedAt: completedAt);
       } else {
-        dev.log('📥 [RACE_SYNC] No participant doc for race $raceId, server steps: 0');
-        return 0;
+        dev.log('📥 [RACE_SYNC] No participant doc for race $raceId, returning defaults');
+        return (steps: 0, isCompleted: false, completedAt: null);
       }
     } catch (e) {
-      dev.log('❌ [RACE_SYNC] Error fetching server steps for race $raceId: $e');
-      return 0;
+      dev.log('❌ [RACE_SYNC] Error fetching participant data for race $raceId: $e');
+      return (steps: 0, isCompleted: false, completedAt: null);
     }
   }
 
@@ -479,13 +503,15 @@ class RaceStepSyncService extends GetxService {
         final raceId = entry.key;
         final baseline = entry.value;
 
-        // Fetch fresh server steps
-        final serverSteps = await _fetchServerSteps(raceId);
+        // Fetch fresh participant data including completion status
+        final participantData = await _fetchParticipantData(raceId);
 
         // Update baseline with server state
-        baseline.serverSteps = serverSteps;
+        baseline.serverSteps = participantData.steps;
+        baseline.isCompleted = participantData.isCompleted;  // ✅ Sync completion status
+        baseline.completedAt = participantData.completedAt;  // ✅ Sync completion time
 
-        dev.log('   ✅ "${baseline.raceTitle}": server=$serverSteps steps');
+        dev.log('   ✅ "${baseline.raceTitle}": server=${participantData.steps} steps, completed=${participantData.isCompleted}');
       }
 
       // Save updated baselines
@@ -640,6 +666,12 @@ class RaceStepSyncService extends GetxService {
             baseline = _raceBaselines[raceId]!;
           }
 
+          // ✅ SKIP STEP SYNC FOR COMPLETED USERS (view-only mode)
+          if (baseline.isCompleted) {
+            dev.log('⏭️ [RACE_SYNC] Skipping sync for completed race: "${baseline.raceTitle}"');
+            continue;
+          }
+
           // Calculate race steps using SIMPLIFIED DUAL-LAYER FORMULA:
           // totalRaceSteps = serverSteps + sessionRaceSteps
           //
@@ -751,54 +783,51 @@ class RaceStepSyncService extends GetxService {
               .collection('participants')
               .doc(currentUser.uid);
 
-          dev.log('🔥 [RACE_SYNC] Writing to Firebase: "${baseline.raceTitle}" = $cappedTotalRaceSteps steps');
+          dev.log('🔥 [RACE_SYNC] Updating race progress via RaceService: "${baseline.raceTitle}" = $cappedTotalRaceSteps steps');
 
-          // ✅ COMPLETION DETECTION: Check if participant finished the race
-          final wasNotCompleted = !baseline.isCompleted;
-          final isNowCompleted = remainingDistance <= 0.05; // 50-meter tolerance (0.05 km) for GPS drift
+          // ✅ Use RaceService.updateParticipantRealTimeData to properly trigger completion logic
+          // This ensures state machine transitions, celebration dialogs, and countdown timers work correctly
+          try {
+            await RaceService.updateParticipantRealTimeData(
+              raceId: raceId,
+              userId: currentUser.uid,
+              distance: cappedRaceDistance,
+              steps: cappedTotalRaceSteps,
+              calories: cappedCalories,
+              avgSpeed: cappedAvgSpeed,
+              isCompleted: false,  // Let RaceService._checkRaceCompletion determine this
+            );
 
-          if (wasNotCompleted && isNowCompleted) {
-            // Participant just completed the race!
-            dev.log('🏁 [RACE_SYNC] PARTICIPANT COMPLETED RACE: "${baseline.raceTitle}"');
+            dev.log('✅ [RACE_SYNC] Race progress updated successfully for "${baseline.raceTitle}"');
 
-            // Mark baseline as completed
-            baseline.isCompleted = true;
-            baseline.completedAt = DateTime.now();
-
-            // Get finish order (count of completed participants + 1)
-            final completedSnapshot = await _firestore
+            // ✅ Check if user completed during this update
+            // Re-fetch participant data to see if completion was triggered
+            final participantDoc = await _firestore
                 .collection('races')
                 .doc(raceId)
                 .collection('participants')
-                .where('isCompleted', isEqualTo: true)
+                .doc(currentUser.uid)
                 .get();
 
-            final finishOrder = completedSnapshot.docs.length + 1;
+            if (participantDoc.exists) {
+              final wasNotCompleted = !baseline.isCompleted;
+              final isNowCompleted = participantDoc.data()?['isCompleted'] as bool? ?? false;
 
-            dev.log('   🥇 Finish order: #$finishOrder');
+              if (wasNotCompleted && isNowCompleted) {
+                // User just completed! Update baseline
+                baseline.isCompleted = true;
+                baseline.completedAt = participantDoc.data()?['completedAt'] != null
+                    ? (participantDoc.data()?['completedAt'] as Timestamp).toDate()
+                    : DateTime.now();
 
-            // Write completion data to Firebase with timeout
-            await participantRef.set({
-              'steps': cappedTotalRaceSteps,
-              'distance': cappedRaceDistance,
-              'remainingDistance': 0.0, // Force to exactly 0 when completed
-              'calories': cappedCalories,
-              'avgSpeed': cappedAvgSpeed,
-              'isCompleted': true,
-              'completedAt': FieldValue.serverTimestamp(),
-              'finishOrder': finishOrder,
-              'lastUpdated': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true)).timeout(Duration(seconds: 10), onTimeout: () {
-              dev.log('❌ [RACE_SYNC] Timeout writing completion data for race $raceId');
-              throw TimeoutException('Firebase write timeout');
-            });
+                dev.log('🏁 [RACE_SYNC] Baseline marked as completed for "${baseline.raceTitle}"');
+              }
+            }
+          } catch (e) {
+            dev.log('❌ [RACE_SYNC] Error updating race progress via RaceService: $e');
+            // Fallback to direct Firebase write if RaceService call fails
+            dev.log('⚠️ [RACE_SYNC] Falling back to direct Firebase write');
 
-            dev.log('✅ [RACE_SYNC] Completion data written to Firebase');
-
-            // TODO: Trigger race state machine if first finisher
-            // TODO: Send completion notification
-          } else {
-            // Normal update (not completed yet, or was already completed)
             await participantRef.set({
               'steps': cappedTotalRaceSteps,
               'distance': cappedRaceDistance,
@@ -811,7 +840,7 @@ class RaceStepSyncService extends GetxService {
               throw TimeoutException('Firebase write timeout');
             });
 
-            dev.log('✅ [RACE_SYNC] Firebase write complete for "${baseline.raceTitle}"');
+            dev.log('✅ [RACE_SYNC] Fallback Firebase write complete');
           }
 
           // ✅ CRITICAL: Update server state and reset session counter

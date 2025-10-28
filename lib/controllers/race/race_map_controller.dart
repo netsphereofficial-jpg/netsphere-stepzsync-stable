@@ -71,6 +71,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
   final RxBool raceClosed = false.obs;
   final RxMap<String, dynamic> participantInfo = <String, dynamic>{}.obs;
 
+  // View-only mode state (for completed users watching others race)
+  final RxBool isViewOnlyMode = false.obs;
+
   //CountDown
   final RxString formattedTime = '00:00:00'.obs;
   late Duration _remaining;

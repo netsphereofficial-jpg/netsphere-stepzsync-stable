@@ -285,7 +285,8 @@ class RaceMapScreen extends StatelessWidget {
             final currentUserFinished = currentUserCompleted || remainingDistanceZero;
             final raceCompleted = mapController.raceStatus.value == 4;
 
-            final showWinnerScreen = currentUserFinished || raceCompleted;
+            // Show WinnerWidget if user finished or race completed, BUT NOT in view-only mode
+            final showWinnerScreen = (currentUserFinished || raceCompleted) && !mapController.isViewOnlyMode.value;
 
             if (showWinnerScreen) {
               return WinnerWidget(
@@ -349,6 +350,58 @@ class RaceMapScreen extends StatelessWidget {
                             ),
                             child: _buildStats(mapController),
                           ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // View-Only Mode Banner (for completed users watching others)
+                  Obx(() {
+                    if (!mapController.isViewOnlyMode.value) {
+                      return SizedBox.shrink();
+                    }
+
+                    return Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.appColor,
+                              AppColors.appColor.withValues(alpha: 0.8),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.visibility,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              "You've finished! Watching others race...",
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -1382,6 +1435,11 @@ class RaceMapScreen extends StatelessWidget {
   // ============ MOTIVATION MESSAGES ============
 
   Widget _buildMotivationMessage(MapController controller) {
+    // Hide motivation messages in view-only mode (completed users watching)
+    if (controller.isViewOnlyMode.value) {
+      return SizedBox.shrink();
+    }
+
     if (controller.raceStatus.value != 3 && controller.raceStatus.value != 6) {
       return SizedBox.shrink();
     }
@@ -1454,6 +1512,11 @@ class RaceMapScreen extends StatelessWidget {
   // ============ COMPACT GAP INDICATOR ============
 
   Widget _buildCompactGapIndicator(BuildContext context, MapController controller) {
+    // Hide in view-only mode (completed users watching)
+    if (controller.isViewOnlyMode.value) {
+      return SizedBox.shrink();
+    }
+
     // Hide for solo races
     if (!_shouldShowGapAnalysis()) return SizedBox.shrink();
 
@@ -1700,6 +1763,11 @@ class RaceMapScreen extends StatelessWidget {
   // ============ MILESTONE TRACKER FOR MARATHON ============
 
   Widget _buildMilestoneTracker(MapController controller) {
+    // Hide in view-only mode (completed users watching)
+    if (controller.isViewOnlyMode.value) {
+      return SizedBox.shrink();
+    }
+
     if (raceModel?.raceTypeId != 4) return SizedBox.shrink(); // Marathon only
     if (controller.raceStatus.value != 3 && controller.raceStatus.value != 6) {
       return SizedBox.shrink();
@@ -2037,166 +2105,210 @@ class WinnerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       height: size.height,
       width: size.width,
-      child: Stack(
+      color: Colors.white,
+      child: Column(
         children: [
-          Positioned(
-            top: size.height * 0.15,
-            left: 0,
-            right: 0,
-            child: SvgPicture.asset(
-              IconPaths.winnerCup,
-              width: size.width,
-              height: size.height * 0.15,
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: SvgPicture.asset(
-              IconPaths.bottomBg,
-              width: size.width,
-              height: size.height * 0.5,
-              fit: BoxFit.fill,
+          // Custom App Bar
+          CustomAppBar(
+            title: "Race Completed",
+            isBack: false,
+            circularBackButton: false,
+            backgroundColor: Colors.white,
+            titleColor: AppColors.appColor,
+            showGradient: false,
+            titleStyle: GoogleFonts.roboto(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.appColor,
             ),
           ),
 
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: SizedBox(
-              height: size.height * 0.5,
-              child: Column(
-                children: [
-                  SizedBox(height: size.height * 0.1),
-                  Text(
-                    "Hurray!",
-                    style: GoogleFonts.poppins(
-                      fontSize: 35,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.buttonBlack,
-                    ),
-                  ),
-                  Text(
-                    "You’ve completed the race!",
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.iconGrey,
-                    ),
-                  ),
-                  SizedBox(height: size.height * 0.08),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SvgPicture.asset(
-                        IconPaths.radioIcon,
-                        color: AppColors.iconGrey,
-                        width: 20,
-                        height: 20,
-                      ),
-                      SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 2.0),
-                        child: SizedBox(
-                          width: size.width * 0.6,
-                          child: VerticalDashedDivider(
-                            isHorizontal: true,
-                            dashHeight: 5,
-                            dashSpacing: 2,
-                            color: AppColors.iconGrey,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      SvgPicture.asset(
-                        IconPaths.locationIcon,
-                        color: AppColors.iconGrey,
-                        width: 20,
-                        height: 20,
-                      ),
-                      SizedBox(height: 10),
-                    ],
-                  ),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  children: [
+                    SizedBox(height: 20),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        SizedBox(
-                          width: size.width * 0.4,
-                          child: Text(
-                            "${raceModel?.startAddress}",
-                            style: GoogleFonts.poppins(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                    // Trophy Icon with Gradient
+                    Container(
+                      padding: EdgeInsets.all(30),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.appColor.withOpacity(0.1),
+                            AppColors.neonYellow.withOpacity(0.1),
+                          ],
                         ),
-                        SizedBox(
-                          width: size.width * 0.4,
-                          child: Text(
-                            "${raceModel?.endAddress}",
-                            style: GoogleFonts.poppins(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
+                        shape: BoxShape.circle,
+                      ),
+                      child: SvgPicture.asset(
+                        IconPaths.winnerCup,
+                        width: 100,
+                        height: 100,
+                      ),
                     ),
-                  ),
-                  Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                    child: Obx(
-                      () {
-                        // Only allow viewing results when race is globally completed (status 4)
-                        final isCompleted = mapController.raceStatus.value == 4;
 
-                        return Column(
-                          children: [
-                            // Show waiting message if race is not completed
-                            if (!isCompleted)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-                                child: Text(
-                                  "Race still in progress. Results will be available when the race completes.",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.iconGrey,
-                                  ),
-                                  textAlign: TextAlign.center,
+                    SizedBox(height: 24),
+
+                    // Hurray Text
+                    Text(
+                      "Hurray!",
+                      style: GoogleFonts.poppins(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.buttonBlack,
+                      ),
+                    ),
+
+                    SizedBox(height: 8),
+
+                    Text(
+                      "You've completed the race!",
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.iconGrey,
+                      ),
+                    ),
+
+                    SizedBox(height: 32),
+
+                    // Race Route Card
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SvgPicture.asset(
+                                IconPaths.radioIcon,
+                                color: AppColors.appColor,
+                                width: 20,
+                                height: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: VerticalDashedDivider(
+                                  isHorizontal: true,
+                                  dashHeight: 5,
+                                  dashSpacing: 2,
+                                  color: AppColors.iconGrey,
+                                  width: 2,
                                 ),
                               ),
+                              SizedBox(width: 8),
+                              SvgPicture.asset(
+                                IconPaths.locationIcon,
+                                color: AppColors.neonYellow,
+                                width: 20,
+                                height: 20,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  "${raceModel?.startAddress}",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                  textAlign: TextAlign.left,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  "${raceModel?.endAddress}",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                  textAlign: TextAlign.right,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
 
-                            CustomButton(
-                              btnTitle: "View results",
-                              onPress: isCompleted ? () async {
-                                await _handleViewResults(
-                                  context,
-                                  raceModel!,
-                                  mapController.participantsList,
-                                );
-                              } : null,
+                    SizedBox(height: 32),
+
+                    // Info Text
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.appColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.appColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              "Watch others racing and see live updates!",
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.buttonBlack,
+                              ),
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 24),
+
+                    // View Results Button - Always enabled
+                    CustomButton(
+                      btnTitle: "View Race Map",
+                      onPress: () async {
+                        await _handleViewResults(
+                          context,
+                          raceModel!,
+                          mapController.participantsList,
                         );
                       },
                     ),
-                  ),
-                  SizedBox(height: 10),
-                ],
+
+                    SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2205,9 +2317,10 @@ class WinnerWidget extends StatelessWidget {
     );
   }
 
-  // ============ AD-GATED VIEW RESULTS ============
+  // ============ AD-GATED VIEW RACE MAP ============
 
-  /// Handle viewing race results with ad gate for free users
+  /// Handle viewing race map with ad gate for free users
+  /// Dismisses WinnerWidget and activates view-only mode
   Future<void> _handleViewResults(
     BuildContext context,
     RaceData raceData,
@@ -2227,11 +2340,8 @@ class WinnerWidget extends StatelessWidget {
 
       if (isPremium) {
         // Premium users get direct access
-        print('✅ Premium user - direct access to results');
-        Get.to(() => RaceWinnersScreen(
-          raceData: raceData,
-          participants: participants,
-        ));
+        print('✅ Premium user - direct access to view-only mode');
+        _activateViewOnlyMode();
         return;
       }
 
@@ -2264,14 +2374,11 @@ class WinnerWidget extends StatelessWidget {
         if (context.mounted) {
           _showSnackbar(
             context,
-            'Ad failed to load. Showing results anyway...',
+            'Ad failed to load. Showing race map anyway...',
             isError: false,
           );
         }
-        Get.to(() => RaceWinnersScreen(
-          raceData: raceData,
-          participants: participants,
-        ));
+        _activateViewOnlyMode();
         return;
       }
 
@@ -2280,17 +2387,14 @@ class WinnerWidget extends StatelessWidget {
 
       if (watchedAd) {
         // User watched the ad - grant access
-        print('✅ User watched ad - granting access to results');
-        Get.to(() => RaceWinnersScreen(
-          raceData: raceData,
-          participants: participants,
-        ));
+        print('✅ User watched ad - activating view-only mode');
+        _activateViewOnlyMode();
       } else {
         // User closed ad without watching
         if (context.mounted) {
           _showSnackbar(
             context,
-            'Please watch the ad to view results',
+            'Please watch the ad to view race map',
             isError: true,
           );
         }
@@ -2298,11 +2402,14 @@ class WinnerWidget extends StatelessWidget {
     } catch (e) {
       print('❌ Error handling view results: $e');
       // On error, allow access (fail gracefully)
-      Get.to(() => RaceWinnersScreen(
-        raceData: raceData,
-        participants: participants,
-      ));
+      _activateViewOnlyMode();
     }
+  }
+
+  /// Activate view-only mode - dismiss WinnerWidget and show race map with banner
+  void _activateViewOnlyMode() {
+    print('🔄 Activating view-only mode');
+    mapController.isViewOnlyMode.value = true;
   }
 
   /// Show loading dialog while ad loads
