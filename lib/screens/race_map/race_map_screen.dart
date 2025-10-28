@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2435,7 +2436,21 @@ class RaceWinnersScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: CustomAppBar(title: "Race Winners", isBack: true),
+      appBar: CustomAppBar(
+        title: "Race Winners",
+        isBack: true,
+        circularBackButton: true,
+        backButtonCircleColor: AppColors.neonYellow,
+        backButtonIconColor: Colors.black,
+        backgroundColor: Colors.white,
+        titleColor: AppColors.appColor,
+        showGradient: false,
+        titleStyle: GoogleFonts.roboto(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: AppColors.appColor,
+        ),
+      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Padding(
@@ -2449,8 +2464,8 @@ class RaceWinnersScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.amber.shade400,
-                      Colors.orange.shade500,
+                      AppColors.appColor,
+                      AppColors.appColor.withValues(alpha: 0.8),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -2458,7 +2473,7 @@ class RaceWinnersScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.amber.withValues(alpha: 0.3),
+                      color: AppColors.appColor.withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -2466,9 +2481,10 @@ class RaceWinnersScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    const Text(
-                      '🏆',
-                      style: TextStyle(fontSize: 48),
+                    const Icon(
+                      Icons.emoji_events,
+                      size: 48,
+                      color: Colors.white,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -2495,7 +2511,7 @@ class RaceWinnersScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildHeaderStat(
-                          '👥',
+                          Icons.group,
                           '${participants.length}',
                           'Racers',
                         ),
@@ -2505,7 +2521,7 @@ class RaceWinnersScreen extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.3),
                         ),
                         _buildHeaderStat(
-                          '📏',
+                          Icons.straighten,
                           '${raceData?.totalDistance?.toStringAsFixed(1) ?? '0'} km',
                           'Distance',
                         ),
@@ -2515,7 +2531,7 @@ class RaceWinnersScreen extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.3),
                         ),
                         _buildHeaderStat(
-                          '✅',
+                          Icons.check_circle,
                           '${participants.where((p) => p.isCompleted).length}',
                           'Finished',
                         ),
@@ -2537,8 +2553,8 @@ class RaceWinnersScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Colors.amber.shade400,
-                            Colors.amber.shade600,
+                            AppColors.appColor,
+                            AppColors.appColor.withValues(alpha: 0.85),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(20),
@@ -2546,7 +2562,7 @@ class RaceWinnersScreen extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('🏆', style: TextStyle(fontSize: 16)),
+                          const Icon(Icons.emoji_events, size: 16, color: Colors.white),
                           const SizedBox(width: 6),
                           Text(
                             'Top 3 Finishers',
@@ -2672,13 +2688,13 @@ class RaceWinnersScreen extends StatelessWidget {
                               Row(
                                 children: [
                                   _buildCompactStat(
-                                    '📏',
-                                    '${participant.distance.toStringAsFixed(2)} km',
+                                    Icons.straighten,
+                                    '${min(participant.distance, raceData?.totalDistance ?? double.infinity).toStringAsFixed(2)} km',
                                   ),
                                   if (participant.avgSpeed > 0) ...[
                                     const SizedBox(width: 12),
                                     _buildCompactStat(
-                                      '⚡',
+                                      Icons.speed,
                                       '${participant.avgSpeed.toStringAsFixed(1)} km/h',
                                     ),
                                   ],
@@ -2726,7 +2742,7 @@ class RaceWinnersScreen extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.3),
+                    color: Colors.grey.withValues(alpha: 0.3),
                     width: 2,
                   ),
                   boxShadow: [
@@ -2824,7 +2840,7 @@ class RaceWinnersScreen extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('👥', style: TextStyle(fontSize: 16)),
+                          const Icon(Icons.group, size: 16, color: Colors.white),
                           const SizedBox(width: 6),
                           Text(
                             'All Participants',
@@ -2868,12 +2884,12 @@ class RaceWinnersScreen extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 6),
                       decoration: BoxDecoration(
                         color: isTopThree
-                            ? Colors.amber.withValues(alpha: 0.05)
+                            ? AppColors.appColor.withValues(alpha: 0.05)
                             : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isTopThree
-                              ? Colors.amber.withValues(alpha: 0.2)
+                              ? AppColors.appColor.withValues(alpha: 0.2)
                               : Colors.grey.withValues(alpha: 0.15),
                           width: 1,
                         ),
@@ -2893,8 +2909,8 @@ class RaceWinnersScreen extends StatelessWidget {
                                 gradient: isTopThree
                                     ? LinearGradient(
                                         colors: [
-                                          Colors.amber.shade300,
-                                          Colors.amber.shade500,
+                                          AppColors.appColor.withValues(alpha: 0.9),
+                                          AppColors.appColor,
                                         ],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
@@ -2909,7 +2925,7 @@ class RaceWinnersScreen extends StatelessWidget {
                                 boxShadow: isTopThree
                                     ? [
                                         BoxShadow(
-                                          color: Colors.amber.withValues(alpha: 0.3),
+                                          color: AppColors.appColor.withValues(alpha: 0.3),
                                           blurRadius: 6,
                                           offset: const Offset(0, 2),
                                         ),
@@ -2950,13 +2966,13 @@ class RaceWinnersScreen extends StatelessWidget {
                                   Row(
                                     children: [
                                       _buildCompactStat(
-                                        '📏',
-                                        '${participant.distance.toStringAsFixed(2)} km',
+                                        Icons.straighten,
+                                        '${min(participant.distance, raceData?.totalDistance ?? double.infinity).toStringAsFixed(2)} km',
                                       ),
                                       if (participant.avgSpeed > 0) ...[
                                         const SizedBox(width: 10),
                                         _buildCompactStat(
-                                          '⚡',
+                                          Icons.speed,
                                           '${participant.avgSpeed.toStringAsFixed(1)} km/h',
                                         ),
                                       ],
@@ -2994,11 +3010,11 @@ class RaceWinnersScreen extends StatelessWidget {
   }
 
   /// Helper method to build compact stat displays
-  static Widget _buildCompactStat(String icon, String text) {
+  static Widget _buildCompactStat(IconData icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(icon, style: const TextStyle(fontSize: 11)),
+        Icon(icon, size: 13, color: AppColors.iconGrey),
         const SizedBox(width: 3),
         Text(
           text,
@@ -3013,10 +3029,10 @@ class RaceWinnersScreen extends StatelessWidget {
   }
 
   /// Helper method to build header stat displays
-  static Widget _buildHeaderStat(String icon, String value, String label) {
+  static Widget _buildHeaderStat(IconData icon, String value, String label) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
+        Icon(icon, size: 24, color: Colors.white),
         const SizedBox(height: 4),
         Text(
           value,
