@@ -64,6 +64,9 @@ class StepTrackingService extends GetxService {
   int _healthKitBaselineCalories = 0;
   int _healthKitBaselineActiveTime = 0;
 
+  // Track what was last propagated to races (prevents duplicate/zero counting)
+  int _lastPropagatedToRaces = 0;
+
   Timer? _periodicSyncTimer;
   Timer? _midnightCheckTimer;
   bool _isInitializing = false;
@@ -182,6 +185,35 @@ class StepTrackingService extends GetxService {
         _healthKitBaselineActiveTime = healthData['activeMinutes'] as int? ?? 0;
 
         print('✅ HealthKit baseline: $_healthKitBaselineSteps steps, ${_healthKitBaselineDistance}km');
+
+        // Calculate delta using separate tracker (prevents duplicate/zero counting on sequential syncs)
+        final stepsDelta = _healthKitBaselineSteps - _lastPropagatedToRaces;
+
+        if (stepsDelta > 0) {
+          print('🏥 HealthKit delta for races: $stepsDelta steps (lastPropagated: $_lastPropagatedToRaces → $_healthKitBaselineSteps)');
+
+          // Propagate to active races
+          if (Get.isRegistered<RaceStepSyncService>()) {
+            try {
+              final raceService = Get.find<RaceStepSyncService>();
+              await raceService.addHealthSyncSteps(stepsDelta);
+
+              // Update tracker AFTER successful propagation
+              _lastPropagatedToRaces = _healthKitBaselineSteps;
+              print('✅ Propagated $stepsDelta steps to active races');
+            } catch (e) {
+              print('⚠️ Could not propagate steps to races: $e');
+              // Don't update tracker if propagation failed
+            }
+          } else {
+            // Service not registered yet - steps will be queued in pending
+            print('⏳ RaceStepSyncService not registered, steps will be queued');
+          }
+        } else if (stepsDelta < 0) {
+          print('⚠️ HealthKit steps decreased by ${stepsDelta.abs()} (data deletion?) - not propagating to races');
+        } else {
+          print('ℹ️ No new HealthKit steps to propagate (already synced: $_lastPropagatedToRaces steps)');
+        }
 
         // CONFLICT RESOLUTION: Check if Firebase has different value
         final todayDate = currentDate.value;
@@ -614,10 +646,7 @@ class StepTrackingService extends GetxService {
       try {
         print('🏥 Updating from HealthKit sync...');
 
-        // Store previous today's steps before updating
-        final previousTodaySteps = todaySteps.value;
-
-        // Update today's baselines
+        // Update today's baselines (display only - race propagation handled by _fetchHealthKitBaseline)
         _healthKitBaselineSteps = todayStepsFromHealth;
         _healthKitBaselineDistance = todayDistanceFromHealth;
         _healthKitBaselineCalories = todayCaloriesFromHealth;
@@ -630,27 +659,33 @@ class StepTrackingService extends GetxService {
         _updateTodayDisplayInternal();
 
         print('✅ HealthKit sync applied successfully');
-        print('   Today: ${todaySteps.value} steps (was $previousTodaySteps)');
-
-        // Calculate delta for race sync
-        final stepsDelta = todayStepsFromHealth - previousTodaySteps;
-
-        // Propagate health sync delta to active races
-        if (stepsDelta > 0 && Get.isRegistered<RaceStepSyncService>()) {
-          try {
-            final raceService = Get.find<RaceStepSyncService>();
-            await raceService.addHealthSyncSteps(stepsDelta);
-            print('✅ Added $stepsDelta health-synced steps to active races');
-          } catch (e) {
-            print('⚠️ Could not update RaceStepSyncService: $e');
-          }
-        }
-
+        print('   Today: ${todaySteps.value} steps');
         print('   Overall: ${overallSteps.value} steps');
       } catch (e) {
         print('❌ Error applying HealthKit sync: $e');
       }
     });
+
+    // Propagate delta to races (OUTSIDE the lock to prevent deadlock)
+    final stepsDelta = _healthKitBaselineSteps - _lastPropagatedToRaces;
+
+    if (stepsDelta > 0) {
+      print('🏥 HealthKit delta for races: $stepsDelta steps (lastPropagated: $_lastPropagatedToRaces → $_healthKitBaselineSteps)');
+
+      if (Get.isRegistered<RaceStepSyncService>()) {
+        try {
+          final raceService = Get.find<RaceStepSyncService>();
+          await raceService.addHealthSyncSteps(stepsDelta);
+
+          _lastPropagatedToRaces = _healthKitBaselineSteps;
+          print('✅ Propagated $stepsDelta steps to active races');
+        } catch (e) {
+          print('⚠️ Could not propagate steps to races: $e');
+        }
+      }
+    } else if (stepsDelta == 0) {
+      print('ℹ️ No new HealthKit steps to propagate (already synced: $_lastPropagatedToRaces steps)');
+    }
   }
 
   /// Force refresh from HealthKit

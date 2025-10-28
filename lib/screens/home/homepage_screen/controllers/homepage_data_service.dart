@@ -1417,21 +1417,7 @@ class HomepageDataService extends GetxController {
         // ✅ Show sync dialog immediately - it will handle permission requests internally
         // The dialog will show different states: requesting permissions, syncing, error, etc.
         print('🏥 [HOMEPAGE_DATA] Showing health sync dialog...');
-        Get.dialog(
-          HealthSyncDialog(
-            syncStatusStream: _healthSyncService!.syncStatusStream,
-            onSyncComplete: () async {
-              print('✅ [HOMEPAGE_DATA] Sync dialog dismissed');
 
-              // Request location permission after health sync completes
-              if (context.mounted) {
-                await _requestLocationPermissionAfterSync(context);
-              }
-            },
-          ),
-          barrierDismissible: false,
-          barrierColor: Colors.black.withOpacity(0.7),
-        );
 
         // Request permissions if needed (this will happen while dialog is visible)
         if (!_healthSyncService!.hasPermissions.value) {
@@ -1493,47 +1479,6 @@ class HomepageDataService extends GetxController {
 
   /// Request location permission after health sync completes
   /// Shows explanation dialog and requests "Always Allow" permission for background tracking
-  Future<void> _requestLocationPermissionAfterSync(BuildContext context) async {
-    try {
-      print('📍 [HOMEPAGE_DATA] Checking location permission status...');
-
-      // Check if location permission is already granted
-      final hasPermission = await PermissionService.hasBackgroundLocationPermission();
-      if (hasPermission) {
-        print('✅ [HOMEPAGE_DATA] Location permission already granted');
-
-        // Start background location tracking if not already running
-        final locationService = BackgroundLocationService();
-        if (!locationService.isTracking) {
-          print('📍 [HOMEPAGE_DATA] Starting background location service (permission already granted)');
-          final started = await locationService.startBackgroundTracking();
-          if (started) {
-            print('✅ [HOMEPAGE_DATA] Background location tracking started');
-          }
-        } else {
-          print('✅ [HOMEPAGE_DATA] Background location tracking already active');
-        }
-        return;
-      }
-
-      // Check if dialog has already been shown
-      final prefsService = PreferencesService();
-      final hasShownDialog = await prefsService.hasShownBackgroundLocationDialog();
-      if (hasShownDialog) {
-        print('ℹ️ [HOMEPAGE_DATA] Background location dialog already shown previously');
-        return;
-      }
-
-
-
-      if (!context.mounted) return;
-
-
-    } catch (e, stackTrace) {
-      print('❌ [HOMEPAGE_DATA] Error requesting location permission: $e');
-      print('📍 Stack trace: $stackTrace');
-    }
-  }
 
   // ================== END HEALTH SYNC INTEGRATION ==================
 

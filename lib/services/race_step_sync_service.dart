@@ -110,6 +110,10 @@ class RaceStepSyncService extends GetxService {
   int _lastPedometerReading = 0;  // Last pedometer incremental reading
   int _cumulativeSteps = 0;        // Cumulative steps for current session (survives pedometer resets)
 
+  // ================== PENDING HEALTHKIT STEPS ==================
+  // Buffer for HealthKit steps received before service starts running
+  int _pendingHealthKitSteps = 0;
+
   // ================== CONCURRENCY CONTROL ==================
   /// Lock for baseline updates to prevent race conditions
   final Lock _baselineUpdateLock = Lock();
@@ -217,6 +221,37 @@ class RaceStepSyncService extends GetxService {
       await _refreshActiveRaces();
 
       dev.log('📊 [RACE_SYNC] Active races after refresh: ${_activeRaceIds.length}');
+
+      // Apply any pending HealthKit steps that arrived before service started
+      if (_pendingHealthKitSteps > 0 && _activeRaceIds.isNotEmpty) {
+        dev.log('🔄 [RACE_SYNC] Applying $_pendingHealthKitSteps pending HealthKit steps to active races...');
+
+        // Add pending steps to cumulative counter
+        _cumulativeSteps += _pendingHealthKitSteps;
+
+        // Add to each active race's session steps
+        for (final raceId in _activeRaceIds) {
+          final baseline = _raceBaselines[raceId];
+          if (baseline != null) {
+            baseline.sessionRaceSteps += _pendingHealthKitSteps;
+            dev.log('   ✅ "${baseline.raceTitle}": +$_pendingHealthKitSteps steps from pending health sync');
+          }
+        }
+
+        // Save updated baselines
+        await _saveBaselines();
+
+        // Clear pending steps
+        final appliedSteps = _pendingHealthKitSteps;
+        _pendingHealthKitSteps = 0;
+
+        dev.log('✅ [RACE_SYNC] Applied $appliedSteps pending HealthKit steps to ${_activeRaceIds.length} race(s)');
+
+        // Trigger immediate sync to Firebase to update race progress
+        await _performSync();
+      } else if (_pendingHealthKitSteps > 0) {
+        dev.log('ℹ️ [RACE_SYNC] $_pendingHealthKitSteps pending HealthKit steps, but no active races yet');
+      }
       dev.log('📊 [RACE_SYNC] Loaded baselines: ${_raceBaselines.length}');
     } catch (e, stackTrace) {
       dev.log('❌ [RACE_SYNC] Start error: $e');
@@ -499,13 +534,22 @@ class RaceStepSyncService extends GetxService {
   /// Perform step sync to all active races using delta-based accumulation
   /// This approach maintains a cumulative counter that survives pedometer resets
   Future<void> _performSync() async {
-    if (!isRunning.value) return;
+    dev.log('🔄 [RACE_SYNC] _performSync() called, isRunning=${isRunning.value}');
+    if (!isRunning.value) {
+      dev.log('⚠️ [RACE_SYNC] Service not running, skipping sync');
+      return;
+    }
 
+    dev.log('🔒 [RACE_SYNC] _performSync acquiring lock...');
     // Protect entire sync operation with lock to prevent concurrent baseline modifications
     await _baselineUpdateLock.synchronized(() async {
       try {
+        dev.log('🔓 [RACE_SYNC] _performSync lock acquired, starting sync...');
         final currentUser = _auth.currentUser;
-        if (currentUser == null) return;
+        if (currentUser == null) {
+          dev.log('⚠️ [RACE_SYNC] No current user, aborting sync');
+          return;
+        }
 
       // ===== STEP 1: Update cumulative counter with delta from pedometer =====
       final currentPedometerReading = _pedometerService.incrementalSteps;
@@ -606,6 +650,8 @@ class RaceStepSyncService extends GetxService {
               .collection('participants')
               .doc(currentUser.uid);
 
+          dev.log('🔥 [RACE_SYNC] Writing to Firebase: "${baseline.raceTitle}" = $totalRaceSteps steps');
+
           await participantRef.set({
             'steps': totalRaceSteps,
             'distance': raceDistance,
@@ -614,6 +660,8 @@ class RaceStepSyncService extends GetxService {
             'avgSpeed': avgSpeed,
             'lastUpdated': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
+
+          dev.log('✅ [RACE_SYNC] Firebase write complete for "${baseline.raceTitle}"');
 
           // ✅ CRITICAL: Update server state and reset session counter
           // After syncing to server:
@@ -661,49 +709,60 @@ class RaceStepSyncService extends GetxService {
   /// Add health-synced steps to active races
   /// Uses lock to prevent race conditions with baseline updates
   Future<void> addHealthSyncSteps(int stepsDelta) async {
-    await _baselineUpdateLock.synchronized(() async {
-      try {
-        if (stepsDelta <= 0) {
-          dev.log('📊 [RACE_SYNC] No health sync steps to add (delta: $stepsDelta)');
-          return;
-        }
+    try {
+      if (stepsDelta <= 0) {
+        dev.log('📊 [RACE_SYNC] No health sync steps to add (delta: $stepsDelta)');
+        return;
+      }
 
-        if (!isRunning.value) {
-          dev.log('⚠️ [RACE_SYNC] Service not running, cannot add health sync steps');
-          return;
-        }
+      if (!isRunning.value) {
+        // Queue the steps to be applied when service starts
+        _pendingHealthKitSteps += stepsDelta;
+        dev.log('⏳ [RACE_SYNC] Service not running yet, queuing $stepsDelta HealthKit steps (total pending: $_pendingHealthKitSteps)');
+        return;
+      }
 
-        if (_activeRaceIds.isEmpty) {
-          dev.log('ℹ️ [RACE_SYNC] No active races, skipping health sync steps');
-          return;
-        }
+      if (_activeRaceIds.isEmpty) {
+        dev.log('ℹ️ [RACE_SYNC] No active races, skipping health sync steps');
+        return;
+      }
 
-        dev.log('🏥 [RACE_SYNC] Adding $stepsDelta health-synced steps to ${_activeRaceIds.length} active race(s)...');
+      dev.log('🏥 [RACE_SYNC] Adding $stepsDelta health-synced steps to ${_activeRaceIds.length} active race(s)...');
+      dev.log('   Current cumulative steps: $_cumulativeSteps');
+
+      // Modify baselines inside lock
+      await _baselineUpdateLock.synchronized(() async {
+        dev.log('   🔒 [RACE_SYNC] Acquired lock, modifying baselines...');
 
         // Add the health sync delta to cumulative counter
         _cumulativeSteps += stepsDelta;
+        dev.log('   📊 [RACE_SYNC] Updated cumulative: $_cumulativeSteps (+$stepsDelta)');
 
         // Add the delta to each race's session steps
         for (final raceId in _activeRaceIds) {
           final baseline = _raceBaselines[raceId];
           if (baseline != null) {
+            final before = baseline.sessionRaceSteps;
             baseline.sessionRaceSteps += stepsDelta;
-            dev.log('   ✅ "${baseline.raceTitle}": +$stepsDelta steps from health sync');
+            dev.log('   ✅ "${baseline.raceTitle}": session steps $before → ${baseline.sessionRaceSteps} (+$stepsDelta)');
           }
         }
 
         // Save updated baselines
         await _saveBaselines();
+        dev.log('   🔓 [RACE_SYNC] Releasing lock, baselines saved');
+      });
 
-        // Trigger immediate sync to Firebase
-        await _performSync();
+      dev.log('🔥 [RACE_SYNC] Triggering immediate Firebase sync (OUTSIDE lock)...');
 
-        dev.log('✅ [RACE_SYNC] Health sync steps added to all active races');
-      } catch (e, stackTrace) {
-        dev.log('❌ [RACE_SYNC] Error adding health sync steps: $e');
-        dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
-      }
-    });
+      // Trigger immediate sync to Firebase OUTSIDE the lock to prevent deadlock
+      await _performSync();
+
+      dev.log('✅ [RACE_SYNC] Health sync complete: steps added and synced to Firebase');
+    } catch (e, stackTrace) {
+      dev.log('❌ [RACE_SYNC] Error adding health sync steps: $e');
+      dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
+    }
   }
 
   /// Get diagnostics for debugging
