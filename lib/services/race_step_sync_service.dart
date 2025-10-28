@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
 import 'pedometer_service.dart';
+import '../utils/race_validation_utils.dart';
 
 /// Race Baseline - Dual-layer tracking for robust race step synchronization
 ///
@@ -33,12 +34,18 @@ class RaceBaseline {
   // Session state (resets on app restart, accumulates during session)
   int sessionRaceSteps;                  // Steps walked in THIS RACE during current session
 
+  // Completion tracking
+  bool isCompleted;                      // Whether participant finished this race
+  DateTime? completedAt;                 // When participant finished
+
   RaceBaseline({
     required this.raceId,
     required this.raceTitle,
     required this.startTime,
     required this.serverSteps,
     required this.sessionRaceSteps,
+    this.isCompleted = false,
+    this.completedAt,
   });
 
   // JSON serialization for persistence
@@ -49,6 +56,8 @@ class RaceBaseline {
       'startTime': startTime.toIso8601String(),
       'serverSteps': serverSteps,
       'sessionRaceSteps': sessionRaceSteps,
+      'isCompleted': isCompleted,
+      'completedAt': completedAt?.toIso8601String(),
     };
   }
 
@@ -59,8 +68,11 @@ class RaceBaseline {
       startTime: DateTime.parse(json['startTime'] as String),
       // Load server steps from storage, will be refreshed from Firestore on startup
       serverSteps: json['serverSteps'] as int? ?? 0,
-      // Session race steps always start at 0 after app restart
-      sessionRaceSteps: 0,
+      // ✅ CRITICAL FIX: Load session steps from storage to survive app restarts during pedometer resets
+      // This prevents step loss if app crashes after pedometer reset but before next sync
+      sessionRaceSteps: json['sessionRaceSteps'] as int? ?? 0,
+      isCompleted: json['isCompleted'] as bool? ?? false,
+      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'] as String) : null,
     );
   }
 
@@ -114,9 +126,16 @@ class RaceStepSyncService extends GetxService {
   // Buffer for HealthKit steps received before service starts running
   int _pendingHealthKitSteps = 0;
 
+  // ================== REQUEST DEDUPLICATION ==================
+  // Track processed request IDs to prevent duplicate propagation
+  final Set<String> _processedRequests = {};
+
   // ================== CONCURRENCY CONTROL ==================
   /// Lock for baseline updates to prevent race conditions
   final Lock _baselineUpdateLock = Lock();
+
+  /// Lock for baseline saves to prevent concurrent write corruption
+  final Lock _baselineSaveLock = Lock();
 
   // ================== CONSTANTS ==================
   static const Duration SYNC_INTERVAL = Duration(seconds: 1); // Real-time updates every 1 second
@@ -371,6 +390,23 @@ class RaceStepSyncService extends GetxService {
   /// Fetches current server state and starts session tracking
   Future<void> _setRaceBaseline(String raceId, String raceTitle) async {
     try {
+      // Fetch race document to get actual start time
+      final raceDoc = await _firestore.collection('races').doc(raceId).get();
+      final raceData = raceDoc.data();
+
+      // Get actual race start time from Firebase
+      DateTime raceStartTime;
+      final actualStartTimeField = raceData?['actualStartTime'];
+
+      if (actualStartTimeField is Timestamp) {
+        raceStartTime = actualStartTimeField.toDate();
+        dev.log('✅ [RACE_SYNC] Using actual race start time: ${raceStartTime.toIso8601String()}');
+      } else {
+        // Fallback: race hasn't officially started yet, or field doesn't exist
+        raceStartTime = DateTime.now();
+        dev.log('⚠️ [RACE_SYNC] No actualStartTime found for race $raceId, using current time');
+      }
+
       // Fetch current server steps (source of truth)
       final serverSteps = await _fetchServerSteps(raceId);
 
@@ -378,15 +414,15 @@ class RaceStepSyncService extends GetxService {
       final baseline = RaceBaseline(
         raceId: raceId,
         raceTitle: raceTitle,
-        startTime: DateTime.now(),
-        serverSteps: serverSteps,              // Server state (persistent)
-        sessionRaceSteps: 0,                   // Start counting from 0 in this session
+        startTime: raceStartTime,  // ✅ FIXED: Use actual race start time
+        serverSteps: serverSteps,  // Server state (persistent)
+        sessionRaceSteps: 0,       // Start counting from 0 in this session
       );
 
       _raceBaselines[raceId] = baseline;
       await _saveBaselines();
 
-      dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle": server=$serverSteps, sessionSteps=0');
+      dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle": server=$serverSteps, sessionSteps=0, started=${raceStartTime.toIso8601String()}');
     } catch (e) {
       dev.log('❌ [RACE_SYNC] Error setting baseline for race $raceId: $e');
     }
@@ -461,22 +497,24 @@ class RaceStepSyncService extends GetxService {
     }
   }
 
-  /// Save baselines to SharedPreferences
+  /// Save baselines to SharedPreferences (thread-safe)
   Future<void> _saveBaselines() async {
-    try {
-      if (_prefs == null) return;
+    await _baselineSaveLock.synchronized(() async {
+      try {
+        if (_prefs == null) return;
 
-      final baselinesJson = _raceBaselines.values
-          .map((baseline) => baseline.toJson())
-          .toList();
+        final baselinesJson = _raceBaselines.values
+            .map((baseline) => baseline.toJson())
+            .toList();
 
-      final jsonString = json.encode(baselinesJson);
-      await _prefs!.setString(BASELINES_STORAGE_KEY, jsonString);
+        final jsonString = json.encode(baselinesJson);
+        await _prefs!.setString(BASELINES_STORAGE_KEY, jsonString);
 
-      dev.log('💾 [RACE_SYNC] Saved ${_raceBaselines.length} baselines to storage');
-    } catch (e) {
-      dev.log('❌ [RACE_SYNC] Error saving baselines: $e');
-    }
+        dev.log('💾 [RACE_SYNC] Saved ${_raceBaselines.length} baselines to storage');
+      } catch (e) {
+        dev.log('❌ [RACE_SYNC] Error saving baselines: $e');
+      }
+    });
   }
 
   /// Load baselines from SharedPreferences
@@ -638,10 +676,73 @@ class RaceStepSyncService extends GetxService {
           final raceMinutes = raceTime.inMinutes;
           final avgSpeed = raceMinutes > 0 ? (raceDistance / raceMinutes) * 60 : 0.0;
 
-          // Get race total distance
-          final raceDoc = await _firestore.collection('races').doc(raceId).get();
+          // Get race total distance with timeout and null check
+          final raceDoc = await _firestore.collection('races').doc(raceId).get()
+            .timeout(Duration(seconds: 10), onTimeout: () {
+              dev.log('❌ [RACE_SYNC] Timeout fetching race doc for $raceId');
+              throw TimeoutException('Race document fetch timeout');
+            });
+
+          // ✅ CRITICAL NULL CHECK: Verify race document exists
+          if (!raceDoc.exists) {
+            dev.log('⚠️ [RACE_SYNC] Race $raceId no longer exists, removing baseline');
+            await _removeRaceBaseline(raceId);
+            continue; // Skip to next race
+          }
+
           final totalDistance = (raceDoc.data()?['totalDistance'] as num?)?.toDouble() ?? 0.0;
-          final remainingDistance = (totalDistance - raceDistance).clamp(0.0, totalDistance);
+
+          // ✅ CRITICAL VALIDATION: Verify race has valid distance
+          if (totalDistance <= 0) {
+            dev.log('❌ [RACE_SYNC] Invalid race distance: $totalDistance km for race $raceId');
+            continue; // Skip invalid race
+          }
+
+          var cappedRaceDistance = raceDistance;
+          var cappedTotalRaceSteps = totalRaceSteps;
+
+          // ✅ VALIDATION: Check for anomalies before writing to Firebase
+          final validationResults = RaceValidationUtils.validateAll(
+            previousSteps: baseline.serverSteps,
+            newSteps: totalRaceSteps,
+            timeSinceLastSync: raceTime,
+            participantDistance: raceDistance,
+            raceTotalDistance: totalDistance,
+            raceTitle: baseline.raceTitle,
+          );
+
+          // ✅ CRITICAL FIX: If validation errors found, CAP the values
+          if (RaceValidationUtils.hasErrors(validationResults)) {
+            dev.log('❌ [RACE_SYNC] VALIDATION ERRORS detected for "${baseline.raceTitle}"');
+            for (final error in RaceValidationUtils.getErrorMessages(validationResults)) {
+              dev.log('   $error');
+            }
+
+            // Cap distance at 110% of race total (allow small overshoot for GPS drift)
+            if (raceDistance > totalDistance * 1.1) {
+              cappedRaceDistance = totalDistance * 1.1;
+              dev.log('⚠️ [RACE_SYNC] Capped distance: ${raceDistance.toStringAsFixed(2)}km → ${cappedRaceDistance.toStringAsFixed(2)}km');
+            }
+
+            // Recalculate steps based on capped distance
+            if (cappedRaceDistance != raceDistance) {
+              cappedTotalRaceSteps = (cappedRaceDistance / STEPS_TO_KM_FACTOR).round();
+              dev.log('⚠️ [RACE_SYNC] Recalculated steps: $totalRaceSteps → $cappedTotalRaceSteps');
+            }
+
+            // Cap step delta if unrealistically high
+            final stepDelta = cappedTotalRaceSteps - baseline.serverSteps;
+            if (stepDelta > 20000) {
+              cappedTotalRaceSteps = baseline.serverSteps + 20000;
+              cappedRaceDistance = cappedTotalRaceSteps * STEPS_TO_KM_FACTOR;
+              dev.log('⚠️ [RACE_SYNC] Capped step delta: ${stepDelta} → 20000 steps');
+            }
+          }
+
+          // Use capped values for remaining calculations
+          final remainingDistance = (totalDistance - cappedRaceDistance).clamp(0.0, totalDistance);
+          final cappedCalories = (cappedTotalRaceSteps * STEPS_TO_CALORIES_FACTOR).round();
+          final cappedAvgSpeed = raceMinutes > 0 ? (cappedRaceDistance / raceMinutes) * 60 : 0.0;
 
           // Write to Firebase
           final participantRef = _firestore
@@ -650,28 +751,78 @@ class RaceStepSyncService extends GetxService {
               .collection('participants')
               .doc(currentUser.uid);
 
-          dev.log('🔥 [RACE_SYNC] Writing to Firebase: "${baseline.raceTitle}" = $totalRaceSteps steps');
+          dev.log('🔥 [RACE_SYNC] Writing to Firebase: "${baseline.raceTitle}" = $cappedTotalRaceSteps steps');
 
-          await participantRef.set({
-            'steps': totalRaceSteps,
-            'distance': raceDistance,
-            'remainingDistance': remainingDistance,
-            'calories': raceCalories,
-            'avgSpeed': avgSpeed,
-            'lastUpdated': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          // ✅ COMPLETION DETECTION: Check if participant finished the race
+          final wasNotCompleted = !baseline.isCompleted;
+          final isNowCompleted = remainingDistance <= 0.05; // 50-meter tolerance (0.05 km) for GPS drift
 
-          dev.log('✅ [RACE_SYNC] Firebase write complete for "${baseline.raceTitle}"');
+          if (wasNotCompleted && isNowCompleted) {
+            // Participant just completed the race!
+            dev.log('🏁 [RACE_SYNC] PARTICIPANT COMPLETED RACE: "${baseline.raceTitle}"');
+
+            // Mark baseline as completed
+            baseline.isCompleted = true;
+            baseline.completedAt = DateTime.now();
+
+            // Get finish order (count of completed participants + 1)
+            final completedSnapshot = await _firestore
+                .collection('races')
+                .doc(raceId)
+                .collection('participants')
+                .where('isCompleted', isEqualTo: true)
+                .get();
+
+            final finishOrder = completedSnapshot.docs.length + 1;
+
+            dev.log('   🥇 Finish order: #$finishOrder');
+
+            // Write completion data to Firebase with timeout
+            await participantRef.set({
+              'steps': cappedTotalRaceSteps,
+              'distance': cappedRaceDistance,
+              'remainingDistance': 0.0, // Force to exactly 0 when completed
+              'calories': cappedCalories,
+              'avgSpeed': cappedAvgSpeed,
+              'isCompleted': true,
+              'completedAt': FieldValue.serverTimestamp(),
+              'finishOrder': finishOrder,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true)).timeout(Duration(seconds: 10), onTimeout: () {
+              dev.log('❌ [RACE_SYNC] Timeout writing completion data for race $raceId');
+              throw TimeoutException('Firebase write timeout');
+            });
+
+            dev.log('✅ [RACE_SYNC] Completion data written to Firebase');
+
+            // TODO: Trigger race state machine if first finisher
+            // TODO: Send completion notification
+          } else {
+            // Normal update (not completed yet, or was already completed)
+            await participantRef.set({
+              'steps': cappedTotalRaceSteps,
+              'distance': cappedRaceDistance,
+              'remainingDistance': remainingDistance,
+              'calories': cappedCalories,
+              'avgSpeed': cappedAvgSpeed,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true)).timeout(Duration(seconds: 10), onTimeout: () {
+              dev.log('❌ [RACE_SYNC] Timeout writing race data for $raceId');
+              throw TimeoutException('Firebase write timeout');
+            });
+
+            dev.log('✅ [RACE_SYNC] Firebase write complete for "${baseline.raceTitle}"');
+          }
 
           // ✅ CRITICAL: Update server state and reset session counter
           // After syncing to server:
-          // 1. Update serverSteps with the total
+          // 1. Update serverSteps with the capped total
           // 2. Reset sessionRaceSteps to 0 (those steps are now in serverSteps)
-          baseline.serverSteps = totalRaceSteps;
+          baseline.serverSteps = cappedTotalRaceSteps;
           baseline.sessionRaceSteps = 0;
 
           updateCount++;
-          dev.log('   ✅ "${baseline.raceTitle}": $totalRaceSteps steps → ${raceDistance.toStringAsFixed(3)}km (${remainingDistance.toStringAsFixed(3)}km remaining)');
+          dev.log('   ✅ "${baseline.raceTitle}": $cappedTotalRaceSteps steps → ${cappedRaceDistance.toStringAsFixed(3)}km (${remainingDistance.toStringAsFixed(3)}km remaining)');
         } catch (e) {
           dev.log('⚠️ [RACE_SYNC] Error syncing race $raceId: $e');
         }
@@ -761,6 +912,109 @@ class RaceStepSyncService extends GetxService {
       dev.log('✅ [RACE_SYNC] Health sync complete: steps added and synced to Firebase');
     } catch (e, stackTrace) {
       dev.log('❌ [RACE_SYNC] Error adding health sync steps: $e');
+      dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
+    }
+  }
+
+  /// Add health-synced steps to active races (IDEMPOTENT VERSION with request ID deduplication)
+  ///
+  /// This is the NEW method that should be called by HealthSyncCoordinator.
+  /// It prevents duplicate step propagation through request ID tracking.
+  ///
+  /// Parameters:
+  /// - [stepsDelta]: Number of steps to add
+  /// - [requestId]: Unique request identifier (prevents duplicate processing)
+  /// - [source]: Source identifier for logging (e.g., "HealthKitBaseline", "ManualHealthSync")
+  Future<void> addHealthSyncStepsIdempotent({
+    required int stepsDelta,
+    required String requestId,
+    required String source,
+  }) async {
+    try {
+      // 1. Check if already processed (idempotency)
+      if (_processedRequests.contains(requestId)) {
+        dev.log('⏭️ [RACE_SYNC] Skipping duplicate request: $requestId (source: $source)');
+        return;
+      }
+
+      // 2. Validate steps delta
+      if (stepsDelta <= 0) {
+        dev.log('⚠️ [RACE_SYNC] Invalid steps delta: $stepsDelta (requestId: $requestId)');
+        return;
+      }
+
+      if (stepsDelta > 20000) {
+        dev.log('❌ [RACE_SYNC] ANOMALY: Step delta too large: $stepsDelta (requestId: $requestId, source: $source)');
+        dev.log('   This will be capped at 20,000 steps to prevent abuse.');
+        stepsDelta = 20000;
+      }
+
+      dev.log('🏥 [RACE_SYNC] Processing health sync request:');
+      dev.log('   Request ID: $requestId');
+      dev.log('   Source: $source');
+      dev.log('   Steps delta: $stepsDelta');
+
+      // 3. Check if service is running
+      if (!isRunning.value) {
+        // Queue the steps to be applied when service starts
+        _pendingHealthKitSteps += stepsDelta;
+        _processedRequests.add(requestId); // Mark as processed
+        dev.log('⏳ [RACE_SYNC] Service not running yet, queuing $stepsDelta steps (total pending: $_pendingHealthKitSteps)');
+        return;
+      }
+
+      // 4. Check if there are active races
+      if (_activeRaceIds.isEmpty) {
+        // Queue the steps instead of discarding - race might become active soon
+        _pendingHealthKitSteps += stepsDelta;
+        _processedRequests.add(requestId); // Mark as processed
+        dev.log('ℹ️ [RACE_SYNC] No active races yet, queuing $stepsDelta steps (total pending: $_pendingHealthKitSteps)');
+        return;
+      }
+
+      // 5. Apply steps to races
+      dev.log('🏥 [RACE_SYNC] Adding $stepsDelta health-synced steps to ${_activeRaceIds.length} active race(s)...');
+
+      // Modify baselines inside lock
+      await _baselineUpdateLock.synchronized(() async {
+        dev.log('   🔒 [RACE_SYNC] Acquired lock, modifying baselines...');
+
+        // Add the health sync delta to cumulative counter
+        _cumulativeSteps += stepsDelta;
+        dev.log('   📊 [RACE_SYNC] Updated cumulative: $_cumulativeSteps (+$stepsDelta)');
+
+        // Add the delta to each race's session steps
+        for (final raceId in _activeRaceIds) {
+          final baseline = _raceBaselines[raceId];
+          if (baseline != null) {
+            final before = baseline.sessionRaceSteps;
+            baseline.sessionRaceSteps += stepsDelta;
+            dev.log('   ✅ "${baseline.raceTitle}": session steps $before → ${baseline.sessionRaceSteps} (+$stepsDelta)');
+          }
+        }
+
+        // Save updated baselines
+        await _saveBaselines();
+        dev.log('   🔓 [RACE_SYNC] Releasing lock, baselines saved');
+      });
+
+      // 6. Mark request as processed
+      _processedRequests.add(requestId);
+
+      // Clean up old request IDs (keep last 50)
+      if (_processedRequests.length > 50) {
+        dev.log('🧹 [RACE_SYNC] Cleaning up old request IDs (count: ${_processedRequests.length})');
+        _processedRequests.clear();
+      }
+
+      dev.log('🔥 [RACE_SYNC] Triggering immediate Firebase sync (OUTSIDE lock)...');
+
+      // Trigger immediate sync to Firebase OUTSIDE the lock
+      await _performSync();
+
+      dev.log('✅ [RACE_SYNC] Health sync complete: steps added and synced to Firebase (requestId: $requestId)');
+    } catch (e, stackTrace) {
+      dev.log('❌ [RACE_SYNC] Error adding health sync steps (requestId: $requestId): $e');
       dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
     }
   }

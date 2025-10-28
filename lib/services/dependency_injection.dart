@@ -8,6 +8,7 @@ import 'step_tracking_service.dart';
 import 'pedometer_service.dart';
 import 'pedometer_permission_monitor.dart';
 import 'health_sync_service.dart';
+import 'health_sync_coordinator.dart';
 import 'database_controller.dart';
 import 'race_bot_service.dart';
 import 'cache_service.dart';
@@ -60,10 +61,16 @@ class DependencyInjection {
     // This syncs HealthKit/Health Connect data on cold starts
     Get.lazyPut<HealthSyncService>(() => HealthSyncService(), fenix: true);
 
+    // ✅ CRITICAL: Register HealthSyncCoordinator as IMMEDIATE permanent singleton
+    // This MUST be registered BEFORE StepTrackingService to prevent step loss
+    // Coordinates all health-to-race step propagation with deduplication
+    // Registered immediately (not lazy) to ensure availability during cold start
+    Get.put<HealthSyncCoordinator>(HealthSyncCoordinator(), permanent: true);
+
     // Register StepTrackingService as lazy permanent singleton
     // Will be initialized on first access (dashboard screen)
     // This ensures race tracking persists across all navigation
-    // Depends on: PedometerService, HealthSyncService
+    // Depends on: PedometerService, HealthSyncService, HealthSyncCoordinator
     Get.lazyPut<StepTrackingService>(() => StepTrackingService(), fenix: true);
 
     // Register RaceStepSyncService as lazy permanent singleton

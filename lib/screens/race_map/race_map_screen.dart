@@ -2160,29 +2160,37 @@ class WinnerWidget extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10.0),
                     child: Obx(
                       () {
-                        // Allow viewing results when:
-                        // 1. Race is globally completed (status 4)
-                        // 2. Timer hits 00:00:00 during ending phase (status 6)
-                        // 3. User personally finished the race (myRaceCompleted)
+                        // Only allow viewing results when race is globally completed (status 4)
                         final isCompleted = mapController.raceStatus.value == 4;
-                        final isTimerFinished = mapController.raceStatus.value == 6 &&
-                                                 mapController.formattedTime.value == '00:00:00';
-                        final userFinished = mapController.myRaceCompleted.value;
-                        final canViewResults = isCompleted || isTimerFinished || userFinished;
 
-                        return CustomButton(
-                          btnTitle: canViewResults
-                              ? "View results"
-                              : "View Results in ${mapController.formattedTime.value}",
-                          onPress: () async {
-                            if (canViewResults) {
-                              await _handleViewResults(
-                                context,
-                                raceModel!,
-                                mapController.participantsList,
-                              );
-                            }
-                          },
+                        return Column(
+                          children: [
+                            // Show waiting message if race is not completed
+                            if (!isCompleted)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                                child: Text(
+                                  "Race still in progress. Results will be available when the race completes.",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.iconGrey,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+
+                            CustomButton(
+                              btnTitle: "View results",
+                              onPress: isCompleted ? () async {
+                                await _handleViewResults(
+                                  context,
+                                  raceModel!,
+                                  mapController.participantsList,
+                                );
+                              } : null,
+                            ),
+                          ],
                         );
                       },
                     ),

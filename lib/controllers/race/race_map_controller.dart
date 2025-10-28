@@ -333,6 +333,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
     _participantsStreamSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
 
+    // Clear marker icon cache to prevent stale avatars from persisting across races
+    _markerIconCache.clear();
+
     // ✅ FIX: Do NOT stop RaceStepSyncService here
     // The service is now initialized at app launch (in HomepageDataService) and runs permanently
     // to capture health sync steps from the home screen. Stopping it here would cause health-synced
@@ -363,9 +366,15 @@ class MapController extends GetxController with WidgetsBindingObserver {
   }
 
   checkRaceCompetion() {
-    if (raceModel.value != null && (raceModel.value?.remainingDistance == 0)) {
-      print("my distance===> ${raceModel.value?.remainingDistance}");
-      myRaceCompleted.value = true;
+    if (raceModel.value != null) {
+      final remainingDistance = raceModel.value?.remainingDistance ?? double.infinity;
+
+      // Use 50-meter tolerance (0.05 km) to account for GPS drift and sensor noise
+      // This prevents false completions while still detecting actual race completion
+      if (remainingDistance <= 0.05) {
+        print("Race completed! Remaining distance: ${remainingDistance}km");
+        myRaceCompleted.value = true;
+      }
     }
   }
 
@@ -995,12 +1004,15 @@ class MapController extends GetxController with WidgetsBindingObserver {
         // ✅ IMPROVED: Check if icon needs to be regenerated (rank, completion state, or current user status changed)
         final completionState = participant.isCompleted ? 'completed' : 'active';
         final currentUserState = isCurrentUser ? 'current' : 'other';
-        final cacheKey = '${participant.userId}_${participant.rank}_${completionState}_$currentUserState';
+        final imageHash = participant.userProfilePicture?.hashCode.toString() ?? 'no_image';
+        final cacheKey = '${participant.userId}_${participant.rank}_${completionState}_${currentUserState}_$imageHash';
         final needsNewIcon = !_markerIconCache.containsKey(cacheKey);
 
         // ✅ IMPROVED: Real-time updates - no time-based debouncing, just position-based
-        if (!hasPositionChanged && !needsNewIcon) {
-          continue; // Skip if no significant change
+        // Only skip if marker already exists on map and no changes detected
+        final markerExists = newMarkers.any((m) => m.markerId.value == participant.userId);
+        if (!hasPositionChanged && !needsNewIcon && markerExists) {
+          continue; // Skip if no significant change and marker already exists
         }
 
         // Update covered distance
@@ -1013,7 +1025,7 @@ class MapController extends GetxController with WidgetsBindingObserver {
         } else {
           // Generate new icon and cache it
           icon = await _generateMarkerIcon(
-            participant.rank,
+            participant,
             isCurrentUser,
             participant.isCompleted,
           );
@@ -1086,29 +1098,15 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
   /// Wrapper for generating marker icon with completion state support
   Future<BitmapDescriptor> _generateMarkerIcon(
-    int rank,
+    Participant participant,
     bool isCurrentUser,
     bool isCompleted,
   ) async {
-    // Find participant to get details
-    final participant = participantsList.firstWhere(
-      (p) => p.rank == rank,
-      orElse: () => Participant(
-        userId: 'unknown',
-        userName: 'Unknown',
-        distance: 0,
-        remainingDistance: 0,
-        rank: rank,
-        steps: 0,
-        isCompleted: isCompleted,
-      ),
-    );
-
     return generateAvatarMarker(
       userName: participant.userName,
       userId: participant.userId,
       profileImageUrl: participant.userProfilePicture,
-      rank: rank,
+      rank: participant.rank,
       size: 120.0, // Large size for excellent profile photo visibility
       isCurrentUser: isCurrentUser,
       isCompleted: isCompleted, // Pass completion state
@@ -1140,7 +1138,24 @@ class MapController extends GetxController with WidgetsBindingObserver {
     ImageProvider? imageProvider;
     if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
       try {
-        imageProvider = NetworkImage(profileImageUrl);
+        // Add cache-busting parameter to force fresh image loads when profile updates
+        // Find participant to get lastUpdated timestamp
+        final participant = participantsList.firstWhere(
+          (p) => p.userId == userId,
+          orElse: () => Participant(
+            userId: userId,
+            userName: userName,
+            distance: 0,
+            remainingDistance: 0,
+            rank: rank ?? 1,
+            steps: 0,
+          ),
+        );
+
+        final urlWithCacheBust = participant.lastUpdated != null
+            ? '$profileImageUrl?t=${participant.lastUpdated!.millisecondsSinceEpoch}'
+            : profileImageUrl;
+        imageProvider = NetworkImage(urlWithCacheBust);
       } catch (e) {
         print('Failed to load profile image for $userName: $e');
         imageProvider = null;

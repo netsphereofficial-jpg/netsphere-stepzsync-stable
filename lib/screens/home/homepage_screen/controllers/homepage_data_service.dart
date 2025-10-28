@@ -541,6 +541,9 @@ class HomepageDataService extends GetxController {
     try {
       print('📊 HomepageDataService: Initializing StepTrackingService...');
 
+      // NOTE: HealthSyncCoordinator is now registered in dependency_injection.dart
+      // No need to register here - it's already available as immediate singleton
+
       // Get or create the permanent step tracking service instance
       if (Get.isRegistered<StepTrackingService>()) {
         _stepTrackingService = Get.find<StepTrackingService>();
