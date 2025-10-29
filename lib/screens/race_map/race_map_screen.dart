@@ -11,6 +11,7 @@ import '../../config/app_colors.dart';
 import '../../controllers/notification_controller.dart';
 import '../../controllers/race/race_map_controller.dart';
 import '../../controllers/chat_controller.dart';
+import '../../controllers/subscription_controller.dart';
 import '../../core/models/race_data_model.dart';
 import '../../core/utils/common_methods.dart';
 import '../../services/race_repository.dart';
@@ -19,6 +20,7 @@ import '../../widgets/common/custom_widgets.dart' hide showSnackbar;
 import '../../widgets/race_chat/race_chat_bottom_sheet.dart';
 import '../../utils/guest_utils.dart';
 import '../../widgets/guest_upgrade_dialog.dart';
+import '../../screens/subscription/subscription_screen.dart';
 import '../race_winner_screens_widgets.dart';
 import '../race_dnf_screen_widget.dart';
 import 'widgets/race_start_countdown.dart';
@@ -71,10 +73,12 @@ class RaceMapScreen extends StatelessWidget {
             mapController.raceModel.value!.remainingDistance! <= 0;
 
         final currentUserFinished = currentUserCompleted || remainingDistanceZero;
-        final raceCompleted = mapController.raceStatus.value == 4;
+
+        // Use raceEnded flag instead of status to prevent flickering (matches body logic)
+        final raceCompleted = mapController.raceEnded.value;
 
         final showDNFScreen = raceCompleted && !currentUserFinished && !mapController.isViewOnlyMode.value;
-        final showWinnerScreen = (currentUserFinished || raceCompleted) && !mapController.isViewOnlyMode.value;
+        final showWinnerScreen = currentUserFinished && raceCompleted && !mapController.isViewOnlyMode.value;
 
         // Hide app bar when showing winner or DNF screen
         final shouldShowAppBar = !showDNFScreen && !showWinnerScreen;
@@ -274,18 +278,14 @@ class RaceMapScreen extends StatelessWidget {
             final raceCompleted = mapController.raceEnded.value;
 
             // Show DNF screen if race ended but user didn't finish
-            // Wait for snapshot to be captured before showing (or show immediately if snapshot exists)
             final showDNFScreen = raceCompleted &&
                 !currentUserFinished &&
-                !mapController.isViewOnlyMode.value &&
-                (mapController.mapSnapshot.value != null || mapController.snapshotTimeout.value);
+                !mapController.isViewOnlyMode.value;
 
             // Show WinnerWidget ONLY if user finished
-            // Wait for snapshot to be captured before showing (or show immediately if snapshot exists)
             final showWinnerScreen = currentUserFinished &&
                 mapController.raceEnded.value && // Also use raceEnded for winners
-                !mapController.isViewOnlyMode.value &&
-                (mapController.mapSnapshot.value != null || mapController.snapshotTimeout.value);
+                !mapController.isViewOnlyMode.value;
 
             if (showDNFScreen) {
               return DNFWidget(
@@ -531,6 +531,23 @@ class RaceMapScreen extends StatelessWidget {
     // Check if guest user trying to access chat
     if (GuestUtils.isGuest()) {
       GuestUpgradeDialog.show(featureName: 'Race Chat');
+      return;
+    }
+
+    // Check if user has premium access
+    // Use Get.isRegistered to safely check if controller exists
+    if (Get.isRegistered<SubscriptionController>()) {
+      final subscriptionController = Get.find<SubscriptionController>();
+      if (!subscriptionController.hasPremiumAccess) {
+        // Show premium dialog for non-premium users
+        _showPremiumRequiredDialog(context);
+        return;
+      }
+    } else {
+      // If subscription controller is not registered, show premium dialog
+      // (Cannot verify premium status, so restrict access by default)
+      debugPrint('⚠️ SubscriptionController not registered, restricting chat access');
+      _showPremiumRequiredDialog(context);
       return;
     }
 
@@ -1113,9 +1130,11 @@ class RaceMapScreen extends StatelessWidget {
         return CustomButton(
           btnTitle: "Race completed. Check winner list.",
           onPress: () async {
-            // Get.put(WinnerListController(raceModel?.id ?? 0));
-            // Get.to(() => RaceWinnersScreen());
-            return;
+            // Navigate to winner screen with race data and participants
+            Get.to(() => RaceWinnersScreen(
+              raceData: raceModel,
+              participants: mapController.participantsList.toList(),
+            ));
           },
         );
 
@@ -1975,6 +1994,169 @@ class RaceMapScreen extends StatelessWidget {
       builder: (BuildContext context) {
         return _CountdownDialog();
       },
+    );
+  }
+
+  // ============ PREMIUM FEATURE DIALOG ============
+
+  /// Show premium required dialog for race chat
+  void _showPremiumRequiredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.appColor, AppColors.neonYellow],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.workspace_premium_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Premium Feature',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Race Chat is a premium feature. Upgrade to premium to:',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+              ),
+              SizedBox(height: 16),
+              _buildPremiumBenefit('💬 Chat with race participants'),
+              _buildPremiumBenefit('🏆 Access exclusive races'),
+              _buildPremiumBenefit('📊 Advanced statistics'),
+              _buildPremiumBenefit('🎯 Priority support'),
+              _buildPremiumBenefit('🚫 Ad-free experience'),
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.appColor.withValues(alpha: 0.1),
+                      AppColors.neonYellow.withValues(alpha: 0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.appColor.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      color: AppColors.appColor,
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Unlock all premium features now!',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.appColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Maybe Later',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Navigate to subscription screen
+                Get.to(() => SubscriptionScreen());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.appColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: Text(
+                'Upgrade Now',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPremiumBenefit(String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 18,
+            color: Colors.green,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
