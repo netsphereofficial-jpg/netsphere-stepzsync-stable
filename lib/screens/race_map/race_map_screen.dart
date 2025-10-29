@@ -26,6 +26,7 @@ import '../../widgets/race_chat/race_chat_bottom_sheet.dart';
 import '../../utils/guest_utils.dart';
 import '../../widgets/guest_upgrade_dialog.dart';
 import '../race_winner_screens_widgets.dart';
+import '../race_dnf_screen_widget.dart';
 import 'widgets/race_start_countdown.dart';
 
 enum UserRole { participant, organizer }
@@ -286,10 +287,19 @@ class RaceMapScreen extends StatelessWidget {
             final currentUserFinished = currentUserCompleted || remainingDistanceZero;
             final raceCompleted = mapController.raceStatus.value == 4;
 
+            // Show DNF screen if race completed but user didn't finish
+            final showDNFScreen = raceCompleted && !currentUserFinished && !mapController.isViewOnlyMode.value;
+
             // Show WinnerWidget if user finished or race completed, BUT NOT in view-only mode
             final showWinnerScreen = (currentUserFinished || raceCompleted) && !mapController.isViewOnlyMode.value;
 
-            if (showWinnerScreen) {
+            if (showDNFScreen) {
+              return DNFWidget(
+                size: size,
+                raceModel: raceModel,
+                mapController: mapController,
+              );
+            } else if (showWinnerScreen) {
               return WinnerWidget(
                 size: size,
                 raceModel: raceModel,
