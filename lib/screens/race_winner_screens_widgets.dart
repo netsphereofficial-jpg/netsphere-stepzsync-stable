@@ -67,8 +67,8 @@ class WinnerWidget extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            AppColors.appColor.withOpacity(0.1),
-                            AppColors.neonYellow.withOpacity(0.1),
+                            AppColors.appColor.withValues(alpha: 0.1),
+                            AppColors.neonYellow.withValues(alpha: 0.1),
                           ],
                         ),
                         shape: BoxShape.circle,
