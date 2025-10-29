@@ -61,7 +61,7 @@ class OverallStatsCardWidget extends StatelessWidget {
               children: [
                 _buildStatColumn('${overallDays.value.toString().padLeft(2, '0')}', 'Days', null, svgPath: 'assets/icons/calender.svg'),
                 _buildStatColumn(_formatStepCount(overallSteps.value), 'Steps', null, svgPath: 'assets/icons/shoe-run.svg'),
-                _buildStatColumn('${overallDistance.value.round()}', 'Distance (Kms)', null, svgPath: 'assets/icons/walking-solid.svg'),
+                _buildStatColumn('${overallDistance.value.toStringAsFixed(2)}', 'Distance (Kms)', null, svgPath: 'assets/icons/walking-solid.svg'),
               ],
             );
           }),

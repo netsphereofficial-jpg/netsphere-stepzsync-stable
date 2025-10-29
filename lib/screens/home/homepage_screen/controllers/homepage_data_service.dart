@@ -44,6 +44,7 @@ class HomepageDataService extends GetxController {
   final RxDouble periodSpeed = 0.0.obs;
   final RxInt periodCalories = 0.obs;
   final RxBool isLoadingPeriodData = false.obs;
+  String _currentPeriod = 'Today'; // Track current period filter
 
   // Loading states
   final RxBool isInitialLoading = true.obs;
@@ -621,6 +622,10 @@ class HomepageDataService extends GetxController {
           if (!_isDisposed) {
             print('HomepageDataService: Today distance updated to $distance');
             localTodayDistance.value = distance;
+            // Update period data if "Today" filter is active
+            if (_currentPeriod.toLowerCase() == 'today') {
+              periodDistance.value = distance;
+            }
           }
         });
 
@@ -628,12 +633,20 @@ class HomepageDataService extends GetxController {
           if (!_isDisposed) {
             print('HomepageDataService: Today calories updated to $calories');
             localTodayCalories.value = calories;
+            // Update period data if "Today" filter is active
+            if (_currentPeriod.toLowerCase() == 'today') {
+              periodCalories.value = calories;
+            }
           }
         });
 
         ever(_stepTrackingService!.todayActiveTime, (int activeTime) {
           if (!_isDisposed) {
             localTodayActiveTime.value = activeTime;
+            // Update period data if "Today" filter is active
+            if (_currentPeriod.toLowerCase() == 'today') {
+              periodActiveTime.value = activeTime;
+            }
           }
         });
 
@@ -1201,6 +1214,9 @@ class HomepageDataService extends GetxController {
 
   /// Load period-based analytics data using Firebase aggregation
   Future<void> loadPeriodData(String period) async {
+    // Store current period for reactive listeners
+    _currentPeriod = period;
+
     // 📊 Start Firebase Performance trace
     final trace = FirebasePerformance.instance.newTrace('load_period_data');
     await trace.start();

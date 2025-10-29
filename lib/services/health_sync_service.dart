@@ -363,25 +363,42 @@ class HealthSyncService extends GetxController {
       // Convert units
       final distanceKm = distanceMeters * HealthConfig.metersToKilometers;
 
-      // ✅ Android: Estimate active minutes from steps
-      // Health Connect doesn't support EXERCISE_TIME, so we estimate from steps
+      // ✅ Fallback: Estimate distance from steps if HealthKit has no distance data
+      double finalDistance = distanceKm;
+      if (distanceKm == 0.0 && steps > 0) {
+        const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
+        finalDistance = steps * stepsToKm;
+        print('${HealthConfig.logPrefix} ⚠️ No distance data from HealthKit, estimated from steps: ${finalDistance.toStringAsFixed(2)}km');
+      }
+
+      // ✅ Fallback: Estimate calories from steps if HealthKit has no calorie data
+      int finalCalories = caloriesKcal.round();
+      if (caloriesKcal == 0.0 && steps > 0) {
+        const stepsToCalories = 0.04; // 1 step ≈ 0.04 calories
+        finalCalories = (steps * stepsToCalories).round();
+        print('${HealthConfig.logPrefix} ⚠️ No calorie data from HealthKit, estimated from steps: $finalCalories cal');
+      }
+
+      // ✅ Fallback: Estimate active minutes from steps if not available from HealthKit
+      // Android: Health Connect doesn't support EXERCISE_TIME
+      // iOS: HealthKit may not have EXERCISE_TIME data if no workouts were logged
       // Average walking pace: 100 steps/minute
-      // Only count active minutes if we have significant steps
-      if (Platform.isAndroid && activeMinutes == 0 && steps > 0) {
+      if (activeMinutes == 0 && steps > 0) {
         activeMinutes = (steps / 100).round();
-        print('${HealthConfig.logPrefix} [Android] Estimated active minutes from steps: $activeMinutes minutes');
+        final platform = Platform.isAndroid ? 'Android' : 'iOS';
+        print('${HealthConfig.logPrefix} [$platform] Estimated active minutes from steps: $activeMinutes minutes');
       }
 
       final result = DailyHealthData(
         date: start,
         steps: steps,
-        distance: distanceKm,
-        calories: caloriesKcal.round(),
+        distance: finalDistance,
+        calories: finalCalories,
         activeMinutes: activeMinutes,
         heartRateBpm: heartRate,
       );
 
-      print('${HealthConfig.logPrefix} Parsed data: ${steps} steps, ${distanceKm.toStringAsFixed(2)} km, ${caloriesKcal.round()} cal, ${activeMinutes} active min');
+      print('${HealthConfig.logPrefix} Parsed data: ${steps} steps, ${finalDistance.toStringAsFixed(2)} km, $finalCalories cal, ${activeMinutes} active min');
 
       return result;
     } catch (e) {
@@ -526,7 +543,7 @@ class HealthSyncService extends GetxController {
   /// Used by StepTrackingService for baseline initialization
   Future<Map<String, dynamic>?> fetchTodaySteps() async {
     try {
-      print('${HealthConfig.logPrefix} Fetching today\'s steps...');
+      print('${HealthConfig.logPrefix} Fetching today\'s health data from HealthKit/Health Connect...');
 
       // Check availability and permissions
       if (!isHealthAvailable.value) {
@@ -548,25 +565,108 @@ class HealthSyncService extends GetxController {
       // This prevents counting duplicate step entries from multiple sources
       final totalSteps = await _health.getTotalStepsInInterval(startOfDay, endOfDay) ?? 0;
 
-      // Estimate distance and calories (simple estimation)
-      const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
-      const stepsToCalories = 0.04; // 1 step ≈ 0.04 calories
-      final distance = totalSteps * stepsToKm;
-      final calories = (totalSteps * stepsToCalories).round();
+      // ✅ NEW: Fetch actual distance, calories, and active time from HealthKit/Health Connect
+      // Instead of calculating with generic formulas, get the real data
+      final List<HealthDataType> otherDataTypes = [
+        HealthDataType.ACTIVE_ENERGY_BURNED, // Calories from HealthKit/Health Connect
+      ];
 
-      // Estimate active time (assuming 100 steps per minute)
-      final activeMinutes = (totalSteps / 100).round();
+      // Add platform-specific data types
+      if (Platform.isIOS) {
+        otherDataTypes.add(HealthDataType.DISTANCE_WALKING_RUNNING); // iOS distance
+        otherDataTypes.add(HealthDataType.EXERCISE_TIME); // iOS active time
+      } else if (Platform.isAndroid) {
+        otherDataTypes.add(HealthDataType.DISTANCE_DELTA); // Android distance
+        // Note: Android Health Connect doesn't have EXERCISE_TIME, will estimate from steps
+      }
 
-      print('${HealthConfig.logPrefix} ✅ Today: $totalSteps steps, ${distance.toStringAsFixed(2)}km');
+      // Fetch actual health data from HealthKit/Health Connect
+      final List<HealthDataPoint> healthData = await _health
+          .getHealthDataFromTypes(
+            types: otherDataTypes,
+            startTime: startOfDay,
+            endTime: endOfDay,
+          )
+          .timeout(
+            HealthConfig.syncTimeout,
+            onTimeout: () => throw TimeoutException('Health data fetch timeout'),
+          );
+
+      print('${HealthConfig.logPrefix} Fetched ${healthData.length} additional data points for today');
+
+      // Parse and aggregate health data
+      double distanceMeters = 0.0;
+      double caloriesKcal = 0.0;
+      int activeMinutes = 0;
+
+      for (final point in healthData) {
+        switch (point.type) {
+          case HealthDataType.DISTANCE_DELTA: // Android
+          case HealthDataType.DISTANCE_WALKING_RUNNING: // iOS
+            if (point.value is NumericHealthValue) {
+              distanceMeters += (point.value as NumericHealthValue).numericValue;
+            }
+            break;
+
+          case HealthDataType.ACTIVE_ENERGY_BURNED:
+            if (point.value is NumericHealthValue) {
+              caloriesKcal += (point.value as NumericHealthValue).numericValue;
+            }
+            break;
+
+          case HealthDataType.EXERCISE_TIME:
+            // iOS only - get actual active minutes from HealthKit
+            if (point.value is NumericHealthValue) {
+              activeMinutes += (point.value as NumericHealthValue).numericValue.toInt();
+            }
+            break;
+
+          default:
+            break;
+        }
+      }
+
+      // Convert distance from meters to kilometers
+      final distanceKm = distanceMeters * HealthConfig.metersToKilometers;
+
+      // ✅ Fallback to calculation if HealthKit data is missing (e.g., no GPS data for distance)
+      double finalDistance = distanceKm;
+      int finalCalories = caloriesKcal.round();
+      int finalActiveMinutes = activeMinutes;
+
+      if (distanceKm == 0.0 && totalSteps > 0) {
+        // Fallback: Estimate distance from steps if HealthKit has no distance data
+        const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
+        finalDistance = totalSteps * stepsToKm;
+        print('${HealthConfig.logPrefix} ⚠️ No distance data from HealthKit, estimated from steps: ${finalDistance.toStringAsFixed(2)}km');
+      }
+
+      if (caloriesKcal == 0.0 && totalSteps > 0) {
+        // Fallback: Estimate calories from steps if HealthKit has no calorie data
+        const stepsToCalories = 0.04; // 1 step ≈ 0.04 calories
+        finalCalories = (totalSteps * stepsToCalories).round();
+        print('${HealthConfig.logPrefix} ⚠️ No calorie data from HealthKit, estimated from steps: $finalCalories cal');
+      }
+
+      // ✅ Fallback: Estimate active minutes from steps if not available from HealthKit
+      // Android: Health Connect doesn't support EXERCISE_TIME
+      // iOS: HealthKit may not have EXERCISE_TIME data if no workouts were logged
+      if (finalActiveMinutes == 0 && totalSteps > 0) {
+        finalActiveMinutes = (totalSteps / 100).round(); // Average walking pace: 100 steps/minute
+        final platform = Platform.isAndroid ? 'Android' : 'iOS';
+        print('${HealthConfig.logPrefix} [$platform] Estimated active minutes from steps: $finalActiveMinutes minutes');
+      }
+
+      print('${HealthConfig.logPrefix} ✅ Today: $totalSteps steps, ${finalDistance.toStringAsFixed(2)}km, $finalCalories cal, $finalActiveMinutes min (from HealthKit)');
 
       return {
         'steps': totalSteps,
-        'distance': distance,
-        'calories': calories,
-        'activeMinutes': activeMinutes,
+        'distance': finalDistance,
+        'calories': finalCalories,
+        'activeMinutes': finalActiveMinutes,
       };
     } catch (e, stackTrace) {
-      print('${HealthConfig.logPrefix} ❌ Error fetching today\'s steps: $e');
+      print('${HealthConfig.logPrefix} ❌ Error fetching today\'s health data: $e');
       print('📍 Stack trace: $stackTrace');
       return null;
     }

@@ -243,7 +243,11 @@ class StepTrackingService extends GetxService {
         // Update today's display with baseline (before pedometer starts)
         await _stateUpdateLock.synchronized(() async {
           _updateTodayDisplayInternal();
-          print('✅ Today\'s baseline updated from HealthKit: ${todaySteps.value} steps');
+          // Force notify listeners after calculation to ensure UI updates
+          todayDistance.refresh();
+          todayCalories.refresh();
+          todayActiveTime.refresh();
+          print('✅ Today\'s baseline updated from HealthKit: ${todaySteps.value} steps, ${todayDistance.value.toStringAsFixed(2)} km, ${todayCalories.value} cal');
         });
       } else {
         print('⚠️ No HealthKit data available for today, using local fallback');
