@@ -80,6 +80,7 @@ class MapController extends GetxController with WidgetsBindingObserver {
   GlobalKey? _mapKey;
   final Rx<Uint8List?> mapSnapshot = Rxn<Uint8List?>();
   final RxBool snapshotTimeout = false.obs;
+  final RxBool raceEnded = false.obs; // Once true, never resets - prevents flickering
 
   //CountDown
   final RxString formattedTime = '00:00:00'.obs;
@@ -259,6 +260,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
         timeRemaining,
         onComplete: () async {
           print('⏰ Race deadline reached! Transitioning to completed...');
+
+          // Mark race as ended (prevents flickering)
+          raceEnded.value = true;
 
           // Capture map snapshot before race ends (for DNF users)
           print("📸 Capturing map snapshot for race end...");
@@ -460,6 +464,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
       if (remainingDistance <= 0.05 && !myRaceCompleted.value) {
         print("Race completed! Remaining distance: ${remainingDistance}km");
         print("📸 Capturing map snapshot before showing winner screen...");
+
+        // Mark race as ended (prevents flickering)
+        raceEnded.value = true;
 
         // Capture map snapshot before showing winner screen
         captureMapSnapshot();

@@ -269,18 +269,21 @@ class RaceMapScreen extends StatelessWidget {
                 mapController.raceModel.value!.remainingDistance! <= 0;
 
             final currentUserFinished = currentUserCompleted || remainingDistanceZero;
-            final raceCompleted = mapController.raceStatus.value == 4;
 
-            // Show DNF screen if race completed but user didn't finish
+            // Use raceEnded flag instead of status to prevent flickering
+            final raceCompleted = mapController.raceEnded.value;
+
+            // Show DNF screen if race ended but user didn't finish
             // Wait for snapshot to be captured before showing (or show immediately if snapshot exists)
             final showDNFScreen = raceCompleted &&
                 !currentUserFinished &&
                 !mapController.isViewOnlyMode.value &&
                 (mapController.mapSnapshot.value != null || mapController.snapshotTimeout.value);
 
-            // Show WinnerWidget ONLY if user finished (not just because race completed)
+            // Show WinnerWidget ONLY if user finished
             // Wait for snapshot to be captured before showing (or show immediately if snapshot exists)
             final showWinnerScreen = currentUserFinished &&
+                mapController.raceEnded.value && // Also use raceEnded for winners
                 !mapController.isViewOnlyMode.value &&
                 (mapController.mapSnapshot.value != null || mapController.snapshotTimeout.value);
 
