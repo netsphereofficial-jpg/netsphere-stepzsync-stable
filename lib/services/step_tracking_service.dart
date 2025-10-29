@@ -346,10 +346,12 @@ class StepTrackingService extends GetxService {
         todayCalories.value = (combinedSteps * _stepsToCaloriesFactor).round();
       }
 
-      // Active time (estimate if not from HealthKit)
+      // Active time - use Health Connect/HealthKit data when available, fallback to pedometer only when no health data
       if (_healthKitBaselineActiveTime > 0) {
-        todayActiveTime.value = _healthKitBaselineActiveTime + _pedometerService.sessionDurationMinutes;
+        // Use only the health data, don't add session duration to avoid double counting
+        todayActiveTime.value = _healthKitBaselineActiveTime;
       } else {
+        // Fallback: Only use pedometer session duration when no health data is available
         todayActiveTime.value = _pedometerService.sessionDurationMinutes;
       }
 
