@@ -309,8 +309,14 @@ class DNFWidget extends StatelessWidget {
                     CustomButton(
                       btnTitle: "Back to Home",
                       onPress: () {
-                        // Navigate back to home screen
-                        Get.offAllNamed('/home');
+                        // Clean up map controller
+                        if (Get.isRegistered<MapController>()) {
+                          Get.delete<MapController>();
+                        }
+                        // Navigate back - this will go back through the navigation stack
+                        // If this doesn't work, you may need to navigate to a specific screen
+                        // using Get.offAll(() => YourHomeScreen()) instead
+                        Get.back();
                       },
                     ),
 

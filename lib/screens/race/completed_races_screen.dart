@@ -106,68 +106,6 @@ class _CompletedRacesScreenState extends State<CompletedRacesScreen>
     );
   }
 
-  Widget _buildStatsHeader() {
-    return Container(
-      margin: EdgeInsets.all(AppConstants.defaultPadding),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.neonYellow.withValues(alpha: 0.12),
-            AppColors.neonYellow.withValues(alpha: 0.08),
-            AppColors.neonYellow.withValues(alpha: 0.04),
-          ],
-          stops: [0.0, 0.5, 1.0],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.neonYellow.withValues(alpha: 0.15),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.neonYellow.withValues(alpha: 0.15),
-            blurRadius: 24,
-            offset: Offset(0, 6),
-            spreadRadius: 2,
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.8),
-            blurRadius: 16,
-            offset: Offset(0, -2),
-            spreadRadius: -1,
-          ),
-        ],
-      ),
-      child: Obx(() {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildStatItem(
-              icon: IconPaths.winnerCup,
-              title: "Completed",
-              value: "${controller.totalCompletedRaces}",
-              delay: 100,
-            ),
-            _buildStatItem(
-              icon: IconPaths.mapIcon,
-              title: "Distance",
-              value: "${controller.totalDistanceCovered.toStringAsFixed(1)}km",
-              delay: 200,
-            ),
-            _buildStatItem(
-              icon: IconPaths.shoesBlack,
-              title: "Calories",
-              value: "${(controller.totalCaloriesBurned / 1000).toStringAsFixed(1)}k",
-              delay: 300,
-            ),
-          ],
-        );
-      }),
-    );
-  }
 
   Widget _buildStatItem({
     required String icon,
@@ -230,7 +168,6 @@ class _CompletedRacesScreenState extends State<CompletedRacesScreen>
   Widget _buildLoadingState() {
     return Column(
       children: [
-        _buildStatsHeader(),
         Expanded(
           child: ListView.builder(
             itemCount: 5,

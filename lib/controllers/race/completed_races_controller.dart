@@ -85,40 +85,38 @@ class CompletedRacesController extends GetxController {
         try {
           final raceData = RaceData.fromFirestore(doc);
 
-          // Find current user's participant data
-          final userParticipant = raceData.participants?.firstWhere(
-            (p) => p.userId == currentUserId,
-            orElse: () => Participant(
-              userId: '', userName: '', distance: 0, remainingDistance: 0,
-              rank: 0, steps: 0, calories: 0, avgSpeed: 0.0, isCompleted: false
-            ),
-          );
+          // ✅ CRITICAL FIX: Always fetch participant data from subcollection
+          // The participants array in the main document is deprecated and may be empty/outdated
+          Participant? userParticipant;
+          bool userCompleted = false;
+
+          try {
+            final participantDoc = await _firestore
+                .collection('races')
+                .doc(doc.id)
+                .collection('participants')
+                .doc(currentUserId)
+                .get();
+
+            if (participantDoc.exists) {
+              userParticipant = Participant.fromFirestoreMap(participantDoc.data()!);
+              userCompleted = userParticipant.isCompleted;
+            }
+          } catch (e) {
+            log('⚠️ Error fetching participant data from subcollection: $e');
+            // Fall back to the participant data from the main document if subcollection fails
+            userParticipant = raceData.participants?.firstWhere(
+              (p) => p.userId == currentUserId,
+              orElse: () => Participant(
+                userId: '', userName: '', distance: 0, remainingDistance: 0,
+                rank: 0, steps: 0, calories: 0, avgSpeed: 0.0, isCompleted: false
+              ),
+            );
+            userCompleted = userParticipant?.isCompleted ?? false;
+          }
 
           // Also check if user was the organizer
           final wasOrganizer = raceData.organizerUserId == currentUserId;
-
-          // ✅ CRITICAL FIX: For active races (status 3), check participants subcollection
-          // to get the most up-to-date completion status
-          bool userCompleted = userParticipant?.isCompleted ?? false;
-
-          if (raceData.statusId == 3 && userParticipant?.userId == currentUserId) {
-            // For active races, fetch fresh data from participants subcollection
-            try {
-              final participantDoc = await _firestore
-                  .collection('races')
-                  .doc(doc.id)
-                  .collection('participants')
-                  .doc(currentUserId)
-                  .get();
-
-              if (participantDoc.exists) {
-                userCompleted = participantDoc.data()?['isCompleted'] ?? false;
-              }
-            } catch (e) {
-              log('⚠️ Error fetching participant data from subcollection: $e');
-              // Fall back to the participant data from the main document
-            }
-          }
 
           // Include race if:
           // - Status 4 (race fully completed) AND user participated/organized OR
@@ -129,6 +127,25 @@ class CompletedRacesController extends GetxController {
                                (raceData.statusId == 3 && userCompleted);
 
           if (shouldInclude) {
+            // ✅ Fetch ALL participants from subcollection to populate the race data properly
+            try {
+              final participantsSnapshot = await _firestore
+                  .collection('races')
+                  .doc(doc.id)
+                  .collection('participants')
+                  .orderBy('rank')
+                  .get();
+
+              final participantsList = participantsSnapshot.docs
+                  .map((pDoc) => Participant.fromFirestoreMap(pDoc.data()))
+                  .toList();
+
+              // Update the race data with the fetched participants
+              raceData.participants = participantsList;
+            } catch (e) {
+              log('⚠️ Error fetching all participants from subcollection for race ${doc.id}: $e');
+            }
+
             races.add(raceData);
           }
         } catch (e) {
@@ -172,38 +189,38 @@ class CompletedRacesController extends GetxController {
         try {
           final raceData = RaceData.fromFirestore(doc);
 
-          // Find current user's participant data
-          final userParticipant = raceData.participants?.firstWhere(
-            (p) => p.userId == currentUserId,
-            orElse: () => Participant(
-              userId: '', userName: '', distance: 0, remainingDistance: 0,
-              rank: 0, steps: 0, calories: 0, avgSpeed: 0.0, isCompleted: false
-            ),
-          );
+          // ✅ CRITICAL FIX: Always fetch participant data from subcollection
+          // The participants array in the main document is deprecated and may be empty/outdated
+          Participant? userParticipant;
+          bool userCompleted = false;
+
+          try {
+            final participantDoc = await _firestore
+                .collection('races')
+                .doc(doc.id)
+                .collection('participants')
+                .doc(currentUserId)
+                .get();
+
+            if (participantDoc.exists) {
+              userParticipant = Participant.fromFirestoreMap(participantDoc.data()!);
+              userCompleted = userParticipant.isCompleted;
+            }
+          } catch (e) {
+            log('⚠️ Error fetching participant data from subcollection: $e');
+            // Fall back to the participant data from the main document if subcollection fails
+            userParticipant = raceData.participants?.firstWhere(
+              (p) => p.userId == currentUserId,
+              orElse: () => Participant(
+                userId: '', userName: '', distance: 0, remainingDistance: 0,
+                rank: 0, steps: 0, calories: 0, avgSpeed: 0.0, isCompleted: false
+              ),
+            );
+            userCompleted = userParticipant?.isCompleted ?? false;
+          }
 
           // Also check if user was the organizer
           final wasOrganizer = raceData.organizerUserId == currentUserId;
-
-          // ✅ CRITICAL FIX: For active races, check participants subcollection
-          bool userCompleted = userParticipant?.isCompleted ?? false;
-
-          if (raceData.statusId == 3 && userParticipant?.userId == currentUserId) {
-            // For active races, fetch fresh data from participants subcollection
-            try {
-              final participantDoc = await _firestore
-                  .collection('races')
-                  .doc(doc.id)
-                  .collection('participants')
-                  .doc(currentUserId)
-                  .get();
-
-              if (participantDoc.exists) {
-                userCompleted = participantDoc.data()?['isCompleted'] ?? false;
-              }
-            } catch (e) {
-              log('⚠️ Error fetching participant data from subcollection: $e');
-            }
-          }
 
           // Include race if:
           // - Status 4 (race fully completed) AND user participated/organized OR
@@ -214,6 +231,25 @@ class CompletedRacesController extends GetxController {
                                (raceData.statusId == 3 && userCompleted);
 
           if (shouldInclude) {
+            // ✅ Fetch ALL participants from subcollection to populate the race data properly
+            try {
+              final participantsSnapshot = await _firestore
+                  .collection('races')
+                  .doc(doc.id)
+                  .collection('participants')
+                  .orderBy('rank')
+                  .get();
+
+              final participantsList = participantsSnapshot.docs
+                  .map((pDoc) => Participant.fromFirestoreMap(pDoc.data()))
+                  .toList();
+
+              // Update the race data with the fetched participants
+              raceData.participants = participantsList;
+            } catch (e) {
+              log('⚠️ Error fetching all participants from subcollection for race ${doc.id}: $e');
+            }
+
             races.add(raceData);
           }
         } catch (e) {

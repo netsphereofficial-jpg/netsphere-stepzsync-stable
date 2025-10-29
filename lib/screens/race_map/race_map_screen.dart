@@ -46,167 +46,200 @@ class RaceMapScreen extends StatelessWidget {
           Get.delete<MapController>();
         }
       },
-      child: Scaffold(
-        appBar: CustomAppBar(
-          title: raceModel?.title ?? "",
-          isBack: true,
-          circularBackButton: true,
-          backButtonCircleColor: AppColors.neonYellow,
-          backButtonIconColor: Colors.black,
-          backgroundColor: Colors.white,
-          titleColor: AppColors.appColor,
-          showGradient: false,
-          titleStyle: GoogleFonts.roboto(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.appColor,
-          ),
-          onBackClick: () {
-            if (Get.isRegistered<MapController>()) {
-              Get.delete<MapController>();
-            }
-            Get.back();
-          },
-          actions: [
-            // Race type and status badges
-            Obx(() {
-              final raceTypeId = raceModel?.raceTypeId ?? 3;
-              String typeText = '';
-              Color badgeColor = AppColors.appColor;
+      child: Obx(() {
+        // Check if we should show winner/DNF screen
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        bool currentUserCompleted = false;
 
-              if (raceTypeId == 1) {
-                typeText = 'Solo';
-                badgeColor = Color(0xFF0EA5E9);
-              } else if (raceTypeId == 4) {
-                typeText = 'Marathon';
-                badgeColor = Color(0xFFDC2626);
-              } else if (raceModel?.isPrivate == true) {
-                typeText = 'Private';
-                badgeColor = Color(0xFFEA580C);
-              } else {
-                typeText = 'Public';
-                badgeColor = Color(0xFF059669);
+        if (currentUserId != null && mapController.participantsList.isNotEmpty) {
+          final currentUserParticipant = mapController.participantsList.firstWhere(
+            (p) => p.userId == currentUserId,
+            orElse: () => Participant(
+              userId: '',
+              userName: '',
+              distance: 0,
+              remainingDistance: mapController.raceModel.value?.totalDistance ?? 0,
+              rank: 0,
+              steps: 0,
+              isCompleted: false,
+            ),
+          );
+          currentUserCompleted = currentUserParticipant.isCompleted;
+        }
+
+        final remainingDistanceZero = mapController.raceModel.value != null &&
+            mapController.raceModel.value!.remainingDistance! <= 0;
+
+        final currentUserFinished = currentUserCompleted || remainingDistanceZero;
+        final raceCompleted = mapController.raceStatus.value == 4;
+
+        final showDNFScreen = raceCompleted && !currentUserFinished && !mapController.isViewOnlyMode.value;
+        final showWinnerScreen = (currentUserFinished || raceCompleted) && !mapController.isViewOnlyMode.value;
+
+        // Hide app bar when showing winner or DNF screen
+        final shouldShowAppBar = !showDNFScreen && !showWinnerScreen;
+
+        return Scaffold(
+          appBar: shouldShowAppBar ? CustomAppBar(
+            title: raceModel?.title ?? "",
+            isBack: true,
+            circularBackButton: true,
+            backButtonCircleColor: AppColors.neonYellow,
+            backButtonIconColor: Colors.black,
+            backgroundColor: Colors.white,
+            titleColor: AppColors.appColor,
+            showGradient: false,
+            titleStyle: GoogleFonts.roboto(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.appColor,
+            ),
+            onBackClick: () {
+              if (Get.isRegistered<MapController>()) {
+                Get.delete<MapController>();
               }
+              Get.back();
+            },
+            actions: [
+              // Race type and status badges
+              Obx(() {
+                final raceTypeId = raceModel?.raceTypeId ?? 3;
+                String typeText = '';
+                Color badgeColor = AppColors.appColor;
 
-              return Row(
-                children: [
-                  // Race type badge
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: badgeColor.withValues(alpha: 0.3),
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      typeText,
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  // Status indicator
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(mapController.raceStatus.value),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _getStatusText(mapController.raceStatus.value),
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                ],
-              );
-            }),
+                if (raceTypeId == 1) {
+                  typeText = 'Solo';
+                  badgeColor = Color(0xFF0EA5E9);
+                } else if (raceTypeId == 4) {
+                  typeText = 'Marathon';
+                  badgeColor = Color(0xFFDC2626);
+                } else if (raceModel?.isPrivate == true) {
+                  typeText = 'Private';
+                  badgeColor = Color(0xFFEA580C);
+                } else {
+                  typeText = 'Public';
+                  badgeColor = Color(0xFF059669);
+                }
 
-            // Race chat icon with unread badge - hide for solo races
-            if (raceModel?.raceTypeId != 1) ...[
-              Stack(
-                children: [
-                  IconButton(
-                    onPressed: () => _openRaceChat(context),
-                    icon: Icon(Icons.chat_bubble_outline, color: AppColors.appColor, size: 22),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.neonYellow.withValues(alpha: 0.2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 6,
-                    top: 6,
-                    child: Obx(() {
-                      final unreadCount = chatController
-                          .getUnreadRaceMessageCount(raceModel?.id ?? '');
-                      if (unreadCount == 0) return SizedBox.shrink();
-
-                      return Container(
-                        padding: EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                        constraints: BoxConstraints(minWidth: 16, minHeight: 16),
-                        child: Text(
-                          unreadCount > 99 ? '99+' : unreadCount.toString(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
+                return Row(
+                  children: [
+                    // Race type badge
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: badgeColor,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: badgeColor.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
                           ),
-                          textAlign: TextAlign.center,
+                        ],
+                      ),
+                      child: Text(
+                        typeText,
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
                         ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-              SizedBox(width: 4),
-            ],
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    // Status indicator
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(mapController.raceStatus.value),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _getStatusText(mapController.raceStatus.value),
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                  ],
+                );
+              }),
 
-            // Leaderboard icon - hide for solo races
-            if (_shouldShowLeaderboard())
-              IconButton(
-                onPressed: () {
-                  if (mapController.participantsList.isEmpty) {
-                    mapController.participantsList.value =
-                        raceModel?.participants ?? [];
-                  }
-                  showRankingBottomSheet(context, mapController.participantsList);
-                },
-                icon: Icon(Icons.leaderboard, color: AppColors.appColor, size: 22),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.neonYellow.withValues(alpha: 0.2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // Race chat icon with unread badge - hide for solo races
+              if (raceModel?.raceTypeId != 1) ...[
+                Stack(
+                  children: [
+                    IconButton(
+                      onPressed: () => _openRaceChat(context),
+                      icon: Icon(Icons.chat_bubble_outline, color: AppColors.appColor, size: 22),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.neonYellow.withValues(alpha: 0.2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Obx(() {
+                        final unreadCount = chatController
+                            .getUnreadRaceMessageCount(raceModel?.id ?? '');
+                        if (unreadCount == 0) return SizedBox.shrink();
+
+                        return Container(
+                          padding: EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          constraints: BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+                SizedBox(width: 4),
+              ],
+
+              // Leaderboard icon - hide for solo races
+              if (_shouldShowLeaderboard())
+                IconButton(
+                  onPressed: () {
+                    if (mapController.participantsList.isEmpty) {
+                      mapController.participantsList.value =
+                          raceModel?.participants ?? [];
+                    }
+                    showRankingBottomSheet(context, mapController.participantsList);
+                  },
+                  icon: Icon(Icons.leaderboard, color: AppColors.appColor, size: 22),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.neonYellow.withValues(alpha: 0.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ) : null,
 
-        body: SafeArea(
-          child: Obx(() {
+          body: SafeArea(
+            child: Obx(() {
             // Show winner screen only if:
             // 1. Current user has finished (remainingDistance <= 0 OR isCompleted flag), OR
             // 2. Race is completed (statusId == 4)
@@ -472,12 +505,13 @@ class RaceMapScreen extends StatelessWidget {
             }
           }),
         ),
-        // floatingActionButton: FloatingActionButton.extended(
-        //   onPressed: () => mapController.moveUserMarker(10), // move 50 meters
-        //   label: const Text('Move 10m', style: TextStyle(color: Colors.black)),
-        //   icon: const Icon(Icons.directions_walk, color: Colors.black),
-        // ),
-      ),
+          // floatingActionButton: FloatingActionButton.extended(
+          //   onPressed: () => mapController.moveUserMarker(10), // move 50 meters
+          //   label: const Text('Move 10m', style: TextStyle(color: Colors.black)),
+          //   icon: const Icon(Icons.directions_walk, color: Colors.black),
+          // ),
+        );
+      }),
     );
   }
 
