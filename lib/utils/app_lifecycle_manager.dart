@@ -167,11 +167,11 @@ class AppLifecycleManager with WidgetsBindingObserver {
     print('🔄 [LIFECYCLE] Registered cold start callback (${_onColdStartCallbacks.length} total)');
 
     // If this is a cold start and app is already resumed, trigger callback immediately
+    // but DON'T reset isColdStart flag here, let other callbacks register too
     if (isColdStart.value && currentState.value == AppLifecycleState.resumed) {
-      print('🔄 [LIFECYCLE] App already resumed - triggering callback immediately');
+      print('🔄 [LIFECYCLE] App already resumed - will trigger callback immediately');
       try {
         callback();
-        isColdStart.value = false; // Mark as handled
       } catch (e) {
         print('🔄 [LIFECYCLE] Error in immediate cold start callback: $e');
       }

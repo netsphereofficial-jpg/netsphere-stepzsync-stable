@@ -4,6 +4,7 @@ enum SubscriptionPlanType {
   free,
   premium1,
   premium2,
+  lifetime,
 }
 
 enum SubscriptionStatus {
@@ -160,6 +161,29 @@ class SubscriptionPlan {
           SubscriptionFeature.available("Exclusive global invites + team battles"),
         ],
       ),
+
+      // Lifetime Plan - Christmas Special
+      SubscriptionPlan(
+        type: SubscriptionPlanType.lifetime,
+        name: "Lifetime Premium",
+        subtitle: "One-Time Payment",
+        emoji: "⭐",
+        price: "\$299",
+        originalPrice: "\$600",
+        billingPeriod: "one-time",
+        badge: "CHRISTMAS SPECIAL",
+        googlePlayProductId: "lifetime_premium",
+        appleProductId: "lifetime_premium",
+        features: [
+          SubscriptionFeature.available("🌍 All Premium 2 features"),
+          SubscriptionFeature.available("♾️ Lifetime access - pay once, use forever"),
+          SubscriptionFeature.available("🎄 50% OFF Christmas Special"),
+          SubscriptionFeature.available("🚫 No monthly fees ever"),
+          SubscriptionFeature.available("⚡ Priority customer support"),
+          SubscriptionFeature.available("🎁 Exclusive lifetime member badge"),
+          SubscriptionFeature.available("🔓 All future premium features included"),
+        ],
+      ),
     ];
   }
 
@@ -173,6 +197,10 @@ class SubscriptionPlan {
 
   static SubscriptionPlan getPremium2Plan() {
     return getAllPlans().firstWhere((plan) => plan.type == SubscriptionPlanType.premium2);
+  }
+
+  static SubscriptionPlan getLifetimePlan() {
+    return getAllPlans().firstWhere((plan) => plan.type == SubscriptionPlanType.lifetime);
   }
 }
 
@@ -269,6 +297,8 @@ class UserSubscription {
         return SubscriptionPlanType.premium1;
       case 'premium2':
         return SubscriptionPlanType.premium2;
+      case 'lifetime':
+        return SubscriptionPlanType.lifetime;
       case 'free':
       default:
         return SubscriptionPlanType.free;

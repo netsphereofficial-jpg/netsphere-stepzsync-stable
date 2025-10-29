@@ -19,6 +19,9 @@ import '../login_screen.dart';
 import '../../utils/guest_utils.dart';
 import '../../utils/app_lifecycle_manager.dart';
 import '../../widgets/guest_upgrade_dialog.dart';
+import '../../widgets/dialogs/premium_purchase_dialog.dart';
+import '../../services/preferences_service.dart';
+import '../../controllers/subscription_controller.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -57,13 +60,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   /// Initialize lifecycle manager and register cold start callback
   Future<void> _initializeLifecycleManager() async {
     try {
+      // Initialize lifecycle manager first
       await _lifecycleManager.initialize();
 
+      // Now register cold start callbacks
+      // If app is already resumed, both callbacks will be triggered immediately
       // Register cold start callback to trigger health sync
       _lifecycleManager.registerColdStartCallback(() {
         print('🔄 [MAIN_NAV] Cold start detected, triggering health sync...');
         _handleColdStart();
       });
+
+      // Register cold start callback to check and show premium dialog
+      _lifecycleManager.registerColdStartCallback(() {
+        print('💎 [MAIN_NAV] Cold start detected, checking premium dialog...');
+        _checkAndShowPremiumDialog();
+      });
+
+      // Reset cold start flag after all callbacks are registered and triggered
+      // This ensures both callbacks get called even if registered after app resumed
+      if (_lifecycleManager.currentState.value == AppLifecycleState.resumed) {
+        _lifecycleManager.isColdStart.value = false;
+        print('✅ [MAIN_NAV] Cold start callbacks completed, flag reset');
+      }
 
       print('✅ [MAIN_NAV] Lifecycle manager initialized');
     } catch (e) {
@@ -94,6 +113,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
       });
     } catch (e) {
       print('❌ [MAIN_NAV] Error handling cold start: $e');
+    }
+  }
+
+  /// Check and show premium purchase dialog if conditions are met
+  /// Waits 15 seconds after cold start to avoid interfering with syncs
+  Future<void> _checkAndShowPremiumDialog() async {
+    try {
+      // Skip if guest user
+      if (GuestUtils.isGuest()) {
+        print('💎 [MAIN_NAV] Skipping premium dialog for guest user');
+        return;
+      }
+
+      // Increment app open count
+      final prefsService = PreferencesService();
+      await prefsService.incrementAppOpenCount();
+
+      final appOpenCount = await prefsService.getAppOpenCount();
+      print('💎 [MAIN_NAV] App open count: $appOpenCount');
+
+      // Check if should show dialog
+      final shouldShow = await prefsService.shouldShowPremiumDialog();
+
+      if (!shouldShow) {
+        print('💎 [MAIN_NAV] Premium dialog conditions not met');
+        return;
+      }
+
+      // Check if user already has premium
+      if (Get.isRegistered<SubscriptionController>()) {
+        final subscriptionController = Get.find<SubscriptionController>();
+        if (subscriptionController.hasPremiumAccess) {
+          print('💎 [MAIN_NAV] User already has premium, skipping dialog');
+          return;
+        }
+      }
+
+      // Wait 15 seconds to avoid interfering with syncs
+      await Future.delayed(Duration(seconds: 15));
+
+      // Increment dialog shown count
+      await prefsService.incrementPremiumDialogShownCount();
+
+      // Show dialog if context is still mounted
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && context.mounted) {
+          print('💎 [MAIN_NAV] Showing premium purchase dialog');
+          PremiumPurchaseDialog.show(context);
+        }
+      });
+    } catch (e) {
+      print('❌ [MAIN_NAV] Error checking/showing premium dialog: $e');
     }
   }
 

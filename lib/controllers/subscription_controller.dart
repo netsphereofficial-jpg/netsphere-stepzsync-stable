@@ -670,6 +670,21 @@ class SubscriptionController extends GetxController {
           'hasGroupChat': true,
         };
         break;
+
+      case SubscriptionPlanType.lifetime:
+        // Lifetime has all Premium 2 features + unlimited
+        features = {
+          'hasGlobalAccess': true,
+          'maxRaces': 999,
+          'maxCreateRaces': 999,
+          'hasLeaderboards': true,
+          'hasHallOfFame': true,
+          'hasAdvancedStats': true,
+          'hasHeartRateZones': true,
+          'hasMarathons': true,
+          'hasGroupChat': true,
+        };
+        break;
     }
 
     return UserSubscription(
@@ -721,6 +736,8 @@ class SubscriptionController extends GetxController {
         return 'Premium 1';
       case SubscriptionPlanType.premium2:
         return 'Premium 2';
+      case SubscriptionPlanType.lifetime:
+        return 'Lifetime Premium';
     }
   }
 }

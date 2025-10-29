@@ -16,6 +16,10 @@ class PreferencesService {
   static const String _backgroundSyncIntervalKey = 'background_sync_interval';
   static const String _backgroundLocationDialogShownKey = 'background_location_dialog_shown';
 
+  // Premium dialog tracking
+  static const String _appOpenCountKey = 'app_open_count';
+  static const String _premiumDialogShownCountKey = 'premium_dialog_shown_count';
+
   SharedPreferences? _preferences;
   bool _isInitialized = false;
 
@@ -204,6 +208,72 @@ class PreferencesService {
   Future<void> setBackgroundLocationDialogShown(bool value) async {
     await _ensureInitialized();
     await _preferences?.setBool(_backgroundLocationDialogShownKey, value);
+  }
+
+  // ========================================
+  // Premium Dialog Tracking
+  // ========================================
+
+  /// Get the total app open count
+  Future<int> getAppOpenCount() async {
+    await _ensureInitialized();
+    return _preferences?.getInt(_appOpenCountKey) ?? 0;
+  }
+
+  /// Increment app open count (call on every app launch)
+  Future<void> incrementAppOpenCount() async {
+    await _ensureInitialized();
+    final count = await getAppOpenCount();
+    await _preferences?.setInt(_appOpenCountKey, count + 1);
+  }
+
+  /// Get premium dialog shown count
+  Future<int> getPremiumDialogShownCount() async {
+    await _ensureInitialized();
+    return _preferences?.getInt(_premiumDialogShownCountKey) ?? 0;
+  }
+
+  /// Increment premium dialog shown count
+  Future<void> incrementPremiumDialogShownCount() async {
+    await _ensureInitialized();
+    final count = await getPremiumDialogShownCount();
+    await _preferences?.setInt(_premiumDialogShownCountKey, count + 1);
+  }
+
+  /// Check if premium dialog should be shown
+  /// Shows on 1st app open, then every 3rd time after that (1st, 4th, 7th, 10th, etc.)
+  /// Also checks if before expiration date (Jan 1, 2026)
+  Future<bool> shouldShowPremiumDialog() async {
+    final count = await getAppOpenCount();
+
+    // Show on 1st open, or every 3rd open after that (4th, 7th, 10th, etc.)
+    // Pattern: 1, 4, 7, 10, 13, 16... (count == 1 or (count - 1) % 3 == 0)
+    bool shouldShow = false;
+
+    if (count == 1) {
+      // First time opening the app
+      shouldShow = true;
+    } else if (count > 1 && (count - 1) % 3 == 0) {
+      // Every 3rd time after first (4th, 7th, 10th, etc.)
+      shouldShow = true;
+    }
+
+    if (shouldShow) {
+      // Check if before expiration date (Jan 1, 2026)
+      final expirationDate = DateTime(2026, 1, 1);
+      final now = DateTime.now();
+
+      return now.isBefore(expirationDate);
+    }
+
+    return false;
+  }
+
+  /// Clear premium dialog tracking (for testing)
+  Future<void> clearPremiumDialogTracking() async {
+    await _ensureInitialized();
+    await _preferences?.remove(_appOpenCountKey);
+    await _preferences?.remove(_premiumDialogShownCountKey);
   }
 }
 
