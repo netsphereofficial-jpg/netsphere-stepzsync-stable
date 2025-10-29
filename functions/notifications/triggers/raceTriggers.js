@@ -46,6 +46,13 @@ exports.onRaceInviteCreated = functions.firestore
 
       console.log(`🎯 Trigger: Race invite created ${inviteId}`);
 
+      // Only process 'received' type invites to avoid duplicate notifications
+      // (Both 'sent' and 'received' invites are created, but we only need to notify once)
+      if (inviteData.type !== 'received') {
+        console.log(`⏭️ Skipping 'sent' type invite ${inviteId} to avoid duplicate notification`);
+        return null;
+      }
+
       // Extract invite details
       const toUserId = inviteData.toUserId;
       const fromUserId = inviteData.fromUserId;
@@ -229,6 +236,13 @@ exports.onRaceInviteAccepted = functions.firestore
         return null;
       }
 
+      // Only process 'received' type invites to avoid duplicate notifications
+      // (Both 'sent' and 'received' invites are updated, but we only need to notify once)
+      if (afterData.type !== 'received') {
+        console.log(`⏭️ Skipping 'sent' type invite ${inviteId} to avoid duplicate notification`);
+        return null;
+      }
+
       console.log(`🎯 Trigger: Race invite accepted ${inviteId}`);
 
       const fromUserId = afterData.fromUserId; // Original inviter/organizer
@@ -301,6 +315,13 @@ exports.onRaceInviteDeclined = functions.firestore
 
       // Only process if status changed to 'declined'
       if (beforeData.status === afterData.status || afterData.status !== 'declined') {
+        return null;
+      }
+
+      // Only process 'received' type invites to avoid duplicate notifications
+      // (Both 'sent' and 'received' invites are updated, but we only need to notify once)
+      if (afterData.type !== 'received') {
+        console.log(`⏭️ Skipping 'sent' type invite ${inviteId} to avoid duplicate notification`);
         return null;
       }
 
