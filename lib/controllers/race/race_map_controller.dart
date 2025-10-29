@@ -325,6 +325,15 @@ class MapController extends GetxController with WidgetsBindingObserver {
     ever(raceStatus, (int newStatus) {
       print('🎯 Race status changed to: $newStatus');
 
+      // ✅ Capture map snapshot when race becomes completed (status 4)
+      if (newStatus == 4 && mapSnapshot.value == null && polylineCoordinates.isNotEmpty) {
+        print('📸 Race completed - capturing map snapshot for Winner/DNF screen');
+        // Small delay to ensure map is fully rendered with all markers
+        Future.delayed(Duration(milliseconds: 800), () {
+          captureMapSnapshot();
+        });
+      }
+
       // ✅ Create markers when race becomes active/ending/completed
       // This handles the case where participants are already loaded but markers weren't created
       // because the race wasn't active yet

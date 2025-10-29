@@ -274,8 +274,8 @@ class RaceMapScreen extends StatelessWidget {
             // Show DNF screen if race completed but user didn't finish
             final showDNFScreen = raceCompleted && !currentUserFinished && !mapController.isViewOnlyMode.value;
 
-            // Show WinnerWidget if user finished or race completed, BUT NOT in view-only mode
-            final showWinnerScreen = (currentUserFinished || raceCompleted) && !mapController.isViewOnlyMode.value;
+            // Show WinnerWidget ONLY if user finished (not just because race completed)
+            final showWinnerScreen = currentUserFinished && !mapController.isViewOnlyMode.value;
 
             if (showDNFScreen) {
               return DNFWidget(
@@ -1022,6 +1022,30 @@ class RaceMapScreen extends StatelessWidget {
         // Race ending - show stats with motivational message (Gap and ETA moved to floating widgets)
         // Marathon: Show motivational message without deadline pressure
         final isMarathon = raceModel?.raceTypeId == 4;
+        final isSolo = raceModel?.raceTypeId == 1;
+
+        // Get the first finisher's name and position
+        String motivationalMessage;
+        if (isMarathon) {
+          motivationalMessage = "Keep Racing! No time limit";
+        } else if (isSolo) {
+          motivationalMessage = "Time is running out! Finish strong!";
+        } else {
+          // Find the first person who completed the race
+          final completedParticipants = mapController.participantsList
+              .where((p) => p.isCompleted == true)
+              .toList()
+            ..sort((a, b) => (a.rank ?? 999).compareTo(b.rank ?? 999));
+
+          if (completedParticipants.isNotEmpty) {
+            final firstFinisher = completedParticipants.first;
+            final finisherName = firstFinisher.userName ?? 'Someone';
+            final position = _getRankSuffix(firstFinisher.rank ?? 1);
+            motivationalMessage = "🏆 $finisherName took $position place! Keep racing!";
+          } else {
+            motivationalMessage = "Keep Racing! Time is running!";
+          }
+        }
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(10),
@@ -1054,9 +1078,7 @@ class RaceMapScreen extends StatelessWidget {
                       SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          isMarathon
-                            ? "Keep Racing! No time limit"
-                            : "Keep Racing! Someone finished, time is running!",
+                          motivationalMessage,
                           style: GoogleFonts.poppins(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
