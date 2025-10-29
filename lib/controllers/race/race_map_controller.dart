@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:developer';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
@@ -73,6 +75,10 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
   // View-only mode state (for completed users watching others race)
   final RxBool isViewOnlyMode = false.obs;
+
+  // Map snapshot state
+  GlobalKey? _mapKey;
+  final Rx<Uint8List?> mapSnapshot = Rxn<Uint8List?>();
 
   //CountDown
   final RxString formattedTime = '00:00:00'.obs;
@@ -253,6 +259,10 @@ class MapController extends GetxController with WidgetsBindingObserver {
         onComplete: () async {
           print('⏰ Race deadline reached! Transitioning to completed...');
 
+          // Capture map snapshot before race ends (for DNF users)
+          print("📸 Capturing map snapshot for race end...");
+          captureMapSnapshot();
+
           // ✅ FIX: Optimistic status update for instant UI response
           raceStatus.value = 4; // Set to completed immediately
 
@@ -368,14 +378,70 @@ class MapController extends GetxController with WidgetsBindingObserver {
     _initializeMap();
   }
 
+  /// Set the map key for screenshot capture
+  void setMapKey(GlobalKey key) {
+    _mapKey = key;
+    print('🗺️ Map key set for snapshot capture');
+  }
+
+  /// Capture map snapshot for display in Winner/DNF screens
+  Future<void> captureMapSnapshot() async {
+    if (_mapKey == null) {
+      print('❌ Cannot capture map: map key not set');
+      return;
+    }
+
+    try {
+      print('📸 Starting map snapshot capture...');
+
+      // Small delay to ensure map is fully rendered
+      await Future.delayed(Duration(milliseconds: 500));
+
+      // Find the RepaintBoundary render object
+      final RenderRepaintBoundary? boundary =
+          _mapKey!.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+
+      if (boundary == null) {
+        print('❌ Cannot capture map: boundary not found');
+        return;
+      }
+
+      // Capture the map as an image with 2x pixel ratio for quality
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+
+      // Convert to PNG byte data
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        print('❌ Cannot capture map: byte data is null');
+        return;
+      }
+
+      // Store the image bytes
+      mapSnapshot.value = byteData.buffer.asUint8List();
+
+      print('✅ Map snapshot captured successfully: ${mapSnapshot.value!.length} bytes');
+    } catch (e, stackTrace) {
+      print('❌ Error capturing map snapshot: $e');
+      print('Stack trace: $stackTrace');
+      mapSnapshot.value = null;
+    }
+  }
+
   checkRaceCompetion() {
     if (raceModel.value != null) {
       final remainingDistance = raceModel.value?.remainingDistance ?? double.infinity;
 
       // Use 50-meter tolerance (0.05 km) to account for GPS drift and sensor noise
       // This prevents false completions while still detecting actual race completion
-      if (remainingDistance <= 0.05) {
+      if (remainingDistance <= 0.05 && !myRaceCompleted.value) {
         print("Race completed! Remaining distance: ${remainingDistance}km");
+        print("📸 Capturing map snapshot before showing winner screen...");
+
+        // Capture map snapshot before showing winner screen
+        captureMapSnapshot();
+
         myRaceCompleted.value = true;
       }
     }

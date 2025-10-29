@@ -194,6 +194,86 @@ class DNFWidget extends StatelessWidget {
 
                     SizedBox(height: 32),
 
+                    // Map Snapshot
+                    Obx(() {
+                      if (mapController.mapSnapshot.value != null) {
+                        return Column(
+                          children: [
+                            GestureDetector(
+                              onTap: () => _showFullScreenMap(context),
+                              child: Container(
+                                height: 250,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.appColor.withValues(alpha: 0.3),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.1),
+                                      blurRadius: 10,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Image.memory(
+                                        mapController.mapSnapshot.value!,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: 250,
+                                      ),
+                                    ),
+                                    // Tap to expand hint
+                                    Positioned(
+                                      bottom: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.6),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.zoom_in,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'Tap to expand',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 32),
+                          ],
+                        );
+                      }
+                      // If snapshot not available, return empty widget
+                      return SizedBox.shrink();
+                    }),
+
                     // Encouraging Message
                     Container(
                       padding: EdgeInsets.all(16),
@@ -241,6 +321,49 @@ class DNFWidget extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Show full-screen map snapshot
+  void _showFullScreenMap(BuildContext context) {
+    if (mapController.mapSnapshot.value == null) return;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(10),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.memory(
+                  mapController.mapSnapshot.value!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
