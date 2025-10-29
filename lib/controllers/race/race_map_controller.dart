@@ -79,6 +79,7 @@ class MapController extends GetxController with WidgetsBindingObserver {
   // Map snapshot state
   GlobalKey? _mapKey;
   final Rx<Uint8List?> mapSnapshot = Rxn<Uint8List?>();
+  final RxBool snapshotTimeout = false.obs;
 
   //CountDown
   final RxString formattedTime = '00:00:00'.obs;
@@ -328,9 +329,24 @@ class MapController extends GetxController with WidgetsBindingObserver {
       // ✅ Capture map snapshot when race becomes completed (status 4)
       if (newStatus == 4 && mapSnapshot.value == null && polylineCoordinates.isNotEmpty) {
         print('📸 Race completed - capturing map snapshot for Winner/DNF screen');
-        // Small delay to ensure map is fully rendered with all markers
-        Future.delayed(Duration(milliseconds: 800), () {
-          captureMapSnapshot();
+
+        // Capture snapshot with small delay to ensure final render is complete
+        Future.delayed(Duration(milliseconds: 300), () async {
+          await captureMapSnapshot();
+
+          // If snapshot still failed after attempt, set timeout to show screen anyway
+          if (mapSnapshot.value == null) {
+            print('⏱️ Snapshot capture failed - will show completion screen without map');
+            snapshotTimeout.value = true;
+          }
+        });
+
+        // Fallback timeout: If snapshot takes too long, show screen anyway after 2 seconds
+        Future.delayed(Duration(seconds: 2), () {
+          if (mapSnapshot.value == null && !snapshotTimeout.value) {
+            snapshotTimeout.value = true;
+            print('⏱️ Snapshot timeout exceeded - showing completion screen without map');
+          }
         });
       }
 
@@ -402,9 +418,6 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
     try {
       print('📸 Starting map snapshot capture...');
-
-      // Small delay to ensure map is fully rendered
-      await Future.delayed(Duration(milliseconds: 500));
 
       // Find the RepaintBoundary render object
       final RenderRepaintBoundary? boundary =
