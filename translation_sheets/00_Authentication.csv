@@ -1,0 +1,207 @@
+﻿English Text,Screen/Context,Notes
+StepzSync Admin,Admin Login Screen (Authentication); Simple Admin Login (Authentication),"Text Widget, Likely button label - keep concise"
+Sign in to access the admin panel,Admin Login Screen (Authentication),Text Widget
+Sign In,Admin Login Screen (Authentication); Simple Admin Login (Authentication); Login Controller (Authentication),"Text Widget, Likely button label - keep concise"
+Go to Main App,Admin Login Screen (Authentication),Text Widget
+Email,Admin Login Screen (Authentication); Login Controller (Authentication); Admin Auth Service (Authentication),Form Input
+Password,Admin Login Screen (Authentication); Simple Admin Login (Authentication),Form Input
+An error occurred,Admin Login Screen (Authentication); Simple Admin Login (Authentication),"String Literal, Likely button label - keep concise, Error message"
+user-not-found,Admin Login Screen (Authentication); Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+No user found with this email,Admin Login Screen (Authentication),String Literal
+wrong-password,Admin Login Screen (Authentication); Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+Wrong password,Admin Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+invalid-email,Admin Login Screen (Authentication); Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise, Error message"
+Invalid email address,Admin Login Screen (Authentication); Simple Admin Login (Authentication),"String Literal, Likely button label - keep concise, Error message"
+user-disabled,Admin Login Screen (Authentication); Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+This user has been disabled,Admin Login Screen (Authentication),String Literal
+Please enter your email,Admin Login Screen (Authentication); Simple Admin Login (Authentication),String Literal
+)) { return,Admin Login Screen (Authentication); Simple Admin Login (Authentication),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+; } if (value.length < 6) { return,Admin Login Screen (Authentication); Simple Admin Login (Authentication),"String Literal, Contains variable placeholder"
+", style: TextStyle(fontSize: 16), ), ), ), const SizedBox(height: 16), TextButton( onPressed: () { // Navigate to main app Navigator.of(context).pushReplacementNamed(",Admin Login Screen (Authentication),"String Literal, Contains variable placeholder"
+"); }, child: const Text(",Admin Login Screen (Authentication),String Literal
+Sign in to access the admin dashboard,Simple Admin Login (Authentication),Text Widget
+Contact system administrator to reset password,Simple Admin Login (Authentication),Text Widget
+Forgot Password?,Simple Admin Login (Authentication); Login Screen (Authentication),"Text Widget, Question, Likely button label - keep concise"
+Email Address,Simple Admin Login (Authentication); Login Screen (Authentication),Form Input
+Enter your password,Simple Admin Login (Authentication); Login Screen (Authentication),Form Input
+No admin account found with this email,Simple Admin Login (Authentication),String Literal
+Incorrect password,Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+This account has been disabled,Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),String Literal
+too-many-requests,Simple Admin Login (Authentication); Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+Too many attempts. Please try again later,Simple Admin Login (Authentication),String Literal
+Login failed,Simple Admin Login (Authentication); Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+", style: TextStyle( fontSize: 18, fontWeight: FontWeight.w600, ), ), ), ), const SizedBox(height: 24), // Forgot Password Link TextButton( onPressed: () { // TODO: Implement forgot password ScaffoldMessenger.of(context).showSnackBar( const SnackBar( content: Text(",Simple Admin Login (Authentication),"String Literal, Contains variable placeholder"
+"), behavior: SnackBarBehavior.floating, ), ); }, child: Text(",Simple Admin Login (Authentication),String Literal
+Confirm Password,Login Screen (Authentication),Form Input
+dart:io,Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+Phone Number,Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+Enter your phone number,Login Screen (Authentication),String Literal
+Enter your email,Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+Re-enter your password,Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+Granted,Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+Denied,Login Screen (Authentication),"String Literal, Likely button label - keep concise"
+); // Mark as requested so we don,Login Screen (Authentication),String Literal
+ℹ️ Notification permission already requested,Login Screen (Authentication),String Literal
+❌ Error requesting notification permission: $e,Login Screen (Authentication),"String Literal, Contains variable placeholder, Error message"
+Account Not Found,Login Controller (Authentication),"Text Widget, Likely button label - keep concise"
+Cancel,Login Controller (Authentication),"Text Widget, Likely button label - keep concise"
+Create Account,Login Controller (Authentication),"Text Widget, Likely button label - keep concise"
+; case AuthMode.signup: return,Login Controller (Authentication),String Literal
+; case AuthMode.forgotPassword: return,Login Controller (Authentication),String Literal
+; case AuthMode.signup: return isMobile.value ?,Login Controller (Authentication),"String Literal, Question"
+ll send you a reset link,Login Controller (Authentication),String Literal
+Send Reset Link,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Don,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Please enter your email address,Login Controller (Authentication),String Literal
+Error,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+Please enter a valid email address,Login Controller (Authentication),String Literal
+Please enter your password,Login Controller (Authentication),String Literal
+Password must be at least 6 characters,Login Controller (Authentication),String Literal
+Please confirm your password,Login Controller (Authentication),String Literal
+Passwords do not match,Login Controller (Authentication),String Literal
+🔵 Attempting sign in with email: $email,Login Controller (Authentication),"String Literal, Contains variable placeholder"
+✅ Sign in successful,Login Controller (Authentication),"String Literal, Success message"
+invalid-credential,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise, Error message"
+); _showSuccess(,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Success message"
+Setting up your account...,Login Controller (Authentication),String Literal
+✅ Account created and signed in automatically,Login Controller (Authentication),String Literal
+🔵 Creating new account with email: $email,Login Controller (Authentication),"String Literal, Contains variable placeholder"
+🔗 Linking guest account with email/password...,Login Controller (Authentication),String Literal
+Account Upgraded!,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Your guest progress has been saved!,Login Controller (Authentication),String Literal
+✅ Guest account linked successfully,Login Controller (Authentication),"String Literal, Success message"
+credential-already-in-use,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+email-already-in-use,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+ℹ️ Account already exists - signing in instead,Login Controller (Authentication),String Literal
+Welcome Back!,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Signed in with existing account,Login Controller (Authentication),String Literal
+✅ New account created successfully,Login Controller (Authentication),"String Literal, Success message"
+ℹ️ Email already in use - attempting sign in,Login Controller (Authentication),String Literal
+Signing In,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+"Account already exists, signing you in...",Login Controller (Authentication),String Literal
+✅ Signed in with existing account,Login Controller (Authentication),String Literal
+✅ Authentication successful - User: ${user.email} (UID: ${user.uid}),Login Controller (Authentication),"String Literal, Contains variable placeholder, Success message"
+🗑️ Clearing auth cache for fresh profile check...,Login Controller (Authentication),String Literal
+📋 Profile completion status: $isProfileCompleted,Login Controller (Authentication),"String Literal, Contains variable placeholder, Success message"
+Welcome!,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Signed in successfully,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Success message"
+📝 Navigating to ProfileScreen for setup,Login Controller (Authentication),String Literal
+name,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Account creation failed,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+No account found with this email address,Login Controller (Authentication); Firebase Auth Service (Authentication),String Literal
+Too many failed attempts. Please try again later,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Error message"
+Invalid email or password,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Error message"
+weak-password,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+Password is too weak. Use at least 6 characters,Login Controller (Authentication); Firebase Auth Service (Authentication),String Literal
+An account already exists with this email,Login Controller (Authentication); Firebase Auth Service (Authentication),String Literal
+operation-not-allowed,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+Email registration is currently disabled,Login Controller (Authentication); Firebase Auth Service (Authentication),String Literal
+Sign Up Failed,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+❌ Unexpected error during email auth: $e,Login Controller (Authentication),"String Literal, Contains variable placeholder, Error message"
+An unexpected error occurred,Login Controller (Authentication); Firebase Auth Service (Authentication),"String Literal, Error message"
+"⏸️ Google sign-in already in progress, ignoring duplicate request",Login Controller (Authentication),String Literal
+🔵 Starting Google sign-in flow...,Login Controller (Authentication),String Literal
+profile,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+prompt,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+select_account,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+👤 Current user status: ${isGuest ?,Login Controller (Authentication),"String Literal, Contains variable placeholder, Question"
+); // Update profile with Google information final linkedUser = userCredential.user!; final googleName = linkedUser.displayName ??,Login Controller (Authentication),"String Literal, Question"
+", photoUrl: linkedUser.photoURL, ); _showSuccess(",Login Controller (Authentication),"String Literal, Success message"
+"🔄 Google account already exists, switching to existing account...",Login Controller (Authentication),String Literal
+⚠️ Failed to delete anonymous profile: $deleteError,Login Controller (Authentication),"String Literal, Contains variable placeholder, Error message"
+🔵 Normal Google sign-in (not a guest),Login Controller (Authentication),String Literal
+✅ Google sign-in successful - User: ${user.email},Login Controller (Authentication),"String Literal, Contains variable placeholder, Success message"
+google,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Google sign in failed,Login Controller (Authentication),"String Literal, Error message"
+account-exists-with-different-credential,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+An account already exists with the same email but different sign-in method,Login Controller (Authentication),String Literal
+The credential received is malformed or has expired,Login Controller (Authentication),String Literal
+Google sign-in is not enabled for this project,Login Controller (Authentication),String Literal
+The user account has been disabled,Login Controller (Authentication),String Literal
+popup-closed-by-user,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+cancelled-popup-request,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+❌ Google sign-in error: $errorMessage,Login Controller (Authentication),"String Literal, Contains variable placeholder, Error message"
+Sign In Failed,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+❌ Unexpected Google sign-in error: $e,Login Controller (Authentication),"String Literal, Contains variable placeholder, Error message"
+An unexpected error occurred during Google sign in,Login Controller (Authentication),"String Literal, Error message"
+"⏸️ Apple sign-in already in progress, ignoring duplicate request",Login Controller (Authentication),String Literal
+🍎 Starting Apple sign-in flow...,Login Controller (Authentication),String Literal
+Not Available,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Apple Sign In is not available on this device,Login Controller (Authentication),String Literal
+); // Update profile with Apple information final linkedUser = userCredential.user!; final appleName = credential.givenName != null || credential.familyName != null ?,Login Controller (Authentication),"String Literal, Question"
+} ${credential.familyName ??,Login Controller (Authentication),"String Literal, Contains variable placeholder, Question, Likely button label - keep concise"
+.trim() : linkedUser.displayName ??,Login Controller (Authentication),"String Literal, Question"
+", photoUrl: null, ); _showSuccess(",Login Controller (Authentication),"String Literal, Success message"
+"🔄 Apple account already exists, switching to existing account...",Login Controller (Authentication),String Literal
+🍎 Normal Apple sign-in (not a guest),Login Controller (Authentication),String Literal
+✅ Apple sign-in successful - User: ${user.email},Login Controller (Authentication),"String Literal, Contains variable placeholder, Success message"
+${credential.givenName ??,Login Controller (Authentication),"String Literal, Contains variable placeholder, Question, Likely button label - keep concise"
+); if (isProfileCompleted) { _showSuccess(,Login Controller (Authentication),"String Literal, Contains variable placeholder, Success message"
+": fullName?.capitalizeWords(),",Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+": user.email,",Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+apple,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Apple sign in failed,Login Controller (Authentication),"String Literal, Error message"
+Apple sign-in is not enabled for this project,Login Controller (Authentication),String Literal
+❌ Unexpected Apple sign-in error: $e,Login Controller (Authentication),"String Literal, Contains variable placeholder, Error message"
+An unexpected error occurred during Apple sign in,Login Controller (Authentication),"String Literal, Error message"
+Email Sent!,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Check your email for reset instructions,Login Controller (Authentication),String Literal
+Failed to send reset email,Login Controller (Authentication),"String Literal, Error message"
+Too many requests. Please try again later,Login Controller (Authentication),String Literal
+Reset Failed,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+Coming Soon,Login Controller (Authentication),"String Literal, Likely button label - keep concise"
+Mobile authentication will be available soon,Login Controller (Authentication),String Literal
+🎭 Starting guest sign-in...,Login Controller (Authentication),String Literal
+✅ Guest sign-in successful - User ID: ${userCredential.user!.uid},Login Controller (Authentication),"String Literal, Contains variable placeholder, Success message"
+Failed to continue as guest,Login Controller (Authentication),"String Literal, Error message"
+Anonymous authentication is currently disabled,Login Controller (Authentication),String Literal
+Guest Sign-in Failed,Login Controller (Authentication),"String Literal, Likely button label - keep concise, Error message"
+❌ Unexpected guest sign-in error: $e,Login Controller (Authentication),"String Literal, Contains variable placeholder, Error message"
+No account found with,Login Controller (Authentication),String Literal
+. Would you like to create a new account with this email?,Login Controller (Authentication),"String Literal, Question"
+user_profiles,Firebase Auth Service (Authentication); Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+Login failed. Please try again.,Firebase Auth Service (Authentication),"String Literal, Error message"
+Profile creation failed during signup: $profileError,Firebase Auth Service (Authentication),"String Literal, Contains variable placeholder, Error message"
+Account creation failed. Please try again.,Firebase Auth Service (Authentication),"String Literal, Error message"
+", phoneNumber:",Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+", countryCode:",Firebase Auth Service (Authentication); Auth Wrapper (Authentication),"String Literal, Likely button label - keep concise"
+", gender:",Firebase Auth Service (Authentication); Auth Wrapper (Authentication),"String Literal, Likely button label - keep concise"
+", location:",Firebase Auth Service (Authentication); Auth Wrapper (Authentication),"String Literal, Likely button label - keep concise"
+", height: 0, heightUnit:",Firebase Auth Service (Authentication); Auth Wrapper (Authentication),String Literal
+", weight: 0, weightUnit:",Firebase Auth Service (Authentication); Auth Wrapper (Authentication),String Literal
+); } catch (e) { // Log error but don,Firebase Auth Service (Authentication),"String Literal, Contains variable placeholder, Error message"
+Failed to create initial profile: $e,Firebase Auth Service (Authentication),"String Literal, Contains variable placeholder, Error message"
+Signed out successfully,Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise, Success message"
+Failed to sign out,Firebase Auth Service (Authentication),"String Literal, Error message"
+Authentication failed,Firebase Auth Service (Authentication),"String Literal, Likely button label - keep concise, Error message"
+role,Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+admin,Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+❌ Error checking admin status: $e,Admin Auth Service (Authentication),"String Literal, Contains variable placeholder, Error message"
+❌ Error checking admin status for UID $uid: $e,Admin Auth Service (Authentication),"String Literal, Contains variable placeholder, Error message"
+", name: data[",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+", role: data[_adminRoleField] ??",Admin Auth Service (Authentication),"String Literal, Question"
+": uid,",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+": email,",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+": name,",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+", email: json[",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+", name: json[",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+", role: json[",Admin Auth Service (Authentication),"String Literal, Likely button label - keep concise"
+); // return false; // Default to profile screen if there,Auth Wrapper Original (Authentication),String Literal
+🏗️ Creating profile object...,Auth Wrapper Original (Authentication),String Literal
+", // fullName:",Auth Wrapper Original (Authentication),"String Literal, Likely button label - keep concise"
+", // phoneNumber:",Auth Wrapper Original (Authentication),"String Literal, Likely button label - keep concise"
+", // countryCode:",Auth Wrapper Original (Authentication),"String Literal, Likely button label - keep concise"
+", // gender:",Auth Wrapper Original (Authentication),"String Literal, Likely button label - keep concise"
+", // location:",Auth Wrapper Original (Authentication),"String Literal, Likely button label - keep concise"
+", // height: 0, // heightUnit:",Auth Wrapper Original (Authentication),String Literal
+", // weight: 0, // weightUnit:",Auth Wrapper Original (Authentication),String Literal
+❌ AuthWrapper error: ${snapshot.error},Auth Wrapper (Authentication),"String Literal, Contains variable placeholder, Error message"
+"⏳ Auth flow already in progress, waiting...",Auth Wrapper (Authentication),String Literal
+❌ Error in getAuthFlowState: $e,Auth Wrapper (Authentication),"String Literal, Contains variable placeholder, Error message"
+👤 Guest user detected - checking profile...,Auth Wrapper (Authentication),String Literal
+🔧 Creating guest profile...,Auth Wrapper (Authentication),String Literal
+⚠️ Failed to save FCM token for guest: $e,Auth Wrapper (Authentication),"String Literal, Contains variable placeholder, Error message"
+✅ Guest profile ready - allowing access to home,Auth Wrapper (Authentication),String Literal
+); } final initialProfile = UserProfile( email: user.email ??,Auth Wrapper (Authentication),"String Literal, Question"
+", fullName: isGuest ? guestName : (user.displayName ??",Auth Wrapper (Authentication),"String Literal, Question"
+"), phoneNumber: user.phoneNumber ??",Auth Wrapper (Authentication),"String Literal, Question"

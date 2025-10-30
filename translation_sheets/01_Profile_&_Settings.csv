@@ -1,0 +1,185 @@
+﻿English Text,Screen/Context,Notes
+Profile,Profile Dummy Screen (Profile & Settings); User Profile Screen (Profile & Settings); Profile View Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Manage your account and preferences,Profile Dummy Screen (Profile & Settings),Text Widget
+Add Your Details,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+* = Mandatory,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Gender *,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Date of Birth *,Profile Screen (Profile & Settings),Text Widget
+Location *,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Height *,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Weight *,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Username *,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Incomplete Profile,Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise, Success message"
+"Your profile is incomplete. If you go back, you\",Profile Screen (Profile & Settings),"Text Widget, Success message"
+Cancel,Profile Screen (Profile & Settings); User Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Sign Out,Profile Screen (Profile & Settings); Profile View Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+${index + 100},Profile Screen (Profile & Settings),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+$index cm,Profile Screen (Profile & Settings),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+${index + 1} ft,Profile Screen (Profile & Settings),"Text Widget, Contains variable placeholder"
+$index in,Profile Screen (Profile & Settings),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Full Name *,Profile Screen (Profile & Settings),Form Input
+Male,Profile Screen (Profile & Settings),Form Input
+Female,Profile Screen (Profile & Settings),Form Input
+Other,Profile Screen (Profile & Settings),Form Input
+Tap to get current location,Profile Screen (Profile & Settings),Form Input
+Select your height,Profile Screen (Profile & Settings),Form Input
+Select your weight,Profile Screen (Profile & Settings),Form Input
+Choose a unique username,Profile Screen (Profile & Settings),Form Input
+Enter your full name,Profile Screen (Profile & Settings),String Literal
+Submit,Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+", icon: Icons.female_rounded, value:",Profile Screen (Profile & Settings),String Literal
+", icon: Icons.transgender_rounded, value:",Profile Screen (Profile & Settings),String Literal
+${date.year},Profile Screen (Profile & Settings); Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+) fullUnit =,Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+; if (unit ==,Profile Screen (Profile & Settings),String Literal
+; } else { if (unit ==,Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder"
+", style: AppTextStyles.bodyText.copyWith( fontWeight: FontWeight.w600, fontSize: 16, ), ), ], ), content: Text(",Profile Screen (Profile & Settings),String Literal
+ll need to sign in again. Are you sure?,Profile Screen (Profile & Settings),"String Literal, Question"
+Select Height,Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Select Weight,Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Kgs,Profile Screen (Profile & Settings); Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+cms,Profile Screen (Profile & Settings); Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+Lbs,Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+inches,Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+${index + 20} Kgs,Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder"
+${index + 44} Lbs,Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder"
+About,User Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Profile Not Found,User Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+This user profile could not be loaded. The user may not exist or there might be a connection issue.,User Profile Screen (Profile & Settings),Text Widget
+Try Again,User Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Remove Friend,User Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Remove,User Profile Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Message,User Profile Screen (Profile & Settings),Form Input
+Sent,User Profile Screen (Profile & Settings),Form Input
+Received,User Profile Screen (Profile & Settings),Form Input
+🔍 UserProfileScreen: Loading profile for userId: $userId,User Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder"
+Location,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Age,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+${_calculateAge(profile.dateOfBirth!)} years old,User Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Gender,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Height,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Weight,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Phone,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+$countryCode $phoneNumber,User Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+* phoneNumber.length; return,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+", color: Colors.blue, onTap: () { // TODO: Open chat Get.snackbar(",User Profile Screen (Profile & Settings),"String Literal, Contains variable placeholder"
+Chat feature coming soon!,User Profile Screen (Profile & Settings),String Literal
+Sending...,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Add Friend,User Profile Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+", style: GoogleFonts.poppins(fontWeight: FontWeight.w600), ), ], ), content: Text(",User Profile Screen (Profile & Settings),String Literal
+", style: GoogleFonts.poppins(), ), actions: [ TextButton( onPressed: () => Get.back(), child: Text(",User Profile Screen (Profile & Settings),String Literal
+Camera,Profile View Screen (Profile & Settings); Profile Controller (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Gallery,Profile View Screen (Profile & Settings); Profile Controller (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Help & Support,Profile View Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Get assistance with any issues,Profile View Screen (Profile & Settings),Text Widget
+Securely log out of your account,Profile View Screen (Profile & Settings),Text Widget
+Version: Unknown,Profile View Screen (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Version ${snapshot.data},Profile View Screen (Profile & Settings),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+© 2024 All rights reserved,Profile View Screen (Profile & Settings),Text Widget
+Completed Races,Profile View Screen (Profile & Settings),"Form Input, Success message"
+Friends & Social,Profile View Screen (Profile & Settings),Form Input
+My Achievements,Profile View Screen (Profile & Settings),Form Input
+Subscription Plans,Profile View Screen (Profile & Settings),Form Input
+Profile Edit,Profile View Screen (Profile & Settings),"String Literal, Likely button label - keep concise"
+Track your race history,Profile View Screen (Profile & Settings),String Literal
+Connect with other runners,Profile View Screen (Profile & Settings),String Literal
+View your fitness milestones,Profile View Screen (Profile & Settings),String Literal
+Manage your premium features,Profile View Screen (Profile & Settings),String Literal
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.w600, ), ), subtitle: Text(",Profile View Screen (Profile & Settings),String Literal
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.w600, color: Colors.red, ), ), subtitle: Text(",Profile View Screen (Profile & Settings),String Literal
+", style: GoogleFonts.poppins( color: AppColors.lightGray, fontSize: 12, ), ); } else { return Row( mainAxisAlignment: MainAxisAlignment.center, children: [ Text(",Profile View Screen (Profile & Settings),"String Literal, Contains variable placeholder"
+", style: GoogleFonts.poppins( color: AppColors.lightGray, fontSize: 12, fontWeight: FontWeight.w500, ), ), SizedBox(width: 8), Container( padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration( color: AppColors.neonGreen.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8), ), child: Text(",Profile View Screen (Profile & Settings),String Literal
+", style: GoogleFonts.poppins( fontSize: 8, fontWeight: FontWeight.w700, color: AppColors.primary, ), ), ), ], ); } }, ), SizedBox(height: 8), Text(",Profile View Screen (Profile & Settings),String Literal
+dart:io,Profile Image Widget (Profile & Settings); Profile View Controller (Profile & Settings); Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+); if (parts.isEmpty) return,Profile Image Widget (Profile & Settings),String Literal
+); profile.value = null; // Show error to user Get.snackbar(,User Profile Controller (Profile & Settings),"String Literal, Error message"
+); // Update friendship status friendshipStatus.value = FriendshipStatus.requestSent; Get.snackbar(,User Profile Controller (Profile & Settings),String Literal
+)) { errorMessage =,User Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+; } Get.snackbar(,User Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+); Get.snackbar(,User Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+.obs; var email =,Profile View Controller (Profile & Settings),String Literal
+.obs; var location =,Profile View Controller (Profile & Settings),String Literal
+.obs; var profilePic =,Profile View Controller (Profile & Settings),String Literal
+; email.value = user.email ??,Profile View Controller (Profile & Settings),"String Literal, Question"
+; profilePic.value = user.photoURL ??,Profile View Controller (Profile & Settings),"String Literal, Question"
+; email.value = user?.email ??,Profile View Controller (Profile & Settings),"String Literal, Question"
+; profilePic.value = user?.photoURL ??,Profile View Controller (Profile & Settings),"String Literal, Question"
+; location.value =,Profile View Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+Camera permission is required. Please enable it in Settings.,Profile View Controller (Profile & Settings); Profile Controller (Profile & Settings),String Literal
+Permission Denied,Profile View Controller (Profile & Settings); Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+Camera permission is required to take photos.,Profile View Controller (Profile & Settings); Profile Controller (Profile & Settings),String Literal
+Error,Profile View Controller (Profile & Settings); Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Error message"
+User not authenticated,Profile View Controller (Profile & Settings); Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise"
+profile_pictures/${user.uid}.jpg,Profile View Controller (Profile & Settings),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Success,Profile View Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Success message"
+Profile picture updated successfully,Profile View Controller (Profile & Settings),"String Literal, Success message"
+Failed to update profile picture,Profile View Controller (Profile & Settings),"String Literal, Error message"
+Logged out successfully,Profile View Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Success message"
+Select Profile Picture,Profile Controller (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Remove Picture,Profile Controller (Profile & Settings),"Text Widget, Likely button label - keep concise"
+Welcome to StepzSync! 🎉,Profile Controller (Profile & Settings),AppBar Title
+) { useCm.value = true; selectedMetric.value =,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+"; selectedFeet.value = (profile.height / 12).floor(); selectedInches.value = (profile.height % 12).round(); } } // Weight - only populate if non-zero, otherwise keep defaults if (profile.weight > 0) { if (profile.weightUnit ==",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+) { useKg.value = true; selectedUnit.value =,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+; selectedKg.value = profile.weight.round(); } else { useKg.value = false; selectedUnit.value =,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+) || username.endsWith(,Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+)) return false; return RegExp(r,Profile Controller (Profile & Settings),String Literal
+Failed to check username availability,Profile Controller (Profile & Settings),"String Literal, Error message"
+Permission Required,Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+Photo library permission is required. Please enable it in Settings.,Profile Controller (Profile & Settings),String Literal
+Photo library permission is required to select photos.,Profile Controller (Profile & Settings),String Literal
+Failed to pick image from gallery,Profile Controller (Profile & Settings),"String Literal, Error message"
+s now uploaded selectedProfileImage.value = null; return newImageUrl; } else { SnackbarUtils.showError(,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+", result.error!); return null; } } catch (e) { SnackbarUtils.showError(",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+Failed to upload image,Profile Controller (Profile & Settings),"String Literal, Error message"
+Location Error,Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Error message"
+Location permissions are denied,Profile Controller (Profile & Settings),String Literal
+Location permissions are permanently denied,Profile Controller (Profile & Settings),String Literal
+"${place.locality}, ${place.administrativeArea}, ${place.country}",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Failed to get current location,Profile Controller (Profile & Settings),"String Literal, Error message"
+|| useKg.value) { weightCtr.text =,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+; } else { weightCtr.text =,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+", ); return false; } // Username validation final username = usernameCtr.text.trim(); if (username.isNotEmpty) { if (!_isValidUsername(username)) { SnackbarUtils.showError(",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+", ); return false; } if (usernameStatus.value == UsernameStatus.taken) { SnackbarUtils.showError(",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+", ); return false; } if (usernameStatus.value == UsernameStatus.checking) { SnackbarUtils.showError(",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+", ); return false; } } if (gender.value.isEmpty) { SnackbarUtils.showError(",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+Please select your gender,Profile Controller (Profile & Settings),String Literal
+Validation Error,Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Error message"
+Please select your date of birth,Profile Controller (Profile & Settings),String Literal
+Please enter your location,Profile Controller (Profile & Settings),String Literal
+"; return UserProfile( email: userEmail, fullName: nameCtr.text.trim().capitalizeWords(), username: usernameCtr.text.trim().isEmpty ? null : usernameCtr.text.trim().toLowerCase(), phoneNumber:",Profile Controller (Profile & Settings),String Literal
+", countryCode:",Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise"
+Profile saved successfully,Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Success message"
+Save Failed,Profile Controller (Profile & Settings),"String Literal, Likely button label - keep concise, Error message"
+An unexpected error occurred,Profile Controller (Profile & Settings),"String Literal, Error message"
+Hi $userName! Your profile is complete. Start your fitness journey now!,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Success message"
+", ); } catch (e) { // Don",Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder"
+Failed to send welcome notification: $e,Profile Controller (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+user_profiles,Profile Service (Profile & Settings); User Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise"
+✅ Awarded profile completion XP to ${user.uid},Profile Service (Profile & Settings),"String Literal, Contains variable placeholder"
+⚠️ Failed to award profile completion XP: $e,Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+t block profile save if XP fails } return AuthResult.success( message:,Profile Service (Profile & Settings),"String Literal, Success message"
+", data: completedProfile.copyWith(id: user.uid), ); } catch (e) { return AuthResult.failure( error:",Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Error message, Success message"
+", data: profile, ); } else { return AuthResult.failure(error:",Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+); } } catch (e) { return AuthResult.failure( error:,Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+); } catch (e) { return AuthResult.failure( error:,Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Error message"
+); return AuthResult.failure(error:,Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise, Error message"
+); // Update profile with new information and mark as incomplete final updateData = {,Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Success message"
+": fullName.capitalizeWords(),",Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise"
+": email, if (photoUrl != null)",Profile Service (Profile & Settings),String Literal
+": photoUrl,",Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise"
+": false, // ← CRITICAL: Force profile completion",Profile Service (Profile & Settings),String Literal
+); return AuthResult.success(message:,Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise, Success message"
+); return AuthResult.failure( error:,Profile Service (Profile & Settings),"String Literal, Error message"
+); return AuthResult.success( message:,Profile Service (Profile & Settings),"String Literal, Success message"
+", data: UserProfile.fromJson(existingDoc.data()!), ); } // Don",Profile Service (Profile & Settings),String Literal
+📝 Profile data: $profileData,Profile Service (Profile & Settings),"String Literal, Contains variable placeholder"
+Initial profile created successfully,Profile Service (Profile & Settings),"String Literal, Success message"
+📍 Stack trace: ${StackTrace.current},Profile Service (Profile & Settings),"String Literal, Contains variable placeholder"
+FCM token updated successfully,Profile Service (Profile & Settings),"String Literal, Success message"
+"📋 Profile info: ${profile.fullName}, Location: ${profile.location}",User Profile Service (Profile & Settings),"String Literal, Contains variable placeholder"
+) .doc(userId) .get(); if (!doc.exists) { return {,User Profile Service (Profile & Settings),"String Literal, Contains variable placeholder"
+Unknown User,User Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise"
+username,User Profile Service (Profile & Settings),"String Literal, Likely button label - keep concise"
+": 8.2, // in km",User Profile Service (Profile & Settings),String Literal
+); return {,User Profile Service (Profile & Settings),"String Literal, Contains variable placeholder, Likely button label - keep concise"

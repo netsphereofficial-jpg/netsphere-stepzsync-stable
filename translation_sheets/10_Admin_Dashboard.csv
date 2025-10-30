@@ -1,0 +1,110 @@
+﻿English Text,Screen/Context,Notes
+Confirm Logout,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Are you sure you want to log out?,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Question"
+Cancel,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Logout,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Verifying admin access...,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Access Denied,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Admin Panel,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Dashboard,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Admin,Enhanced Admin Dashboard (Admin Dashboard); Admin Setup Helper (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+${_metrics!.raceMetrics.totalRaces} total races,Enhanced Admin Dashboard (Admin Dashboard),"AppBar Title, Contains variable placeholder, Likely button label - keep concise"
+${_metrics!.engagementMetrics.dailyActiveUsers} daily active,Enhanced Admin Dashboard (Admin Dashboard),"AppBar Title, Contains variable placeholder, Likely button label - keep concise"
+Create Race,Enhanced Admin Dashboard (Admin Dashboard),Form Input
+Users,Enhanced Admin Dashboard (Admin Dashboard); User Growth Chart (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),Form Input
+Races,Enhanced Admin Dashboard (Admin Dashboard); Race Activity Chart (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),Form Input
+Analytics,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),Form Input
+Settings,Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),Form Input
+Total Users,Enhanced Admin Dashboard (Admin Dashboard),Form Input
+Active Races,Enhanced Admin Dashboard (Admin Dashboard),Form Input
+Monthly Revenue,Enhanced Admin Dashboard (Admin Dashboard),Form Input
+Error loading metrics: $e,Enhanced Admin Dashboard (Admin Dashboard),"String Literal, Contains variable placeholder, Error message"
+You do not have admin privileges,Enhanced Admin Dashboard (Admin Dashboard),String Literal
+Soon,Enhanced Admin Dashboard (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Refresh Data,Enhanced Admin Dashboard (Admin Dashboard),"String Literal, Likely button label - keep concise"
+", style: const TextStyle( color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, ), ), ), const SizedBox(width: 12), Column( crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [ const Text(",Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),String Literal
+", style: TextStyle( fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a1a1a), ), ), Text( _currentUser?.email ??",Enhanced Admin Dashboard (Admin Dashboard); Admin Dashboard Screen (Admin Dashboard),"String Literal, Question"
+", ), ), const SizedBox(width: 16), Expanded( child: MetricCard( label:",Enhanced Admin Dashboard (Admin Dashboard),String Literal
+", value:",Enhanced Admin Dashboard (Admin Dashboard),"String Literal, Likely button label - keep concise"
+", icon: Icons.analytics_rounded, iconColor: const Color(0xFFF59E0B), subtitle:",Enhanced Admin Dashboard (Admin Dashboard),String Literal
+❌ No user logged in. Please sign in first.,Admin Setup Helper (Admin Dashboard),String Literal
+🔧 Creating admin profile for UID: ${user.uid},Admin Setup Helper (Admin Dashboard),"String Literal, Contains variable placeholder"
+📧 Email: ${user.email},Admin Setup Helper (Admin Dashboard),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+user_profiles,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+⚠️ Profile already exists. Updating role to admin...,Admin Setup Helper (Admin Dashboard),String Literal
+role,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+✅ Profile updated with admin role!,Admin Setup Helper (Admin Dashboard),String Literal
+📝 Creating new admin profile...,Admin Setup Helper (Admin Dashboard),String Literal
+email,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Admin User,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+gender,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+cms,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+weight,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Kgs,Admin Setup Helper (Admin Dashboard),"String Literal, Likely button label - keep concise"
+✅ Admin profile created successfully!,Admin Setup Helper (Admin Dashboard),"String Literal, Success message"
+Free,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Premium 1,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Premium 2,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+type,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+other,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+title,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+", description: data[",Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+", timestamp: (data[",Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+"] as Timestamp?)?.toDate() ?? DateTime.now(), userId: data[",Dashboard Metrics (Admin Dashboard),String Literal
+"], userName: data[",Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+"], raceId: data[",Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+"], raceName: data[",Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+"], metadata: data[",Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+: case,Dashboard Metrics (Admin Dashboard),"String Literal, Likely button label - keep concise"
+: return ActivityType.newUser; case,Dashboard Metrics (Admin Dashboard),String Literal
+: return ActivityType.raceCreated; case,Dashboard Metrics (Admin Dashboard),String Literal
+: return ActivityType.raceStarted; case,Dashboard Metrics (Admin Dashboard),String Literal
+: return ActivityType.raceCompleted; case,Dashboard Metrics (Admin Dashboard),"String Literal, Success message"
+: return ActivityType.subscriptionPurchased; case,Dashboard Metrics (Admin Dashboard),String Literal
+: return ActivityType.subscriptionCancelled; case,Dashboard Metrics (Admin Dashboard),String Literal
+; case ActivityType.raceCreated: return,Dashboard Metrics (Admin Dashboard),String Literal
+; case ActivityType.raceStarted: return,Dashboard Metrics (Admin Dashboard),String Literal
+; case ActivityType.raceCompleted: return,Dashboard Metrics (Admin Dashboard),"String Literal, Success message"
+; case ActivityType.subscriptionPurchased: return,Dashboard Metrics (Admin Dashboard),String Literal
+; case ActivityType.subscriptionCancelled: return,Dashboard Metrics (Admin Dashboard),String Literal
+; case ActivityType.reportSubmitted: return,Dashboard Metrics (Admin Dashboard),String Literal
+; case ActivityType.other: return,Dashboard Metrics (Admin Dashboard),String Literal
+Recent Activity,Activity Feed (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Live,Activity Feed (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Failed to load activity feed,Activity Feed (Admin Dashboard),"Text Widget, Error message"
+No recent activity,Activity Feed (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+", style: TextStyle( fontSize: 16, color: Colors.grey[500], ), ), const Spacer(), Text(",Metric Card (Admin Dashboard),String Literal
+User Growth,User Growth Chart (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+Failed to load data,User Growth Chart (Admin Dashboard); Revenue Chart (Admin Dashboard); Race Activity Chart (Admin Dashboard),"Text Widget, Error message"
+Retry,User Growth Chart (Admin Dashboard); Revenue Chart (Admin Dashboard); Race Activity Chart (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+No user data available,User Growth Chart (Admin Dashboard),Text Widget
+Refresh,User Growth Chart (Admin Dashboard); Revenue Chart (Admin Dashboard); Race Activity Chart (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Revenue Trend,Revenue Chart (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+No revenue data available,Revenue Chart (Admin Dashboard),Text Widget
+Total Revenue,Revenue Chart (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Avg. Monthly,Revenue Chart (Admin Dashboard),"String Literal, Likely button label - keep concise"
+\${value},Revenue Chart (Admin Dashboard),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Revenue,Revenue Chart (Admin Dashboard),"String Literal, Likely button label - keep concise"
+Race Activity,Race Activity Chart (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+${_data!.totalRaces} races,Race Activity Chart (Admin Dashboard),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+No race data available,Race Activity Chart (Admin Dashboard),Text Widget
+Welcome to Admin Dashboard,Admin Dashboard Screen (Admin Dashboard),Text Widget
+Manage your StepzSync application from here,Admin Dashboard Screen (Admin Dashboard),Text Widget
+Features Coming Soon,Admin Dashboard Screen (Admin Dashboard),"Text Widget, Likely button label - keep concise"
+User Management,Admin Dashboard Screen (Admin Dashboard),"AppBar Title, Likely button label - keep concise"
+Race Management,Admin Dashboard Screen (Admin Dashboard),"AppBar Title, Likely button label - keep concise"
+", style: TextStyle( fontSize: 20, fontWeight: FontWeight.bold, ), ), content: const Text(",Admin Dashboard Screen (Admin Dashboard),String Literal
+"), actions: [ TextButton( onPressed: () => Get.back(result: false), child: const Text(",Admin Dashboard Screen (Admin Dashboard),String Literal
+"), ), ElevatedButton( onPressed: () => Get.back(result: true), style: ElevatedButton.styleFrom( backgroundColor: Colors.red, ), child: const Text(",Admin Dashboard Screen (Admin Dashboard),String Literal
+"), ], ), ), ); } if (!_isAdmin) { return const Scaffold( body: Center( child: Text(",Admin Dashboard Screen (Admin Dashboard),"String Literal, Contains variable placeholder"
+", style: TextStyle( fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1a1a1a), ), ), Text(",Admin Dashboard Screen (Admin Dashboard),String Literal
+", icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label:",Admin Dashboard Screen (Admin Dashboard),String Literal
+", icon: Icons.people_outline, selectedIcon: Icons.people, label:",Admin Dashboard Screen (Admin Dashboard),String Literal
+", badge:",Admin Dashboard Screen (Admin Dashboard),"String Literal, Likely button label - keep concise"
+", icon: Icons.analytics_outlined, selectedIcon: Icons.analytics, label:",Admin Dashboard Screen (Admin Dashboard),String Literal
+", icon: Icons.settings_outlined, selectedIcon: Icons.settings, label:",Admin Dashboard Screen (Admin Dashboard),String Literal
+", style: TextStyle( fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, ), ), const SizedBox(height: 8), Text(",Admin Dashboard Screen (Admin Dashboard),String Literal
+", description:",Admin Dashboard Screen (Admin Dashboard),"String Literal, Likely button label - keep concise"
+: return,Admin Dashboard Screen (Admin Dashboard),"String Literal, Likely button label - keep concise"
+; case,Admin Dashboard Screen (Admin Dashboard),"String Literal, Likely button label - keep concise"
+; default: return,Admin Dashboard Screen (Admin Dashboard),"String Literal, Likely button label - keep concise"

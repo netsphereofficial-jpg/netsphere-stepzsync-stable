@@ -1,0 +1,35 @@
+﻿English Text,Screen/Context,Notes
+Friends,Leaderboard Screen (Leaderboard & Stats); Filter Toggle (Leaderboard & Stats),"Text Widget, Likely button label - keep concise"
+Global,Leaderboard Screen (Leaderboard & Stats); Filter Toggle (Leaderboard & Stats),"Text Widget, Likely button label - keep concise"
+Select Season,Leaderboard Screen (Leaderboard & Stats),"Text Widget, Likely button label - keep concise"
+🏆 Leaderboard,Leaderboard Screen (Leaderboard & Stats),"AppBar Title, Likely button label - keep concise"
+dart:math,Leaderboard Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Season,Leaderboard Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Lvl ${userXP.level},Xp Badge (Leaderboard & Stats),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+${userXP.totalXP} XP,Xp Badge (Leaderboard & Stats),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Level ${userXP.level},Xp Badge (Leaderboard & Stats),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+${userXP.totalXP % 1000} / 1000 XP,Xp Badge (Leaderboard & Stats),"Text Widget, Contains variable placeholder"
+${userXP.xpToNextLevel} XP to Level ${userXP.level + 1},Xp Badge (Leaderboard & Stats),"Text Widget, Contains variable placeholder"
+", style: GoogleFonts.poppins( fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, ), ), const SizedBox(width: 8), Text(",Xp Badge (Leaderboard & Stats),String Literal
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, ), ), Text(",Xp Badge (Leaderboard & Stats),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.8), ), ), ], ), const SizedBox(height: 8), ], ClipRRect( borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator( value: userXP.levelProgress, minHeight: 12, backgroundColor: Colors.white.withOpacity(0.2), valueColor: AlwaysStoppedAnimation<Color>( _getLevelColor(), ), ), ), if (showDetails) ...[ const SizedBox(height: 6), Text(",Xp Badge (Leaderboard & Stats),String Literal
+No Seasons,Season Dropdown (Leaderboard & Stats),"Text Widget, Likely button label - keep concise"
+$rank,Premium Podium Display (Leaderboard & Stats),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+1st,Premium Podium Display (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+2nd,Premium Podium Display (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+3rd,Premium Podium Display (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+${entry.rank},Leaderboard Entry Card (Leaderboard & Stats),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Hall of Fame,Hall Of Fame Screen (Leaderboard & Stats),"Text Widget, Likely button label - keep concise"
+"Explore the hall of fame featuring top performers, record holders, and legendary achievements in the running community!",Hall Of Fame Screen (Leaderboard & Stats),Text Widget
+Hall of Champions,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Top performing athletes,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Record Breakers,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Speed and distance records,Hall Of Fame Screen (Leaderboard & Stats),String Literal
+Achievement Gallery,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Legendary accomplishments,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Top Runners,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Speed Kings,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Distance Masters,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Weekly Heroes,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+Coming Soon!,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Likely button label - keep concise"
+$title category is under development,Hall Of Fame Screen (Leaderboard & Stats),"String Literal, Contains variable placeholder"

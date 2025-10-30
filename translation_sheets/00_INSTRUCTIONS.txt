@@ -1,0 +1,59 @@
+
+╔═══════════════════════════════════════════════════════════════════╗
+║          StepzSync Translation Guide                              ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+PROJECT INFORMATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  App Name:         StepzSync
+  Type:             Fitness Tracking & Racing App
+  Platform:         Flutter (iOS & Android)
+  Extracted Date:   2025-10-30
+  Total Strings:    3734
+
+HOW TO USE THESE FILES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  • Each CSV file represents a different section of the app
+  • Files are numbered (01_, 02_, etc.) for easy organization
+  • Each CSV has three columns:
+    - Column A: English Text (the original text to translate)
+    - Column B: Screen/Context (where this text appears)
+    - Column C: Notes (additional context)
+
+TRANSLATION GUIDELINES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Keep the same tone and style as the English text
+  2. For button labels, keep translations concise
+  3. Pay attention to placeholders (marked in Notes)
+  4. Placeholders like {count}, {name}, $variable should NOT be translated
+  5. Maintain similar text length for UI elements
+  6. Error messages should be clear and helpful
+  7. Questions should end with appropriate punctuation
+
+SPECIAL CONSIDERATIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  • Health & Fitness terms should use standard translations
+  • Race terminology should be consistent throughout
+  • Premium/Subscription text should be clear about benefits
+  • Permission requests should explain why clearly
+
+ADDING YOUR TRANSLATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Option 1: Add a new column (D, E, etc.) for each target language
+  Option 2: Create a copy of files for each language
+  Option 3: Import into Excel/Google Sheets for easier editing
+
+  Recommended: Open all CSV files in Excel, then save as .xlsx workbook
+
+QUALITY ASSURANCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Review translations in context of their screen
+  ✓ Check that button labels fit on buttons
+  ✓ Ensure error messages make sense
+  ✓ Test that placeholders are preserved correctly
+  ✓ Verify consistency across similar screens
+
+QUESTIONS OR ISSUES?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Contact the development team for clarification on any strings.
+

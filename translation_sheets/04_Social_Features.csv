@@ -1,0 +1,169 @@
+﻿English Text,Screen/Context,Notes
+Recent,Chat List Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Friends,Chat List Screen (Social Features); Friends Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Tap to start chatting,Chat List Screen (Social Features),Text Widget
+Loading messages...,Chat List Screen (Social Features); Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+No Messages Yet,Chat List Screen (Social Features); Race Chat Bottom Sheet (Social Features),"Text Widget, Likely button label - keep concise"
+Start a conversation with your friends! Switch to the Friends tab to begin chatting.,Chat List Screen (Social Features),Text Widget
+View Friends,Chat List Screen (Social Features),"Text Widget, Likely button label - keep concise"
+No Friends Yet,Chat List Screen (Social Features); Friends List Tab (Social Features),"Text Widget, Likely button label - keep concise"
+Add friends to start chatting! Go to the Friends screen to connect with people.,Chat List Screen (Social Features),Text Widget
+Find Friends,Chat List Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Messages,Chat List Screen (Social Features),"AppBar Title, Likely button label - keep concise"
+Navigation,Chat List Screen (Social Features),"String Literal, Likely button label - keep concise"
+Go to Friends tab to add friends,Chat List Screen (Social Features),String Literal
+Yesterday,Chat List Screen (Social Features); Individual Chat Screen (Social Features); Friends List Tab (Social Features); Friend Requests Tab (Social Features),"String Literal, Likely button label - keep concise"
+Active now,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Delete Chat,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Replying to ${replyToMessage!.senderName},Individual Chat Screen (Social Features); Race Chat Bottom Sheet (Social Features),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Start the conversation,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Say hello to $otherParticipantName!,Individual Chat Screen (Social Features),"Text Widget, Contains variable placeholder"
+Reply,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Copy,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Delete,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Delete Message,Individual Chat Screen (Social Features),"Text Widget, Likely button label - keep concise"
+Are you sure you want to delete this message?,Individual Chat Screen (Social Features),"Text Widget, Question"
+Cancel,Individual Chat Screen (Social Features); Friends Controller (Social Features),"Text Widget, Likely button label - keep concise"
+Are you sure you want to delete this entire conversation? This action cannot be undone.,Individual Chat Screen (Social Features),Text Widget
+Type a message...,Individual Chat Screen (Social Features); Race Chat Bottom Sheet (Social Features),Form Input
+Copied,Individual Chat Screen (Social Features),"Snackbar/Toast, Likely button label - keep concise"
+Today,Individual Chat Screen (Social Features); Friends List Tab (Social Features),"String Literal, Likely button label - keep concise"
+Message copied to clipboard,Individual Chat Screen (Social Features),String Literal
+Friends & Social,Friends Screen (Social Features),"AppBar Title, Likely button label - keep concise"
+Search by name or username...,Friends Screen (Social Features),Form Input
+Received,Friends Screen (Social Features),"String Literal, Likely button label - keep concise"
+Sent,Friends Screen (Social Features),"String Literal, Likely button label - keep concise"
+Searching...,User Search Tab (Social Features),"Text Widget, Likely button label - keep concise"
+Search for Friends,User Search Tab (Social Features),"Text Widget, Likely button label - keep concise"
+Enter a name or username to find people,User Search Tab (Social Features),Text Widget
+No Results Found,User Search Tab (Social Features),"Text Widget, Likely button label - keep concise"
+No users found for,User Search Tab (Social Features),Text Widget
+Decline,User Search Tab (Social Features); Friend Requests Tab (Social Features),"Text Widget, Likely button label - keep concise"
+Already Friends,User Search Tab (Social Features),"Text Widget, Likely button label - keep concise"
+Blocked,User Search Tab (Social Features),"Text Widget, Likely button label - keep concise"
+. Try a different search term.,User Search Tab (Social Features),String Literal
+Location not available,User Search Tab (Social Features),"String Literal, Likely button label - keep concise"
+Add Friend,User Search Tab (Social Features),"String Literal, Likely button label - keep concise"
+Cancelling...,User Search Tab (Social Features),"String Literal, Likely button label - keep concise"
+Request Sent,User Search Tab (Social Features),"String Literal, Likely button label - keep concise"
+Accept,User Search Tab (Social Features); Friend Requests Tab (Social Features),"String Literal, Likely button label - keep concise"
+Start connecting with people! Search for friends using the search bar above.,Friends List Tab (Social Features),Text Widget
+Tap search bar to find friends,Friends List Tab (Social Features),Text Widget
+Friends since ${_formatDate(friend.createdAt)},Friends List Tab (Social Features),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Remove Friend,Friends List Tab (Social Features); Friends Controller (Social Features),"Text Widget, Likely button label - keep concise"
+remove,Friends List Tab (Social Features); Friends Controller (Social Features),"String Literal, Likely button label - keep concise"
+${difference.inDays} days ago,Friends List Tab (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+1 week ago,Friends List Tab (Social Features),"String Literal, Likely button label - keep concise"
+$weeks weeks ago,Friends List Tab (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+1 month ago,Friends List Tab (Social Features),"String Literal, Likely button label - keep concise"
+$months months ago,Friends List Tab (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+${date.day}/${date.month}/${date.year},Friends List Tab (Social Features); Friend Requests Tab (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Waiting for response...,Friend Requests Tab (Social Features),"Text Widget, Likely button label - keep concise"
+No Friend Requests,Friend Requests Tab (Social Features),"String Literal, Likely button label - keep concise"
+No Sent Requests,Friend Requests Tab (Social Features),"String Literal, Likely button label - keep concise"
+You don\,Friend Requests Tab (Social Features),"String Literal, Likely button label - keep concise"
+t sent any friend requests yet. Search for people and send them friend requests.,Friend Requests Tab (Social Features),String Literal
+Just now,Friend Requests Tab (Social Features),"String Literal, Likely button label - keep concise"
+${difference.inHours}h ago,Friend Requests Tab (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+${difference.inDays}d ago,Friend Requests Tab (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+$participantCount participant${participantCount != 1 ?,Race Chat Bottom Sheet (Social Features),"Text Widget, Contains variable placeholder, Question"
+Start the conversation with your race participants!,Race Chat Bottom Sheet (Social Features),Text Widget
+Error initializing race chat: $e,Race Chat Bottom Sheet (Social Features),"String Literal, Contains variable placeholder, Error message"
+Race Chat,Race Chat Bottom Sheet (Social Features); Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600], ), ), SizedBox(height: 8), Text(",Race Chat Bottom Sheet (Social Features),String Literal
+Replying to:,Race Chat Message Widget (Social Features),"Text Widget, Likely button label - keep concise"
+", style: GoogleFonts.poppins( fontSize: 10, fontWeight: FontWeight.w500, color: Colors.grey[600], ), ), SizedBox(height: 2), Text( message.replyToMessage ??",Race Chat Message Widget (Social Features),"String Literal, Question"
+).format(timestamp); } else if (difference.inHours > 0) { return DateFormat(,Race Chat Message Widget (Social Features),"String Literal, Contains variable placeholder"
+).format(timestamp); } else if (difference.inMinutes > 0) { return,Race Chat Message Widget (Social Features),"String Literal, Contains variable placeholder"
+; } else { return,Race Chat Message Widget (Social Features),"String Literal, Contains variable placeholder"
+Error,Chat Controller (Social Features); Friends Controller (Social Features),"Snackbar/Toast, Likely button label - keep concise, Error message"
+dart:developer,Chat Controller (Social Features); Friend Notification Service (Social Features); Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+) .where(,Chat Controller (Social Features); Friend Notification Service (Social Features); Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+); Get.snackbar(,Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+Failed to load friends,Chat Controller (Social Features),"String Literal, Error message"
+chat_rooms,Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+❌ Error updating race chat rooms: $e,Chat Controller (Social Features),"String Literal, Contains variable placeholder, Error message"
+Failed to create chat room,Chat Controller (Social Features),"String Literal, Error message"
+", isEqualTo: chatId) .orderBy(",Chat Controller (Social Features),String Literal
+) .doc(chatRoom.id!) .update({,Chat Controller (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+": messageText.trim(),",Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+": currentUser,",Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+": FieldValue.increment(1), }); // ✅ Notification sent automatically by Cloud Function (onChatMessageCreated) // See: functions/notifications/triggers/chatTriggers.js:26-52 } catch (e) { Get.snackbar(",Chat Controller (Social Features),"String Literal, Contains variable placeholder"
+Failed to send message,Chat Controller (Social Features),"String Literal, Error message"
+chat_messages,Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+Failed to delete message,Chat Controller (Social Features),"String Literal, Error message"
+Failed to delete chat,Chat Controller (Social Features),"String Literal, Error message"
+race_${race.id},Chat Controller (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Organizer,Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+Participant,Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+❌ Error creating race chat room: $e,Chat Controller (Social Features),"String Literal, Contains variable placeholder, Error message"
+Failed to create race chat room,Chat Controller (Social Features),"String Literal, Error message"
+", isEqualTo: raceChatId) .orderBy(",Chat Controller (Social Features),String Literal
+) .doc(raceChatRoom.id!) .update({,Chat Controller (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+": updatedUnreadCounts, }); // ✅ Notification sent automatically by Cloud Function (onRaceChatMessageCreated) // See: functions/notifications/triggers/chatTriggers.js:60-116 } catch (e) { log(",Chat Controller (Social Features),"String Literal, Contains variable placeholder"
+re using unreadCounts at room level } catch (e) { log(,Chat Controller (Social Features),"String Literal, Contains variable placeholder"
+; participantProfilePictures[race.organizerUserId!] = null; // Preserve existing unread count or default to 0 unreadCounts[race.organizerUserId!] = existingRoom.unreadCounts[race.organizerUserId!] ?? 0; } // Add participants if (race.participants != null) { for (final participant in race.participants!) { if (participant.userId != null && !participantIds.contains(participant.userId)) { participantIds.add(participant.userId!); participantNames[participant.userId!] = participant.userName ??,Chat Controller (Social Features),"String Literal, Contains variable placeholder, Question"
+) .doc(existingRoom.id) .update({,Chat Controller (Social Features),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+": participantIds,",Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+": participantNames,",Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+": participantProfilePictures,",Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+": unreadCounts,",Chat Controller (Social Features),"String Literal, Likely button label - keep concise"
+); } } catch (e) { log(,Chat Controller (Social Features),"String Literal, Contains variable placeholder"
+); SnackbarUtils.showError(,Friends Controller (Social Features),"String Literal, Likely button label - keep concise, Error message"
+Search Error,Friends Controller (Social Features),"String Literal, Likely button label - keep concise, Error message"
+Friend request sent to ${user.fullName},Friends Controller (Social Features),"String Literal, Contains variable placeholder"
+Success,Friends Controller (Social Features),"String Literal, Likely button label - keep concise, Success message"
+You are now friends with ${request.senderName},Friends Controller (Social Features),"String Literal, Contains variable placeholder"
+Declined,Friends Controller (Social Features),"String Literal, Likely button label - keep concise"
+Friend request from ${request.senderName} declined,Friends Controller (Social Features),"String Literal, Contains variable placeholder"
+Cancelled,Friends Controller (Social Features),"String Literal, Likely button label - keep concise"
+Friend request to ${user.fullName} cancelled,Friends Controller (Social Features),"String Literal, Contains variable placeholder"
+Removed,Friends Controller (Social Features),"String Literal, Likely button label - keep concise"
+${friend.friendName} removed from friends,Friends Controller (Social Features),"String Literal, Contains variable placeholder"
+❌ No current user for notification monitoring,Friend Notification Service (Social Features),String Literal
+🔄 Starting unified notification monitoring for user: $currentUserId,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder"
+user_notifications,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+❌ Notification stream error: $error,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder, Error message"
+✅ Unified notification monitoring started,Friend Notification Service (Social Features),String Literal
+❌ Error starting friend notification monitoring: $e,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder, Error message"
+🛑 Unified notification monitoring stopped,Friend Notification Service (Social Features),String Literal
+❌ Error stopping notification monitoring: $e,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder, Error message"
+📬 Received notification updates: ${snapshot.docChanges.length} changes,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder"
+"📝 Doc change type: ${change.type}, doc ID: ${change.doc.id}",Friend Notification Service (Social Features),"String Literal, Contains variable placeholder"
+❌ Error handling notification updates: $e,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder, Error message"
+type,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+title,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+message,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+icon,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+category,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+⚠️ Invalid notification data,Friend Notification Service (Social Features),"String Literal, Error message"
+🔔 Processing notification: $type - $title,Friend Notification Service (Social Features),"String Literal, Contains variable placeholder"
+Social,Friend Notification Service (Social Features),"String Literal, Likely button label - keep concise"
+t mark as read immediately - keep it unread so it shows in the notification bell log(,Friend Notification Service (Social Features),String Literal
+); } catch (e) { log(,Friend Notification Service (Social Features); Friends Service (Social Features),"String Literal, Contains variable placeholder"
+", isEqualTo: currentUserId) .where(",Friend Notification Service (Social Features); Friends Service (Social Features),String Literal
+", isEqualTo: false) .get(); log(",Friend Notification Service (Social Features),String Literal
+user_profiles,Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+\uf8ff,Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+username,Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+Failed to search users: $e,Friends Service (Social Features),"String Literal, Contains variable placeholder, Error message"
+s the current user,Friends Service (Social Features),String Literal
+s available for them to keep final existingDoc = query.docs.first; if (existingDoc.id == currentUserId) { return true; } } return query.docs.isEmpty; } catch (e) { throw Exception(,Friends Service (Social Features),"String Literal, Contains variable placeholder"
+", isEqualTo: currentUser) .where(",Friends Service (Social Features),String Literal
+", isEqualTo: userId) .where(",Friends Service (Social Features),String Literal
+", isEqualTo:",Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+) .limit(1) .get(); if (receivedRequestQuery.docs.isNotEmpty) { return FriendshipStatus.requestReceived; } return FriendshipStatus.none; } catch (e) { throw Exception(,Friends Service (Social Features),"String Literal, Contains variable placeholder"
+).doc(currentUser).get(); if (!userDoc.exists) throw Exception(,Friends Service (Social Features),String Literal
+).add(request.toJson()); // ✅ Notification will be sent automatically by Cloud Function (onFriendRequestCreated) log(,Friends Service (Social Features),String Literal
+); } catch (e) { throw Exception(,Friends Service (Social Features),"String Literal, Contains variable placeholder"
+).doc(requestId).get(); if (!requestDoc.exists) throw Exception(,Friends Service (Social Features),String Literal
+": FriendRequestStatus.accepted.value,",Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+✅ Friend request accepted: ${receiverProfile.fullName} accepted ${senderProfile.fullName}\,Friends Service (Social Features),"String Literal, Contains variable placeholder"
+": FriendRequestStatus.declined.value,",Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+", isEqualTo: currentUserId) .orderBy(",Friends Service (Social Features),String Literal
+) .orderBy(,Friends Service (Social Features),"String Literal, Likely button label - keep concise"
+); } } throw Exception(,Friends Service (Social Features),String Literal
+", isEqualTo: friendId) .where(",Friends Service (Social Features),String Literal
+", isEqualTo: receiverId) .where(",Friends Service (Social Features),String Literal
+); } } // ================= NOTIFICATION METHODS ================= // ✅ All friend notifications are now handled by Cloud Functions! // See: functions/notifications/triggers/friendTriggers.js // // Automatic triggers: // - onFriendRequestCreated: Sends notification when friend_requests doc is created // - onFriendRequestAccepted: Sends notification when status changes to,Friends Service (Social Features),String Literal
+// - onFriendRequestDeclined: Sends notification when status changes to,Friends Service (Social Features),String Literal

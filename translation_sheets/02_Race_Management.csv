@@ -1,0 +1,498 @@
+﻿English Text,Screen/Context,Notes
+Hurray!,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise"
+You,Race Winner Screens Widgets (Race Management); Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Watch others racing and see live updates!,Race Winner Screens Widgets (Race Management),Text Widget
+Loading ad...,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise"
+🏆 Participant Rankings,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise"
+${item.rank},Race Winner Screens Widgets (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Race Complete!,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise, Success message"
+Top 3 Finishers,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise"
+#${participant.rank},Race Winner Screens Widgets (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+No participants completed the race yet.,Race Winner Screens Widgets (Race Management),"Text Widget, Success message"
+📊 Your Performance,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise"
+Steps: ${sortedParticipants[0].steps},Race Winner Screens Widgets (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Calories: ${sortedParticipants[0].calories},Race Winner Screens Widgets (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+All Participants,Race Winner Screens Widgets (Race Management),"Text Widget, Likely button label - keep concise"
+${participant.rank},Race Winner Screens Widgets (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Race Completed,Race Winner Screens Widgets (Race Management); Race Dnf Screen Widget (Race Management),"AppBar Title, Likely button label - keep concise, Success message"
+Race Winners,Race Winner Screens Widgets (Race Management),"AppBar Title, Likely button label - keep concise"
+dart:math,Race Winner Screens Widgets (Race Management); Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.iconGrey, ), ), SizedBox(height: 32), // Race Route Card Container( padding: EdgeInsets.all(16), decoration: BoxDecoration( color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [ BoxShadow( color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4), ), ], ), child: Column( children: [ Row( mainAxisAlignment: MainAxisAlignment.center, children: [ SvgPicture.asset( IconPaths.radioIcon, color: AppColors.appColor, width: 20, height: 20, ), SizedBox(width: 8), Expanded( child: VerticalDashedDivider( isHorizontal: true, dashHeight: 5, dashSpacing: 2, color: AppColors.iconGrey, width: 2, ), ), SizedBox(width: 8), SvgPicture.asset( IconPaths.locationIcon, color: AppColors.neonYellow, width: 20, height: 20, ), ], ), SizedBox(height: 12), Row( mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Expanded( child: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( color: Colors.black, fontWeight: FontWeight.w500, fontSize: 13, ), textAlign: TextAlign.left, maxLines: 2, overflow: TextOverflow.ellipsis, ), ), SizedBox(width: 16), Expanded( child: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( color: Colors.black, fontWeight: FontWeight.w500, fontSize: 13, ), textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, ), ), ], ), ], ), ), SizedBox(height: 32), // Info Text Container( padding: EdgeInsets.all(16), decoration: BoxDecoration( color: AppColors.appColor.withOpacity(0.05), borderRadius: BorderRadius.circular(12), ), child: Row( children: [ Icon( Icons.info_outline, color: AppColors.appColor, size: 20, ), SizedBox(width: 12), Expanded( child: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.buttonBlack, ), ), ), ], ), ), SizedBox(height: 24), // View Results Button - Always enabled CustomButton( btnTitle:",Race Winner Screens Widgets (Race Management),String Literal
+"), title: Text( displayName, style: GoogleFonts.poppins(), ), subtitle: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", isBack: true, circularBackButton: true, backButtonCircleColor: AppColors.neonYellow, backButtonIconColor: Colors.black, backgroundColor: Colors.white, titleColor: AppColors.appColor, showGradient: false, titleStyle: GoogleFonts.roboto( fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.appColor, ), ), body: SingleChildScrollView( physics: const BouncingScrollPhysics(), child: Padding( padding: const EdgeInsets.all(16.0), child: Column( children: [ const SizedBox(height: 8), // Hero Header Container( padding: const EdgeInsets.all(20), decoration: BoxDecoration( gradient: LinearGradient( colors: [ AppColors.appColor, AppColors.appColor.withValues(alpha: 0.8), ], begin: Alignment.topLeft, end: Alignment.bottomRight, ), borderRadius: BorderRadius.circular(20), boxShadow: [ BoxShadow( color: AppColors.appColor.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8), ), ], ), child: Column( children: [ const Icon( Icons.emoji_events, size: 48, color: Colors.white, ), const SizedBox(height: 8), Text( raceData?.title ??",Race Winner Screens Widgets (Race Management),"String Literal, Question"
+", style: GoogleFonts.poppins( fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white, ), textAlign: TextAlign.center, ), const SizedBox(height: 4), Text(",Race Winner Screens Widgets (Race Management),String Literal
+} km,Race Winner Screens Widgets (Race Management),"String Literal, Likely button label - keep concise"
+Distance,Race Winner Screens Widgets (Race Management); Race Map Screen (Race Management); Race Invites Screen (Race Management); Quick Race Waiting Room Screen (Race Management); Distance Selector Widget (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+${participants.where((p) => p.isCompleted).length},Race Winner Screens Widgets (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise, Success message"
+Finished,Race Winner Screens Widgets (Race Management),"String Literal, Likely button label - keep concise"
+"]; final medalColors = [ [const Color(0xFF1E88E5), const Color(0xFF1565C0)], // Blue gradient for 1st [const Color(0xFFC0C0C0), const Color(0xFF999999)], [const Color(0xFFCD7F32), const Color(0xFF8B4513)], ]; return Container( margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration( gradient: LinearGradient( colors: [ Colors.white, medalColors[index][0].withValues(alpha: 0.05), ], begin: Alignment.centerLeft, end: Alignment.centerRight, ), borderRadius: BorderRadius.circular(16), border: Border.all( color: medalColors[index][0].withValues(alpha: 0.3), width: 1.5, ), boxShadow: [ BoxShadow( color: medalColors[index][0].withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4), ), ], ), child: Padding( padding: const EdgeInsets.all(12), child: Row( children: [ // Medal Badge Container( width: 48, height: 48, decoration: BoxDecoration( gradient: LinearGradient( colors: medalColors[index], begin: Alignment.topLeft, end: Alignment.bottomRight, ), shape: BoxShape.circle, boxShadow: [ BoxShadow( color: medalColors[index][1].withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 2), ), ], ), child: Center( child: Text( medals[index], style: const TextStyle(fontSize: 24), ), ), ), const SizedBox(width: 12), // Participant Info Expanded( child: Column( crossAxisAlignment: CrossAxisAlignment.start, children: [ Row( children: [ Expanded( child: Text( participant.userName.isNotEmpty ? participant.userName :",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.buttonBlack, ), overflow: TextOverflow.ellipsis, ), ), Container( padding: const EdgeInsets.symmetric( horizontal: 8, vertical: 2, ), decoration: BoxDecoration( color: medalColors[index][0].withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12), ), child: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", ), ], ], ), ], ), ), ], ), ), ); }), ] else if (!isSoloRace) ...[ // Non-solo race with no finishers yet Container( padding: const EdgeInsets.all(24), decoration: BoxDecoration( color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), ), child: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 16, color: AppColors.iconGrey, ), textAlign: TextAlign.center, ), ), ] else if (isSoloRace && sortedParticipants.isNotEmpty) ...[ // Solo race - show personal stats Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.buttonBlack, ), ), const SizedBox(height: 16), Container( padding: const EdgeInsets.all(16), decoration: BoxDecoration( color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all( color: Colors.grey.withValues(alpha: 0.3), width: 2, ), boxShadow: [ BoxShadow( color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2), ), ], ), child: Column( crossAxisAlignment: CrossAxisAlignment.start, children: [ Row( children: [ Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: const TextStyle(fontSize: 32), ), const SizedBox(width: 16), Expanded( child: Column( crossAxisAlignment: CrossAxisAlignment.start, children: [ Text( sortedParticipants[0].userName.isNotEmpty ? sortedParticipants[0].userName :",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.buttonBlack, ), ), const SizedBox(height: 4), Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, color: AppColors.iconGrey, ), ), if (sortedParticipants[0].avgSpeed > 0) Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, color: AppColors.iconGrey, ), ), Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, color: AppColors.iconGrey, ), ), if (sortedParticipants[0].calories > 0) Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, color: AppColors.iconGrey, ), ), ], ), ), ], ), ], ), ), ], const SizedBox(height: 24), // All Participants Section if (sortedParticipants.length > 3) ...[ Container( padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), child: Row( children: [ Container( padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration( gradient: LinearGradient( colors: [ Colors.blue.shade400, Colors.blue.shade600, ], ), borderRadius: BorderRadius.circular(20), ), child: Row( mainAxisSize: MainAxisSize.min, children: [ const Icon(Icons.group, size: 16, color: Colors.white), const SizedBox(width: 6), Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white, ), ), const SizedBox(width: 4), Container( padding: const EdgeInsets.symmetric( horizontal: 6, vertical: 2, ), decoration: BoxDecoration( color: Colors.white.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(10), ), child: Text(",Race Winner Screens Widgets (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 13, fontWeight: FontWeight.w700, color: isTopThree ? Colors.white : Colors.grey.shade700, ), ), ), ), const SizedBox(width: 12), // Participant Info Expanded( child: Column( crossAxisAlignment: CrossAxisAlignment.start, children: [ Text( participant.userName.isNotEmpty ? participant.userName :",Race Winner Screens Widgets (Race Management),String Literal
+Create New Race,Create Race Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Create a New Race,Create Race Screen (Race Management),Text Widget
+Fill in the details below to create a new race for your users,Create Race Screen (Race Management),Text Widget
+Start Location,Create Race Screen (Race Management); Quick Race Selection Screen (Race Management),"Text Widget, Likely button label - keep concise"
+End Location,Create Race Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Cancel,Create Race Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Create Race,Create Race Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Race Title,Create Race Screen (Race Management),Form Input
+Organizer Name,Create Race Screen (Race Management),Form Input
+Race Type,Create Race Screen (Race Management),Form Input
+Gender Preference,Create Race Screen (Race Management),Form Input
+Start Address,Create Race Screen (Race Management),Form Input
+Latitude,Create Race Screen (Race Management),Form Input
+Longitude,Create Race Screen (Race Management),Form Input
+End Address,Create Race Screen (Race Management),Form Input
+Total Distance (km),Create Race Screen (Race Management),Form Input
+Participant Limit,Create Race Screen (Race Management),Form Input
+Schedule Time,Create Race Screen (Race Management),Form Input
+Race Deadline,Create Race Screen (Race Management),Form Input
+Public,Create Race Screen (Race Management); Races List Screen (Race Management); Quick Race Selection Screen (Race Management),"String Literal, Likely button label - keep concise"
+All,Create Race Screen (Race Management); Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Solo,Create Race Screen (Race Management); Races List Screen (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Private,Create Race Screen (Race Management); Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Marathon,Create Race Screen (Race Management); Races List Screen (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Quick Race,Create Race Screen (Race Management); Quick Race Selection Screen (Race Management),"String Literal, Likely button label - keep concise"
+Male,Create Race Screen (Race Management); Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Female,Create Race Screen (Race Management); Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Other,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Error calculating distance: $e,Create Race Screen (Race Management),"String Literal, Contains variable placeholder, Error message"
+Please select a schedule time,Create Race Screen (Race Management),String Literal
+Please select a race deadline,Create Race Screen (Race Management),String Literal
+User not authenticated,Create Race Screen (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+scheduled,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Success,Create Race Screen (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise, Success message"
+Race created successfully!,Create Race Screen (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise, Success message"
+Error,Create Race Screen (Race Management); Invite Users Screen (Race Management); Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise, Error message"
+Basic Information,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Location Details,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Enter destination address,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Race Configuration,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Auto-calculated or enter manually,Create Race Screen (Race Management),String Literal
+Please enter $label,Create Race Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+"MMM dd, yyyy hh:mm a",Create Race Screen (Race Management),String Literal
+Select date and time,Create Race Screen (Race Management),String Literal
+Race is Over,Race Dnf Screen Widget (Race Management),"Text Widget, Likely button label - keep concise"
+You did not complete the race,Race Dnf Screen Widget (Race Management),"Text Widget, Success message"
+Good effort! Try again next time!,Race Dnf Screen Widget (Race Management),Text Widget
+Back to Home,Race Dnf Screen Widget (Race Management),"String Literal, Likely button label - keep concise"
+Move 10m,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+You can start the race once the timer reaches zero,Race Map Screen (Race Management),Text Widget
+Not Enough Participants,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+You need at least $minPart participants to start the race.,Race Map Screen (Race Management),"Text Widget, Contains variable placeholder"
+Current,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Required,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Start Race,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Waiting for organizer to start the race!,Race Map Screen (Race Management),Text Widget
+Race Gaps,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Milestones,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+✓ ${m}km,Race Map Screen (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Next: ${nextMilestone}km,Race Map Screen (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+All done! 🎉,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Premium Feature,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Race Chat is a premium feature. Upgrade to premium to:,Race Map Screen (Race Management),Text Widget
+Unlock all premium features now!,Race Map Screen (Race Management),Text Widget
+Maybe Later,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Upgrade Now,Race Map Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Duration,Race Map Screen (Race Management); Quick Race Waiting Room Screen (Race Management); Quick Race Selection Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Type,Race Map Screen (Race Management); Quick Race Waiting Room Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Participants,Race Map Screen (Race Management); Quick Race Waiting Room Screen (Race Management); Create Race Screen (Race Management); Participant Selector Widget (Race Management); Create Race Controller (Race Management); Quick Race Controller (Race Management); Quick Race Service (Race Management),"AppBar Title, Likely button label - keep concise"
+Starts on,Race Map Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Starts at,Race Map Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Avg Speed,Race Map Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Distance covered,Race Map Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Distance remaining,Race Map Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+My Position,Race Map Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Gap to leader,Race Map Screen (Race Management),Form Input
+${playerAhead!.userName} ahead,Race Map Screen (Race Management),"Form Input, Contains variable placeholder"
+${playerBehind!.userName} behind,Race Map Screen (Race Management),"Form Input, Contains variable placeholder"
+dart:ui,Race Map Screen (Race Management); Race Start Countdown (Race Management),"String Literal, Likely button label - keep concise"
+", userName:",Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+; Color badgeColor = AppColors.appColor; if (raceTypeId == 1) { typeText =,Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+; badgeColor = Color(0xFF0EA5E9); } else if (raceTypeId == 4) { typeText =,Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+; badgeColor = Color(0xFFEA580C); } else { typeText =,Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+final formatter = DateFormat(,Race Map Screen (Race Management),String Literal
+${hours}h ${minutes}m ${seconds}s,Race Map Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+${minutes}m ${seconds}s,Race Map Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+${seconds}s,Race Map Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Race starts in:,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+Waiting for race to start,Race Map Screen (Race Management),String Literal
+: durationMins == 60 ?,Race Map Screen (Race Management),"String Literal, Question"
+"; return Positioned( top: 80, left: 0, right: 0, child: Padding( padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 20), child: ClipRRect( borderRadius: BorderRadius.circular(10), child: BackdropFilter( filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: Container( padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration( color: Colors.red.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(10), border: Border.all( color: Colors.white.withValues(alpha: 0.4), width: 1.5, ), boxShadow: [ BoxShadow( color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: Offset(0, 2), ), ], ), child: Column( mainAxisSize: MainAxisSize.min, children: [ Row( mainAxisAlignment: MainAxisAlignment.center, children: [ Icon( Icons.timer, color: Colors.white, size: 16, ), SizedBox(width: 6), Text( isSolo ?",Race Map Screen (Race Management),"String Literal, Question"
+", style: GoogleFonts.poppins( color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, ), ), ], ), SizedBox(height: 6), Text( time, style: GoogleFonts.poppins( color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2, ), ), SizedBox(height: 2), Text( isSolo ?",Race Map Screen (Race Management),"String Literal, Question"
+", style: GoogleFonts.poppins( fontSize: 18, fontWeight: FontWeight.w700, ), ), ), ], ), content: Column( mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [ Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, fontWeight: FontWeight.w500, ), ), SizedBox(height: 16), Container( padding: EdgeInsets.all(16), decoration: BoxDecoration( color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all( color: Colors.orange.withValues(alpha: 0.3), ), ), child: Row( mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Column( crossAxisAlignment: CrossAxisAlignment.start, children: [ Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 11, color: Colors.grey.shade600, ), ), Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 24, fontWeight: FontWeight.w700, color: Colors.orange, ), ), ], ), Icon(Icons.arrow_forward, color: Colors.grey), Column( crossAxisAlignment: CrossAxisAlignment.end, children: [ Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 24, fontWeight: FontWeight.w700, color: Colors.green, ), ), ], ), ], ), ), ], ), actions: [ TextButton( onPressed: () => Navigator.of(context).pop(), style: TextButton.styleFrom( padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(12), ), ), child: Text(",Race Map Screen (Race Management),String Literal
+] == 200) { // Race started successfully } else { showSnackbar(,Race Map Screen (Race Management),"String Literal, Contains variable placeholder, Success message"
+", response?[",Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+", style: GoogleFonts.poppins( fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5, ), ), ], ), ), ); }, ), ), ), ); } else { return ClipRRect( borderRadius: BorderRadius.circular(10), child: BackdropFilter( filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: Container( padding: EdgeInsets.all(10), decoration: BoxDecoration( color: Colors.white.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(10), border: Border.all( color: Colors.white.withValues(alpha: 0.3), width: 1.5, ), ), child: Text(",Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+", style: GoogleFonts.poppins( fontSize: 16, fontWeight: FontWeight.w600, ), textAlign: TextAlign.center, ), ), ), ); } case 2: return ClipRRect( borderRadius: BorderRadius.circular(10), child: BackdropFilter( filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: Container( padding: EdgeInsets.all(10), decoration: BoxDecoration( color: Colors.white.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(10), border: Border.all( color: Colors.white.withValues(alpha: 0.3), width: 1.5, ), ), child: Text(",Race Map Screen (Race Management),String Literal
+Keep Racing! No time limit,Race Map Screen (Race Management),String Literal
+Time is running out! Finish strong!,Race Map Screen (Race Management),String Literal
+Someone,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+🏆 $finisherName took $position place! Keep racing!,Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+Keep Racing! Time is running!,Race Map Screen (Race Management),String Literal
+Endurance,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+; } else { return,Race Map Screen (Race Management); Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; if (rank == 2) return,Race Map Screen (Race Management),String Literal
+; if (rank == 3) return,Race Map Screen (Race Management),String Literal
+; return,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+; case 1: return,Race Map Screen (Race Management),String Literal
+; case 2: return,Race Map Screen (Race Management),String Literal
+; case 3: return,Race Map Screen (Race Management),String Literal
+; case 4: return,Race Map Screen (Race Management),String Literal
+; case 6: return,Race Map Screen (Race Management),String Literal
+; case 7: return,Race Map Screen (Race Management),String Literal
+; default: return,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+; icon = Icons.celebration; bgColor = Colors.green; } else if (distance >= totalDistance / 2 && distance < (totalDistance / 2 + 0.1)) { message =,Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+re leading! Don,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+re leading!,Race Map Screen (Race Management),"String Literal, Likely button label - keep concise"
+by ${_formatGap(gapBehind)},Race Map Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+", style: GoogleFonts.poppins( fontSize: 11, fontWeight: FontWeight.w700, color: Colors.amber.shade900, ), ), ], ), if (distanceToNext > 0) ...[ SizedBox(height: 4), Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 9, color: Colors.grey.shade700, ), ), ], ], ), ) else // All milestones completed Container( padding: EdgeInsets.all(8), decoration: BoxDecoration( color: Colors.green.shade100, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade400, width: 1.5), ), child: Row( children: [ Icon(Icons.emoji_events, size: 16, color: Colors.green.shade700), SizedBox(width: 4), Expanded( child: Text(",Race Map Screen (Race Management),"String Literal, Success message"
+", style: GoogleFonts.poppins( fontSize: 18, fontWeight: FontWeight.w600, ), ), ), ], ), content: Column( mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [ Text(",Race Map Screen (Race Management),String Literal
+"), SizedBox(height: 16), Container( padding: EdgeInsets.all(12), decoration: BoxDecoration( gradient: LinearGradient( colors: [ AppColors.appColor.withValues(alpha: 0.1), AppColors.neonYellow.withValues(alpha: 0.1), ], ), borderRadius: BorderRadius.circular(10), border: Border.all( color: AppColors.appColor.withValues(alpha: 0.3), width: 1, ), ), child: Row( children: [ Icon( Icons.star_rounded, color: AppColors.appColor, size: 20, ), SizedBox(width: 8), Expanded( child: Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 12, color: AppColors.appColor, fontWeight: FontWeight.w600, ), ), ), ], ), ), ], ), actions: [ TextButton( onPressed: () => Navigator.pop(context), child: Text(",Race Map Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 14, color: Colors.grey[600], fontWeight: FontWeight.w500, ), ), ), ElevatedButton( onPressed: () { Navigator.pop(context); // Navigate to subscription screen Get.to(() => SubscriptionScreen()); }, style: ElevatedButton.styleFrom( backgroundColor: AppColors.appColor, shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(12), ), padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12), ), child: Text(",Race Map Screen (Race Management),"String Literal, Contains variable placeholder"
+", style: GoogleFonts.poppins( fontSize: 48, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2, ), ), ], ) : Text(",Race Map Screen (Race Management),String Literal
+Invite Friends,Invite Users Screen (Race Management); Create Race Controller (Race Management),"Text Widget, Likely button label - keep concise"
+Inviting to:,Invite Users Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Search Friends,Invite Users Screen (Race Management),"Text Widget, Likely button label - keep concise"
+No users found,Invite Users Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Search for friends to invite,Invite Users Screen (Race Management),Text Widget
+Type at least 2 characters to start searching,Invite Users Screen (Race Management),Text Widget
+Personal Message (Optional),Invite Users Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Search by name or email...,Invite Users Screen (Race Management),Form Input
+Add a personal message to your invite...,Invite Users Screen (Race Management),Form Input
+Failed to search users,Invite Users Screen (Race Management),"String Literal, Error message"
+Please select at least one user to invite,Invite Users Screen (Race Management),String Literal
+] ?? user[,Invite Users Screen (Race Management),"String Literal, Likely button label - keep concise"
+} successfully${failCount > 0 ?,Invite Users Screen (Race Management),"String Literal, Contains variable placeholder, Question, Success message"
+", backgroundColor: const Color(0xFF35B555), colorText: Colors.white, snackPosition: SnackPosition.TOP, ); if (failCount == 0) { Get.back(); // Go back if all were successful } } else { Get.snackbar(",Invite Users Screen (Race Management),"String Literal, Contains variable placeholder, Success message"
+"), ); } if (searchResults.isEmpty) { return Center( child: Column( mainAxisAlignment: MainAxisAlignment.center, children: [ Icon( Icons.people_outline, size: 64, color: Colors.grey[400], ), const SizedBox(height: 16), Text(",Invite Users Screen (Race Management),"String Literal, Contains variable placeholder"
+", style: AppTextStyles.bodyLarge.copyWith( color: Colors.grey[600], ), ), const SizedBox(height: 8), Text(",Invite Users Screen (Race Management),String Literal
+]?.isNotEmpty == true ? user[,Invite Users Screen (Race Management),String Literal
+"] : null, size: 40, ), title: Text( user[",Invite Users Screen (Race Management),String Literal
+", style: AppTextStyles.bodyLarge.copyWith( fontWeight: FontWeight.w600, ), ), subtitle: user[",Invite Users Screen (Race Management),String Literal
+]?.isNotEmpty == true ? Text( user[,Invite Users Screen (Race Management),String Literal
+Invites,Race Invites Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Join Request,Race Invites Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Decline,Race Invites Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Oops!,Race Invites Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Retry,Race Invites Screen (Race Management); Nearby Places Bottom Sheet (Race Management),"Text Widget, Likely button label - keep concise"
+Race Invites,Race Invites Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Location,Race Invites Screen (Race Management),Form Input
+Date,Race Invites Screen (Race Management),Form Input
+Time,Race Invites Screen (Race Management),Form Input
+Received,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+Sent,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+⏳ Waiting for received invites data...,Race Invites Screen (Race Management),String Literal
+📍 Error stack trace: ${snapshot.stackTrace},Race Invites Screen (Race Management),"String Literal, Contains variable placeholder, Error message"
+Error loading invites: ${snapshot.error},Race Invites Screen (Race Management),"String Literal, Contains variable placeholder, Error message"
+📦 Received invites data: ${invites.length} invites,Race Invites Screen (Race Management),"String Literal, Contains variable placeholder"
+📝 Invite $i: ${invites[i].raceTitle} from ${invites[i].fromUserName},Race Invites Screen (Race Management),"String Literal, Contains variable placeholder"
+📭 No received invites to display,Race Invites Screen (Race Management),String Literal
+No Invites Received,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+You haven\,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+t sent any race invites yet,Race Invites Screen (Race Management),String Literal
+🔄 Refreshing sent invites...,Race Invites Screen (Race Management),String Literal
+Unexpected state,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+${invite.fromUserName} wants to join,Race Invites Screen (Race Management),"String Literal, Contains variable placeholder"
+${invite.fromUserName} invited you,Race Invites Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Invited ${invite.toUserName},Race Invites Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Approve,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+Accept,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+Success!,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise, Success message"
+Race invite accepted successfully,Race Invites Screen (Race Management),"String Literal, Success message"
+Failed to accept invite. Please try again.,Race Invites Screen (Race Management),"String Literal, Error message"
+An unexpected error occurred,Race Invites Screen (Race Management),"String Literal, Error message"
+Declined,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+Race invite declined,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+Failed to decline invite. Please try again.,Race Invites Screen (Race Management),"String Literal, Error message"
+Race details not available,Race Invites Screen (Race Management),String Literal
+Requested,Race Invites Screen (Race Management),"String Literal, Likely button label - keep concise"
+No Completed Races Yet,Completed Races Screen (Race Management),"Text Widget, Success message"
+Complete your first race to see your achievements here!,Completed Races Screen (Race Management),"Text Widget, Success message"
+Browse Races,Completed Races Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Completed Races,Completed Races Screen (Race Management),"AppBar Title, Likely button label - keep concise, Success message"
+", style: GoogleFonts.poppins( fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87, ), ), SizedBox(height: 12), Padding( padding: EdgeInsets.symmetric(horizontal: 40), child: Text(",Completed Races Screen (Race Management),String Literal
+", textAlign: TextAlign.center, style: GoogleFonts.poppins( fontSize: 14, color: Colors.grey[600], ), ), ), SizedBox(height: 32), ElevatedButton( onPressed: () => Get.back(), style: ElevatedButton.styleFrom( backgroundColor: AppColors.neonYellow, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12), shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(25), ), ), child: Text(",Completed Races Screen (Race Management),String Literal
+Clear Filters,Races List Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Filter,Races List Screen (Race Management),"Text Widget, Likely button label - keep concise"
+${filter[,Races List Screen (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+All Races,Races List Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+"Search races by title, creator, or location...",Races List Screen (Race Management),Form Input
+icon,Races List Screen (Race Management); Participant Selector Widget (Race Management); Distance Selector Widget (Race Management),"String Literal, Likely button label - keep concise"
+color,Races List Screen (Race Management); Participant Selector Widget (Race Management); Distance Selector Widget (Race Management),"String Literal, Likely button label - keep concise"
+label,Races List Screen (Race Management); Participant Selector Widget (Race Management); Distance Selector Widget (Race Management),"String Literal, Likely button label - keep concise"
+Quick,Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Short,Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Medium,Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Long,Races List Screen (Race Management),"String Literal, Likely button label - keep concise"
+Any,Races List Screen (Race Management); Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+]} ($count),Races List Screen (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+No Marathon Races,Marathon Races Screen (Race Management),"Text Widget, Likely button label - keep concise"
+There are no marathon races available at the moment. Check back later or create one!,Marathon Races Screen (Race Management),Text Widget
+Create Marathon,Marathon Races Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Marathon Races,Marathon Races Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+sec,Quick Race Waiting Room Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Racers,Quick Race Waiting Room Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Ready,Quick Race Waiting Room Screen (Race Management); Quick Race Service (Race Management),"Text Widget, Likely button label - keep concise"
+Waiting...,Quick Race Waiting Room Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Empty,Quick Race Waiting Room Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Finding Racers...,Quick Race Waiting Room Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+dart:developer,Quick Race Waiting Room Screen (Race Management); Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+[WAITING_ROOM] Starting countdown timer,Quick Race Waiting Room Screen (Race Management),String Literal
+races,Quick Race Waiting Room Screen (Race Management); Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+[WAITING_ROOM] Race is now filled! Starting auto-countdown...,Quick Race Waiting Room Screen (Race Management),String Literal
+[WAITING_ROOM] All slots filled! Cancelling countdown and starting race in 3 seconds...,Quick Race Waiting Room Screen (Race Management),String Literal
+Get Ready,Quick Race Waiting Room Screen (Race Management),"String Literal, Likely button label - keep concise"
+[WAITING_ROOM] Adding $slotsToFill bots to fill empty slots (5 seconds remaining)...,Quick Race Waiting Room Screen (Race Management),"String Literal, Contains variable placeholder"
+[WAITING_ROOM] Bots added and simulation started successfully,Quick Race Waiting Room Screen (Race Management),"String Literal, Success message"
+[WAITING_ROOM] Error adding bots: $e,Quick Race Waiting Room Screen (Race Management),"String Literal, Contains variable placeholder, Error message"
+[WAITING_ROOM] Disposing waiting room screen,Quick Race Waiting Room Screen (Race Management),String Literal
+Starting race...,Quick Race Waiting Room Screen (Race Management),"String Literal, Likely button label - keep concise"
+All slots filled! Get ready...,Quick Race Waiting Room Screen (Race Management),String Literal
+Waiting for racers to join...,Quick Race Waiting Room Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white, ), ), ), ), SizedBox(width: 10), // Name Expanded( child: Column( crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [ Text( participant.userName.isNotEmpty ? participant.userName :",Quick Race Waiting Room Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87, ), maxLines: 1, overflow: TextOverflow.ellipsis, ), Text(",Quick Race Waiting Room Screen (Race Management),String Literal
+", style: GoogleFonts.poppins( fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade600, ), ), Text(",Quick Race Waiting Room Screen (Race Management),String Literal
+", value:",Quick Race Waiting Room Screen (Race Management),"String Literal, Likely button label - keep concise"
+Instant race • Starts immediately,Quick Race Selection Screen (Race Management),Text Widget
+Getting location...,Quick Race Selection Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Find Race,Quick Race Selection Screen (Race Management),"Text Widget, Likely button label - keep concise"
+12 Hours,Quick Race Selection Screen (Race Management); Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Visibility,Quick Race Selection Screen (Race Management),"String Literal, Likely button label - keep concise"
+Auto,Quick Race Selection Screen (Race Management),"String Literal, Likely button label - keep concise"
+Route,Quick Race Selection Screen (Race Management),"String Literal, Likely button label - keep concise"
+minimum,Create Race Screen (Race Management),"Text Widget, Likely button label - keep concise"
+Schedule a race,Create Race Screen (Race Management),"Text Widget, Likely button label - keep concise"
+"$formattedDate, $formattedTime",Create Race Screen (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+"Date, $formattedDate",Create Race Screen (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+"Time, $formattedTime",Create Race Screen (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Done,Create Race Screen (Race Management); Create Race Controller (Race Management),"Text Widget, Likely button label - keep concise"
+Create a race,Create Race Screen (Race Management),"AppBar Title, Likely button label - keep concise"
+Enter race title,Create Race Screen (Race Management),Form Input
+Add date and time,Create Race Screen (Race Management),Form Input
+5 mins,Create Race Screen (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+1 hours,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+24 hours,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Race Details,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Getting current location...,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Total Participants,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Min. Participants,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Race Duration,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Schedule,Create Race Screen (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Gender,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Proceed,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+"Personal challenge, perfect for self-improvement",Create Race Screen (Race Management),String Literal
+Invite-only race with friends and family,Create Race Screen (Race Management),String Literal
+No preference,Create Race Screen (Race Management); Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+dd MMM yyyy,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+hh:mm a,Create Race Screen (Race Management),"String Literal, Likely button label - keep concise"
+Starting Location,Location Type Selector Widget (Race Management),"Text Widget, Likely button label - keep concise"
+Choose where to start your race,Location Type Selector Widget (Race Management),Text Widget
+value,Participant Selector Widget (Race Management); Distance Selector Widget (Race Management),"String Literal, Likely button label - keep concise"
+Finding nearby places...,Nearby Places Bottom Sheet (Race Management),"Text Widget, Likely button label - keep concise"
+Failed to load nearby places,Nearby Places Bottom Sheet (Race Management),"String Literal, Error message"
+Create Another,Create Race Controller (Race Management),"Text Widget, Likely button label - keep concise"
+$label:,Create Race Controller (Race Management),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Race Name,Create Race Controller (Race Management),"Dialog, Likely button label - keep concise"
+).format(dateTime); final formattedTime = DateFormat(,Create Race Controller (Race Management),String Literal
+"}, ${placemark.locality ??",Create Race Controller (Race Management),"String Literal, Contains variable placeholder, Question, Likely button label - keep concise"
+"}, ${placemark.administrativeArea ??",Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Question, Likely button label - keep concise"
+"}, ${placemark.country ??",Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Question, Likely button label - keep concise"
+.replaceAll( RegExp(r,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+", ) // Remove leading/trailing commas .replaceAll(RegExp(r",Create Race Controller (Race Management),String Literal
+); } } catch (e) { log(,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; participantLimit.value = 1; // Auto-set limit to 1 for solo } else if (totalParticipants.value <= 5) { if (raceType.value ==,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+) { raceType.value =,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; // Switch from Solo to Private for small groups } } else if (totalParticipants.value <= 15) { if (raceType.value ==,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; // Switch from Solo to Public for medium groups } } else { if (raceType.value ==,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (totalParticipants.value <= 3) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (totalParticipants.value <= 10) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (totalParticipants.value <= 15) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (distance < 5) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (distance < 10) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (distance < 21) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (distance < 2) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+) { raceStoppingTime.value =,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (distance >= 0.5 && distance < 2 && raceStoppingTime.value !=,Create Race Controller (Race Management),String Literal
+; } else if (distance >= 2 && distance < 10 && raceStoppingTime.value ==,Create Race Controller (Race Management),String Literal
+; } else if (distance >= 10 && raceStoppingTime.value !=,Create Race Controller (Race Management),String Literal
+; } else if (progress >= 0.7) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; } else if (progress >= 0.4) { return,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+Unknown,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+${race.maxParticipants ?? 0},Create Race Controller (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Not scheduled,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Race ID,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+; endAddress.value =,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+; routeDistance.value =,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+; // Reset to defaults raceType.value =,Create Race Controller (Race Management),String Literal
+; totalParticipants.value = 10; participantLimit.value = 2; raceStoppingTime.value =,Create Race Controller (Race Management),String Literal
+; genderPref.value =,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+; selectedDateTime.value = DateTime.now().add(Duration(minutes: 30)); // Reset coordinates to Delhi startLat?.value = 28.6139; startLng?.value = 77.2090; endLat?.value = 28.6139; endLng?.value = 77.2090; // Reinitialize schedule time _initializeScheduleTime(); // Show encouraging feedback Get.snackbar(,Create Race Controller (Race Management),String Literal
+", ); // Don",Create Race Controller (Race Management),String Literal
+Authentication Error,Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise, Error message"
+Please login to create a race,Create Race Controller (Race Management); Quick Race Controller (Race Management),String Literal
+Location Error,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise, Error message"
+Unable to get location coordinates. Please try selecting locations again.,Create Race Controller (Race Management),String Literal
+No limit,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+", distance: 0.0, remainingDistance: distance, rank: 1, steps: 0, status:",Create Race Controller (Race Management),String Literal
+) { formattedScheduleTimeDisplay =,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+; actualScheduleTime = null; // Solo races don,Create Race Controller (Race Management),String Literal
+Open-ended,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+t have a schedule time } else { final dateTime = selectedDateTime.value; formattedScheduleTimeDisplay = DateFormat(,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+? 1 : raceType.value ==,Create Race Controller (Race Management),String Literal
+? 2 : raceType.value ==,Create Race Controller (Race Management),String Literal
+? 1 : finalGenderPref ==,Create Race Controller (Race Management),String Literal
+) { // Marathon: No time limit (set to a very high value like 999 days) durationMins = 999 * 24 * 60; // 999 days in minutes durationHrs = 999 * 24; // 999 days in hours } else if (finalRaceStoppingTime.contains(,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+")) { // Parse minutes (e.g.,",Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+")[0]) ?? 5; durationHrs = 1; // Keep for backward compatibility, but durationMins is preferred } else if (finalRaceStoppingTime.contains(",Create Race Controller (Race Management),String Literal
+")) { // Parse hours and convert to minutes (e.g.,",Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+", totalDistance: distance, statusId: formattedScheduleTimeDisplay.isNotEmpty ? 1 : 0, // statusId: 1 = Scheduled (has schedule time), statusId: 0 = Created (no schedule) status: formattedScheduleTimeDisplay.isNotEmpty ?",Create Race Controller (Race Management),"String Literal, Question"
+": FieldValue.serverTimestamp(), }; // ✅ FIX: Store actual Timestamp for auto-start to work correctly if (actualScheduleTime != null) { updateData[",Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+New Race,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Race created with ID: $raceId,Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+Creator auto-joined as participant with comprehensive data structure,Create Race Controller (Race Management),String Literal
+🎯 Awarding XP to race creator: ${currentUser.uid},Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+Race,Create Race Controller (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+✅ Awarded XP to race creator (create + join + first race bonus if applicable),Create Race Controller (Race Management),String Literal
+⚠️ Failed to award XP to creator: $e,Create Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+Stack trace: $stackTrace,Create Race Controller (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+"t block race creation if XP fails } // Navigate based on race type _handleDirectNavigation(race, raceId); } catch (e) { SnackbarUtils.showError(",Create Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+", ); log(",Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Please enter race title,Create Race Controller (Race Management),String Literal
+Validation Error,Create Race Controller (Race Management),"String Literal, Likely button label - keep concise, Error message"
+Please choose race type,Create Race Controller (Race Management),String Literal
+Please schedule the race time,Create Race Controller (Race Management),String Literal
+Notified homepage of race creation - updating active race count,Create Race Controller (Race Management),String Literal
+"]!, ); if (placemarks.isNotEmpty) { final placemark = placemarks.first; final address =",Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+) .replaceAll(RegExp(r,Create Race Controller (Race Management); Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+", ); // Show suggestion feedback } } catch (e) { log(",Create Race Controller (Race Management),"String Literal, Contains variable placeholder"
+": lat2 * 180 / dart_math.pi,",Create Race Controller (Race Management),String Literal
+Getting your location...,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Location permission denied,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Permission Denied,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Please enable location permissions to create quick races,Quick Race Controller (Race Management),String Literal
+Location Disabled,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+${placemark.locality ??,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Question, Likely button label - keep concise"
+); currentAddress.value = address.trim().isNotEmpty ? address.trim() :,Quick Race Controller (Race Management),String Literal
+; } else { currentAddress.value =,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+"; } // Set default selected start location to current location selectedStartLocation.value = QuickRaceStartLocation.fromCurrentLocation( address: currentAddress.value, latitude: position.latitude, longitude: position.longitude, ); log(",Quick Race Controller (Race Management),String Literal
+); } catch (e) { log(,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+); currentAddress.value =,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+; SnackbarUtils.showError(,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise, Error message"
+": location.latitude,",Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+": location.longitude, }; } // Fallback to current location return {",Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+": currentLat.value ?? 0.0,",Quick Race Controller (Race Management),String Literal
+) { return,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+) .where(,Quick Race Controller (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+", isEqualTo: 5) // Quick Race .where(",Quick Race Controller (Race Management),String Literal
+", isEqualTo: selectedParticipants.value) .where(",Quick Race Controller (Race Management),String Literal
+", isEqualTo: selectedDistance.value) .where(",Quick Race Controller (Race Management),String Literal
+", isGreaterThan: Timestamp.fromDate(cutoffTime)) .orderBy(",Quick Race Controller (Race Management),String Literal
+", descending: false) // Join oldest first .limit(3) // Get top 3 to try in case first is full .get(); if (matchingRaces.docs.isEmpty) { log(",Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+); return null; } if (statusId != 0 && statusId != 3) { log(,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+); return null; } // Check participant doesn,Quick Race Controller (Race Management),String Literal
+⚠️ User already in race ${raceDoc.id},Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+user_profiles,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+User,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+joined,Quick Race Controller (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+user_races,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+role,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+participant,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+status,Quick Race Controller (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+✅ Successfully joined race ${raceDoc.id} atomically,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Success message"
+✅ Transaction completed successfully for race ${result.id},Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Success message"
+❌ Transaction failed for race ${raceDoc.id}: $e,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+⚠️ Could not join any matching race,Quick Race Controller (Race Management),String Literal
+❌ Error in find and join matching quick race: $e,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+Location Required,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Please wait while we get your location,Quick Race Controller (Race Management),String Literal
+⏱️ Adding ${delayMs}ms stagger delay to prevent race condition...,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+🔍 Searching for matching quick race with transaction...,Quick Race Controller (Race Management),String Literal
+Matched!,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Joined existing Quick Race with same criteria!,Quick Race Controller (Race Management),String Literal
+🔄 Navigating to waiting room for matched race: ${matchedRace.id},Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+📊 Fresh race data - participants: ${freshRaceData.joinedParticipants}/${freshRaceData.maxParticipants},Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+✅ Navigation to waiting room completed (matched race),Quick Race Controller (Race Management),"String Literal, Success message"
+❌ Navigation error: $navError,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+"📝 No matching race found or all were full, creating new quick race",Quick Race Controller (Race Management),String Literal
+🗺️ Calculating route through nearby POIs...,Quick Race Controller (Race Management),String Literal
+lat,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+lng,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+Destination,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+) .trim(); if (endAddress.isEmpty) endAddress =,Quick Race Controller (Race Management),String Literal
+; } } catch (e) { log(,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+"); } // Create participant for the race creator final creatorParticipant = Participant( userId: currentUser.uid, userName: currentUser.displayName ?? currentUser.email?.split(",Quick Race Controller (Race Management),String Literal
+", distance: 0.0, remainingDistance: selectedDistance.value, rank: 1, steps: 0, status:",Quick Race Controller (Race Management),String Literal
+", raceTypeId: 5, // Quick Race type maxParticipants: selectedParticipants.value, minParticipants: 2, joinedParticipants: 1, // Creator is auto-joined startLat: startCoords[",Quick Race Controller (Race Management),String Literal
+"], startLong: startCoords[",Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+"], startAddress: startAddress, endAddress: endAddress, isPrivate: false, // Always public raceScheduleTime:",Quick Race Controller (Race Management),String Literal
+", totalDistance: selectedDistance.value, statusId: 3, // Active - race starts immediately status:",Quick Race Controller (Race Management),String Literal
+": raceId,",Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+": FieldValue.serverTimestamp(),",Quick Race Controller (Race Management); Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+": FieldValue.serverTimestamp(), // Race starts now",Quick Race Controller (Race Management),String Literal
+": FieldValue.serverTimestamp(), }); // Add participant to race",Quick Race Controller (Race Management),String Literal
+✅ Quick race created with ID: $raceId (statusId: 3 - Active),Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+📍 Start: $startAddress,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+🏁 End: $endAddress,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+📏 Distance: ${selectedDistance.value} km,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+👥 Max participants: ${selectedParticipants.value},Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+poi,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise"
+); } SnackbarUtils.showSuccess(,Quick Race Controller (Race Management),"String Literal, Likely button label - keep concise, Success message"
+); } catch (navError) { log(,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+); rethrow; } } catch (e) { SnackbarUtils.showError(,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+🎯 Routing through POI: ${poi.displayName},Quick Race Controller (Race Management),"String Literal, Contains variable placeholder"
+"⚠️ No POI found, using random bearing",Quick Race Controller (Race Management),String Literal
+❌ Error finding POI: $e,Quick Race Controller (Race Management),"String Literal, Contains variable placeholder, Error message"
+Quick Race $raceTypeLabel,Quick Race Service (Race Management),"AppBar Title, Contains variable placeholder, Likely button label - keep concise"
+message,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+User not authenticated. Please login first.,Quick Race Service (Race Management),String Literal
+Invalid participant count. Must be between 2-8 players.,Quick Race Service (Race Management),"String Literal, Error message"
+", isEqualTo: participantCount) .where(",Quick Race Service (Race Management),String Literal
+", isEqualTo:",Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+": false,",Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+You are already in this race!,Quick Race Service (Race Management),String Literal
+quick_races,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+waiting,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+Joined existing quick race!,Quick Race Service (Race Management),String Literal
+Created new quick race! Waiting for ${participantCount - 1} more players.,Quick Race Service (Race Management),"String Literal, Contains variable placeholder"
+Failed to join quick race: $e,Quick Race Service (Race Management),"String Literal, Contains variable placeholder, Error message"
+1v3,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+1v5,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+1v7,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+", createdTime: now, raceType:",Quick Race Service (Race Management),String Literal
+] ?? userProfile[,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+) .doc(userId) .set({,Quick Race Service (Race Management),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+": userId,",Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+": displayName, // Changed from",Quick Race Service (Race Management),String Literal
+": currentPosition?.latitude ?? 0.0,",Quick Race Service (Race Management),String Literal
+": currentPosition?.longitude ?? 0.0,",Quick Race Service (Race Management),String Literal
+rank,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+progress,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+active,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+Quick race started!,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+Failed to start race: $e,Quick Race Service (Race Management),"String Literal, Contains variable placeholder, Error message"
+", arrayContains: currentUserId) .where(",Quick Race Service (Race Management),String Literal
+", whereIn: [",Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+Race not found,Quick Race Service (Race Management),"String Literal, Likely button label - keep concise"
+You are not in this race,Quick Race Service (Race Management),String Literal
+Left quick race successfully,Quick Race Service (Race Management),"String Literal, Success message"
+Failed to leave race: $e,Quick Race Service (Race Management),"String Literal, Contains variable placeholder, Error message"

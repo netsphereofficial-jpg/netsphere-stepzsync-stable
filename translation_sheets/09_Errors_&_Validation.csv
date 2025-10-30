@@ -1,0 +1,43 @@
+﻿English Text,Screen/Context,Notes
+Please enter your email address,App Constants (Errors & Validation),String Literal
+Please enter a valid email address,App Constants (Errors & Validation),String Literal
+Please enter your password,App Constants (Errors & Validation),String Literal
+Password must be at least 6 characters,App Constants (Errors & Validation),String Literal
+Please enter your mobile number,App Constants (Errors & Validation),String Literal
+Mobile number must be at least 10 digits,App Constants (Errors & Validation),String Literal
+Login successful,App Constants (Errors & Validation),"String Literal, Likely button label - keep concise, Success message"
+Account created successfully,App Constants (Errors & Validation),"String Literal, Likely button label - keep concise, Success message"
+Password reset email sent,App Constants (Errors & Validation),String Literal
+Poppins,Text Styles (Errors & Validation),"String Literal, Likely button label - keep concise"
+Nunito,Text Styles (Errors & Validation),"String Literal, Likely button label - keep concise"
+dart:developer,Race Validation Utils (Errors & Validation),"String Literal, Likely button label - keep concise"
+Negative step delta: $delta steps (pedometer reset?),Race Validation Utils (Errors & Validation),"String Literal, Contains variable placeholder"
+", suggestedFix:",Race Validation Utils (Errors & Validation),"String Literal, Likely button label - keep concise"
+Possible data corruption or teleportation detected,Race Validation Utils (Errors & Validation),String Literal
+⚠️ [VALIDATION] Issues detected for race: ${raceTitle ??,Race Validation Utils (Errors & Validation),"String Literal, Contains variable placeholder, Question"
+); for (final result in results) { dev.log(,Race Validation Utils (Errors & Validation),"String Literal, Contains variable placeholder"
+} ${result.message},Race Validation Utils (Errors & Validation),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+→ ${result.suggestedFix},Race Validation Utils (Errors & Validation),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+ValidationResult(${level.name.toUpperCase()}: $message${suggestedFix != null ?,Race Validation Utils (Errors & Validation),"String Literal, Contains variable placeholder, Question"
+user_steps,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+daily_steps,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+users,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+step_summary,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Step Tracking,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+StepzSync is tracking your steps,Step Constants (Errors & Validation),String Literal
+Tracking in progress...,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+health,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+notification,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+healthkit,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+pedometer,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+merged,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Required permissions not granted,Step Constants (Errors & Validation),String Literal
+HealthKit not available on this device,Step Constants (Errors & Validation),String Literal
+Pedometer not available on this device,Step Constants (Errors & Validation),String Literal
+Today,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Yesterday,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Last 7 days,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Last 30 days,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Last 60 days,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+Last 90 days,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"
+All time,Step Constants (Errors & Validation),"String Literal, Likely button label - keep concise"

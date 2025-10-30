@@ -1,0 +1,140 @@
+﻿English Text,Screen/Context,Notes
+Unlock $featureName,Guest Upgrade Dialog (Dialogs & Popups),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Create a free account to unlock:,Guest Upgrade Dialog (Dialogs & Popups),Text Widget
+Your progress will be saved!,Guest Upgrade Dialog (Dialogs & Popups),Text Widget
+Maybe Later,Guest Upgrade Dialog (Dialogs & Popups); Premium Purchase Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Sign Up Free,Guest Upgrade Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+🏆 Global Leaderboard Rankings,Guest Upgrade Dialog (Dialogs & Popups),String Literal
+💬 Chat with Friends,Guest Upgrade Dialog (Dialogs & Popups),String Literal
+🏁 Create Custom Races,Guest Upgrade Dialog (Dialogs & Popups),String Literal
+📨 Send & Receive Race Invites,Guest Upgrade Dialog (Dialogs & Popups),String Literal
+🎖️ Achievements & Badges,Guest Upgrade Dialog (Dialogs & Popups),String Literal
+🔔 Real-time Notifications,Guest Upgrade Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Returning to home...,Race Completion Celebration Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Your Performance,Race Completion Celebration Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+YOU FINISHED 1ST PLACE!,Race Completion Celebration Dialog (Dialogs & Popups),Text Widget
+Distance,Race Completion Celebration Dialog (Dialogs & Popups); Race Summary Dialog (Dialogs & Popups),Form Input
+Calories,Race Completion Celebration Dialog (Dialogs & Popups),Form Input
+Avg Speed,Race Completion Celebration Dialog (Dialogs & Popups),Form Input
+; backgroundColor = Color(0xFFFFD700); // Gold break; case 2: emoji =,Race Completion Celebration Dialog (Dialogs & Popups),String Literal
+; backgroundColor = Color(0xFFC0C0C0); // Silver break; case 3: emoji =,Race Completion Celebration Dialog (Dialogs & Popups),String Literal
+; backgroundColor = Color(0xFFCD7F32); // Bronze break; default: emoji =,Race Completion Celebration Dialog (Dialogs & Popups),String Literal
+", value:",Race Completion Celebration Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+; case 2: return,Race Completion Celebration Dialog (Dialogs & Popups),String Literal
+; case 3: return,Race Completion Celebration Dialog (Dialogs & Popups),String Literal
+; default: return,Race Completion Celebration Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+; } switch (number % 10) { case 1: return,Race Completion Celebration Dialog (Dialogs & Popups),"String Literal, Contains variable placeholder"
+Race Summary,Race Summary Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Please review your race details before creating,Race Summary Dialog (Dialogs & Popups),Text Widget
+Cancel,Race Summary Dialog (Dialogs & Popups); Health Permission Handler Dialog (Dialogs & Popups); Logout Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Create,Race Summary Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+$label:,Race Summary Dialog (Dialogs & Popups),"Text Widget, Contains variable placeholder, Likely button label - keep concise"
+Race Title,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Type,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Solo,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Participants,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Min. Participants,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Duration,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Schedule,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Gender Preference,Race Summary Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Health Connect Required,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Install,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Enable in Settings,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+You\,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+For Samsung devices:,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+1. Connect Samsung Health to Health Connect,Health Permission Handler Dialog (Dialogs & Popups),Text Widget
+2. Open Health Connect settings,Health Permission Handler Dialog (Dialogs & Popups),Text Widget
+3. Enable StepzSync permissions,Health Permission Handler Dialog (Dialogs & Popups),Text Widget
+1. Open Health Connect app,Health Permission Handler Dialog (Dialogs & Popups),Text Widget
+2. Go to App permissions,Health Permission Handler Dialog (Dialogs & Popups),Text Widget
+3. Find StepzSync,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+4. Enable all data types,Health Permission Handler Dialog (Dialogs & Popups),Text Widget
+Open Samsung Health,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Open Settings,Health Permission Handler Dialog (Dialogs & Popups); Pedometer Permission Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Setup Instructions,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Close,Health Permission Handler Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Unknown error occurred,Health Permission Handler Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise, Error message"
+", style: Get.textTheme.bodyMedium, ), const SizedBox(height: 16), if (validation.hasSamsungHealth) ...[ Text(",Health Permission Handler Dialog (Dialogs & Popups),String Literal
+", style: Get.textTheme.titleSmall?.copyWith( fontWeight: FontWeight.bold, ), ), const SizedBox(height: 8), const Text(",Health Permission Handler Dialog (Dialogs & Popups),String Literal
+"), const Text(",Health Permission Handler Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+"), ] else ...[ const Text(",Health Permission Handler Dialog (Dialogs & Popups),String Literal
+"), ], ], ), actions: [ TextButton( onPressed: () => Get.back(), child: const Text(",Health Permission Handler Dialog (Dialogs & Popups),String Literal
+", icon: const Icon(Icons.settings), snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 4), mainButton: TextButton( onPressed: () => _helper.openHealthSettings(), child: const Text(",Health Permission Handler Dialog (Dialogs & Popups),String Literal
+", validation.hasSamsungHealth ?",Health Permission Handler Dialog (Dialogs & Popups),"String Literal, Question, Likely button label - keep concise"
+", icon: const Icon(Icons.block), snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 4), mainButton: validation.hasSamsungHealth ? TextButton( onPressed: () => _helper.openSamsungHealthApp(), child: const Text(",Health Permission Handler Dialog (Dialogs & Popups),String Literal
+Continue Anyway,Health Sync Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+dart:ui,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Connecting,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Syncing Data,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Updating Stats,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Sync Complete!,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise, Success message"
+Sync Failed,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise, Error message"
+Permission Required,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Not Available,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Fetching your fitness data from Health Connect...,Health Sync Dialog (Dialogs & Popups),String Literal
+Calculating your statistics...,Health Sync Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Your data has been synced successfully!,Health Sync Dialog (Dialogs & Popups),"String Literal, Success message"
+Failed to sync. Using pedometer data instead.,Health Sync Dialog (Dialogs & Popups),"String Literal, Error message"
+Please grant health permissions to sync data.,Health Sync Dialog (Dialogs & Popups),String Literal
+Health Sync Setup,Samsung Health Onboarding Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Connect your fitness data for seamless tracking,Samsung Health Onboarding Dialog (Dialogs & Popups),Text Widget
+This is a one-time setup required by Android for privacy and security.,Samsung Health Onboarding Dialog (Dialogs & Popups),Text Widget
+Skip for Now,Samsung Health Onboarding Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Continue,Samsung Health Onboarding Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Connect Samsung Health,Samsung Health Onboarding Dialog (Dialogs & Popups),"AppBar Title, Likely button label - keep concise"
+Enable Settings,Samsung Health Onboarding Dialog (Dialogs & Popups),"AppBar Title, Likely button label - keep concise"
+Grant Permissions,Samsung Health Onboarding Dialog (Dialogs & Popups),"AppBar Title, Likely button label - keep concise"
+", title:",Samsung Health Onboarding Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+", description:",Samsung Health Onboarding Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+", icon: Icons.phone_android, actionText:",Samsung Health Onboarding Dialog (Dialogs & Popups),String Literal
+", style: Theme.of(context).textTheme.bodySmall?.copyWith( color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8), ), ), ), ], ), ), const SizedBox(height: 24), // Buttons Row( children: [ Expanded( child: OutlinedButton( onPressed: () { Get.back(result: false); onSkip?.call(); }, style: OutlinedButton.styleFrom( padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(12), ), ), child: const Text(",Samsung Health Onboarding Dialog (Dialogs & Popups),"String Literal, Contains variable placeholder"
+Your steps are still being tracked locally! Connect to sync your progress.,No Internet Dialog (Dialogs & Popups),Text Widget
+Offline Mode Active,No Internet Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Continue Offline,No Internet Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Retry,No Internet Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Connected!,No Internet Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Still Offline,No Internet Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Motion & Fitness Required,Pedometer Permission Dialog (Dialogs & Popups),Text Widget
+Grant Permission,Pedometer Permission Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Physical Activity Required,Pedometer Permission Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+This permission is required for the app to function properly.,Pedometer Permission Dialog (Dialogs & Popups),Text Widget
+dart:io,Pedometer Permission Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+"📱 Permission dialog already showing, skipping duplicate",Pedometer Permission Dialog (Dialogs & Popups),String Literal
+🚨 Showing pedometer permission dialog (permanently denied: $isPermanentlyDenied),Pedometer Permission Dialog (Dialogs & Popups),"String Literal, Contains variable placeholder"
+✅ Permission dialog dismissed,Pedometer Permission Dialog (Dialogs & Popups),String Literal
+StepzSync needs access to Motion & Fitness to track your steps accurately. Please enable it in Settings → StepzSync → Motion & Fitness.,Pedometer Permission Dialog (Dialogs & Popups),String Literal
+StepzSync tracks your daily steps using your device\,Pedometer Permission Dialog (Dialogs & Popups),String Literal
+", style: TextStyle(fontSize: 13), ), ], ), actions: [ if (isPermanentlyDenied) CupertinoDialogAction( child: Text(",Pedometer Permission Dialog (Dialogs & Popups),String Literal
+"StepzSync needs permission to access your physical activity data to track your steps. To continue using the app, please:",Pedometer Permission Dialog (Dialogs & Popups),String Literal
+Physical activity,Pedometer Permission Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+", ), ] else ...[ SizedBox(height: 12), Container( padding: EdgeInsets.all(12), decoration: BoxDecoration( color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.blue.withOpacity(0.2)), ), child: Row( children: [ Icon(Icons.info_outline, color: Colors.blue, size: 20), SizedBox(width: 8), Expanded( child: Text(",Pedometer Permission Dialog (Dialogs & Popups),String Literal
+Create Account,Logout Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Logout Anyway,Logout Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Logout,Logout Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+⚠️ Warning: Data Will Be Lost!,Logout Dialog (Dialogs & Popups),String Literal
+Logout Confirmation,Logout Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+"As a guest user, logging out will permanently delete all your progress (races, XP, stats). Create an account to save your data before logging out.",Logout Dialog (Dialogs & Popups),String Literal
+Are you sure you want to logout from your account? You will need to sign in again to access your data.,Logout Dialog (Dialogs & Popups),String Literal
+Christmas Special,Premium Purchase Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Ends in $_daysRemaining days ⏰,Premium Purchase Dialog (Dialogs & Popups),"Text Widget, Contains variable placeholder"
+LIFETIME • ONE-TIME,Premium Purchase Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+Claim Christmas Offer,Premium Purchase Dialog (Dialogs & Popups),"Text Widget, Likely button label - keep concise"
+", style: TextStyle(fontSize: 16)), ), ), Positioned( top: 15, right: 25, child: Opacity( opacity: 0.5, child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: TextStyle(fontSize: 12)), ), ), Positioned( top: 35, right: 45, child: Opacity( opacity: 0.7, child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: TextStyle(fontSize: 14)), ), ), Positioned( top: 30, left: 45, child: Opacity( opacity: 0.6, child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: TextStyle(fontSize: 12)), ), ), // Main content Padding( padding: EdgeInsets.fromLTRB(24, 28, 24, 20), child: Column( children: [ // Christmas tree with glow effect Container( padding: EdgeInsets.all(14), decoration: BoxDecoration( color: Colors.white.withValues(alpha: 0.25), shape: BoxShape.circle, boxShadow: [ BoxShadow( color: Colors.white.withValues(alpha: 0.3), blurRadius: 12, spreadRadius: 2, ), ], ), child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: TextStyle(fontSize: 36), ), ), SizedBox(height: 14), Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.8, shadows: [ Shadow( color: Colors.black.withValues(alpha: 0.2), offset: Offset(0, 2), blurRadius: 4, ), ], ), ), SizedBox(height: 6), Container( padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6), decoration: BoxDecoration( color: Color(0xFFFFD700), borderRadius: BorderRadius.circular(14), boxShadow: [ BoxShadow( color: Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 8, offset: Offset(0, 2), ), ], ), child: Row( mainAxisSize: MainAxisSize.min, children: [ Icon(Icons.timer_outlined, size: 15, color: Color(0xFFDC143C)), SizedBox(width: 6), Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 12, color: Color(0xFFDC143C), fontWeight: FontWeight.w800, ), ), ], ), ), ], ), ), ], ), ), // Content with better spacing Padding( padding: EdgeInsets.fromLTRB(24, 24, 24, 24), child: Column( children: [ // Pricing Section with better layout Stack( children: [ Column( children: [ // Original price Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey[400], decoration: TextDecoration.lineThrough, decorationThickness: 3, decorationColor: Color(0xFFDC143C), ), ), SizedBox(height: 2), // New price Row( mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [ Padding( padding: EdgeInsets.only(top: 8), child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF16A34A), ), ), ), Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 64, fontWeight: FontWeight.w900, color: Color(0xFF16A34A), height: 0.85, letterSpacing: -2, ), ), ], ), SizedBox(height: 8), // Lifetime badge with better shadow Container( padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration( gradient: LinearGradient( colors: [Color(0xFF16A34A), Color(0xFF15803D)], ), borderRadius: BorderRadius.circular(24), boxShadow: [ BoxShadow( color: Color(0xFF16A34A).withValues(alpha: 0.4), blurRadius: 12, offset: Offset(0, 4), ), ], ), child: Row( mainAxisSize: MainAxisSize.min, children: [ Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: TextStyle(fontSize: 14), ), SizedBox(width: 6), Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.8, ), ), ], ), ), ], ), // 50% OFF badge - better positioned Positioned( top: -4, right: 0, child: Container( padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration( gradient: LinearGradient( colors: [Color(0xFFDC143C), Color(0xFFB91C1C)], ), borderRadius: BorderRadius.circular(10), boxShadow: [ BoxShadow( color: Color(0xFFDC143C).withValues(alpha: 0.4), blurRadius: 8, offset: Offset(0, 2), ), ], ), child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+Global Races Worldwide,Premium Purchase Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Advanced Leaderboards,Premium Purchase Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Performance Analytics,Premium Purchase Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Marathon Events,Premium Purchase Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+Ad-Free Forever,Premium Purchase Dialog (Dialogs & Popups),"String Literal, Likely button label - keep concise"
+", style: TextStyle(fontSize: 22), ), SizedBox(width: 10), Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal
+", style: GoogleFonts.poppins( fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.3, ), ), ], ), ), ), SizedBox(height: 10), // Maybe Later button TextButton( onPressed: () => Get.back(), style: TextButton.styleFrom( padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16), ), child: Text(",Premium Purchase Dialog (Dialogs & Popups),String Literal

@@ -1,0 +1,124 @@
+﻿English Text,Screen/Context,Notes
+No Joined Races,Active Races Screen (Active Races),"Text Widget, Likely button label - keep concise"
+You haven\,Active Races Screen (Active Races),"Text Widget, Likely button label - keep concise"
+Browse Races,Active Races Screen (Active Races),"Text Widget, Likely button label - keep concise"
+My Races,Active Races Screen (Active Races),"AppBar Title, Likely button label - keep concise"
+", userName:",Active Races Screen (Active Races); Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", style: GoogleFonts.poppins( fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87, ), ), SizedBox(height: 12), Padding( padding: EdgeInsets.symmetric(horizontal: 40), child: Text(",Active Races Screen (Active Races),String Literal
+t joined any races yet. Browse available races and join one to see it here!,Active Races Screen (Active Races),String Literal
+Start,Race Map Controller (Active Races),"AppBar Title, Likely button label - keep concise"
+Finish,Race Map Controller (Active Races),"AppBar Title, Likely button label - keep concise"
+$percentage% Milestone,Race Map Controller (Active Races),"AppBar Title, Contains variable placeholder, Likely button label - keep concise"
+Race Started! 🏁,Race Map Controller (Active Races),"AppBar Title, Likely button label - keep concise"
+Congratulations! 🏆,Race Map Controller (Active Races),"AppBar Title, Likely button label - keep concise"
+First Finisher! 🏆,Race Map Controller (Active Races),"AppBar Title, Likely button label - keep concise"
+Race Finished! $rankEmoji,Race Map Controller (Active Races),"AppBar Title, Contains variable placeholder, Likely button label - keep concise"
+Position Change! $icon,Race Map Controller (Active Races),"AppBar Title, Contains variable placeholder, Likely button label - keep concise"
+dart:developer,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+dart:math,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+dart:ui,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+dart:typed_data,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+); } } // Don,Race Map Controller (Active Races),String Literal
+; return formatted; } else { return,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+"; } } else { // Calculate remaining time until deadline final utcTime = DateTime.parse(time!); final localTime = utcTime.toLocal(); final diff = localTime.difference(now); // Deadline - Now = remaining time // If deadline has passed, return 00:00:00 if (diff.isNegative) { return",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+; } final hours = diff.inHours; final minutes = diff.inMinutes % 60; final seconds = diff.inSeconds % 60; final formatted =,Race Map Controller (Active Races),String Literal
+); } final currentStatus = raceDoc.data()?[,Race Map Controller (Active Races),String Literal
+"] ?? 0; // Only transition from ending (6) to completed (4) if (currentStatus == 6) { transaction.update(raceRef, {",Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Success message"
+completed,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise, Success message"
+✅ Race transitioned to completed via transaction,Race Map Controller (Active Races),"String Literal, Success message"
+"⚠️ Race status is $currentStatus, not ending (6) - skipping completion",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+❌ Error completing race: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+❌ Error starting ending countdown: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+🎯 Race status changed to: $newStatus,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+t created // because the race wasn,Race Map Controller (Active Races),String Literal
+Stack trace: $stackTrace,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+Race completed! Remaining distance: ${remainingDistance}km,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Success message"
+Error,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise, Error message"
+⏸️ Race not active yet (status ${raceStatus.value}) - markers will be created when race starts,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+"), position: start, icon: startDot, anchor: Offset(0.5, 0.5), // Center the dot infoWindow: InfoWindow( title:",Race Map Controller (Active Races),String Literal
+", snippet:",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", ), ), Marker( markerId: const MarkerId(",Race Map Controller (Active Races),String Literal
+"), position: end, icon: flagIcon, infoWindow: InfoWindow( title:",Race Map Controller (Active Races),String Literal
+"), position: position, icon: icon, anchor: Offset(0.5, 0.5), // Center the dot // Lower z-index to render milestone markers below participant markers infoWindow: InfoWindow( title:",Race Map Controller (Active Races),String Literal
+); final url =,Race Map Controller (Active Races),String Literal
+💾 [CACHE SAVED] Route cached for 24 hours,Race Map Controller (Active Races),String Literal
+❌ Route fetch failed: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+route,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+⚡ [SHIMMER] Route ready (state: 2),Race Map Controller (Active Races),String Literal
+⚠️ Rejecting backwards movement for $userId: ${distance}m < ${previousDistance}m,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+Unknown,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+You - $displayName,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Likely button label - keep concise"
+; final currentUserState = isCurrentUser ?,Race Map Controller (Active Races),"String Literal, Question"
+; final cacheKey =,Race Map Controller (Active Races),String Literal
+"); } // Calculate marker position final position = getPositionAtDistance(polylineCoordinates, raceProgress); // Create marker final marker = Marker( markerId: MarkerId(participant.userId), position: position, icon: icon, infoWindow: InfoWindow( title: isCurrentUser ?",Race Map Controller (Active Races),"String Literal, Question"
+": participant.userName, snippet:",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+❌ Error updating marker for ${participant.userId}: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+✅ Updated ${newMarkers.length} markers,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+⚡ [SHIMMER] Markers ready (state: 3),Race Map Controller (Active Races),String Literal
+⚡ Fully loaded (state: 4),Race Map Controller (Active Races),String Literal
+"🎨 Generating marker for $userName: size=${size}px, isCurrentUser=$isCurrentUser",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+Failed to load profile image for $userName: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+Image loading timeout,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+Failed to draw profile image: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+; final parts = userName.trim().split(,Race Map Controller (Active Races),String Literal
+🔄 Processing participant update: ${newParticipants.length} participants,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+"⚠️ Participant ${participant.userId} has empty name, fetching from profile...",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+✅ Fetched name for ${participant.userId}: ${updatedParticipant.userName},Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+); } } /// Calculate ranks locally based on distance (real-time ranking for UI) /// This doesn,Race Map Controller (Active Races),String Literal
+📊 Calculating local ranks:,Race Map Controller (Active Races),String Literal
+${newRank}. ${participant.userName}: ${participant.distance}km (rank: ${participant.rank} → $newRank),Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+🏁 Race is already active - checking if step tracking should start,Race Map Controller (Active Races),String Literal
+❌ No current user ID for defensive step tracking check,Race Map Controller (Active Races),String Literal
+🔄 Processing participant changes for ${newParticipant.userName}: rank $previousRank → $currentRank,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+🎯 Rank change detected for ${newParticipant.userName}: $previousRank → $currentRank,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+s an improvement (overtaking) if (currentRank < previousRank) { // This participant moved up in rank (overtook someone) final overtakingUserName = newParticipant.userName ??,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Question"
+; log(,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", distance: 0, remainingDistance: 0, rank: 0, steps: 0), ); if (overtakenParticipant.userId.isNotEmpty) { log(",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+); } } else if (previousRank == null) { log(,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+", milestonePercent: milestone, ); log(",Race Map Controller (Active Races),String Literal
+); } } catch (e) { log(,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+); log(,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+); if (currentUserId == null || raceData.participants == null) { log(,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+", message:",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", notificationType:",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", category:",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", icon:",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", raceId: raceData.id, raceName: raceData.title, ); log(",Race Map Controller (Active Races),String Literal
+); } else { log(,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+); } } else { log(,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+", raceId: raceData.id, raceName: raceData.title, userName: userName, metadata: {",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+": userId,",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+": durationText, }, ); log(",Race Map Controller (Active Races),String Literal
+; message =,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+; } else if (finalRank == 2) { rankEmoji =,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+; } else if (finalRank == 3) { rankEmoji =,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+; } else { rankEmoji =,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+", message: message, notificationType:",Race Map Controller (Active Races),String Literal
+", icon: rankEmoji, raceId: raceData.id, raceName: raceData.title, userName: userName, metadata: {",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+": finalRank}, ); log(",Race Map Controller (Active Races),String Literal
+$userName moved up to rank #$newRank! 📈,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+; notificationType =,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+; } else { // Position dropped message =,Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+; icon =,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+", message: message, notificationType: notificationType, category:",Race Map Controller (Active Races),String Literal
+", icon: icon, raceId: raceData.id, raceName: raceData.title, userName: userName, metadata: {",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+": previousRank,",Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+": newRank, }, ); log(",Race Map Controller (Active Races),String Literal
+👑 Leader change detected: $newLeaderName is now leading (server will send notifications),Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+"⏭️ Race not active (status: ${race.statusId}), skipping bot simulation restart",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+races,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+participants,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+bot_,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+Hannah,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+Justin,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+Julia,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+Marcus,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+Emily,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+David,Race Map Controller (Active Races),"String Literal, Likely button label - keep concise"
+🤖 Restarting bot simulation for race ${race.id} (found $botCount bots),Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+✅ Bot simulation restarted successfully,Race Map Controller (Active Races),"String Literal, Success message"
+"ℹ️ No bots found in race (${participants.length} total participants), skipping bot simulation",Race Map Controller (Active Races),"String Literal, Contains variable placeholder"
+❌ Error restarting bot simulation: $e,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Error message"
+); final startTime = DateTime.now(); // Generate placeholder icons for ranks 1-10 in parallel // We,Race Map Controller (Active Races),String Literal
+); // ✅ SAFETY: Failure doesn,Race Map Controller (Active Races),String Literal
+$rank,Race Map Controller (Active Races),"String Literal, Contains variable placeholder, Likely button label - keep concise"

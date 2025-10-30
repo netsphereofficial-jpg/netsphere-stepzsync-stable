@@ -10,8 +10,6 @@ import '../screens/race_invites/race_invites_screen.dart';
 import '../screens/race_map/race_map_screen.dart';
 import '../screens/races/marathon_races_screen.dart';
 import '../screens/races/quick_race/quick_race_selection_screen.dart';
-import '../screens/admin/admin_login_screen.dart';
-import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/subscription/subscription_screen.dart';
 
 class AppRoutes {
@@ -87,18 +85,6 @@ class AppRoutes {
         Get.lazyPut(() => NotificationController(), fenix: true);
       }),
       transition: Transition.rightToLeft,
-      transitionDuration: const Duration(milliseconds: 300),
-    ),
-    GetPage(
-      name: adminLogin,
-      page: () => const AdminLoginScreen(),
-      transition: Transition.fadeIn,
-      transitionDuration: const Duration(milliseconds: 300),
-    ),
-    GetPage(
-      name: adminDashboard,
-      page: () => const AdminDashboardScreen(),
-      transition: Transition.fadeIn,
       transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
