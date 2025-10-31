@@ -1897,7 +1897,7 @@ class MapController extends GetxController with WidgetsBindingObserver {
       // Update current user's race data if found
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
       if (currentUserId != null) {
-        final myParticipant = participantsWithRanks.firstWhereOrNull(
+        final myParticipant = participantsWithNames.firstWhereOrNull(
           (p) => p.userId == currentUserId,
         );
 
@@ -1906,7 +1906,7 @@ class MapController extends GetxController with WidgetsBindingObserver {
         }
       }
 
-      print('✅ Successfully processed ${participantsWithRanks.length} participants');
+      print('✅ Successfully processed ${participantsWithNames.length} participants');
     } catch (e) {
       print('❌ Error processing participant update: $e');
     }
