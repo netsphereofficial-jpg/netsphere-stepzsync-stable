@@ -708,7 +708,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             cappedDistanceDelta,
             cappedCaloriesDelta,
             raceData.totalDistance || 0,
-            raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
+            raceData.actualStartTime || raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
           );
 
           // Update baseline with capped values
@@ -729,7 +729,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             distanceDelta,
             caloriesDelta,
             raceData.totalDistance || 0,
-            raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
+            raceData.actualStartTime || raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
           );
 
           // 8. Update baseline to new totals (prevent future double-counting)
@@ -760,6 +760,49 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
       } catch (rankError) {
         console.error(`   ⚠️ Failed to update ranks for race ${raceId}: ${rankError}`);
         // Don't fail the whole operation if rank update fails
+      }
+    }
+
+    // 9.5. Check if races should auto-end (all participants completed)
+    console.log('🏁 [HEALTH_SYNC] Checking for race auto-completion...');
+    for (const { raceId, raceData } of userActiveRaces) {
+      try {
+        // Get all participants for this race
+        const allParticipants = await db.collection('races')
+          .doc(raceId)
+          .collection('participants')
+          .get();
+
+        if (allParticipants.empty) {
+          console.log(`   ⚠️ Race ${raceId} has no participants, skipping auto-end check`);
+          continue;
+        }
+
+        // Check if ALL participants have completed
+        const allCompleted = allParticipants.docs.every(doc => {
+          const data = doc.data();
+          return data.isCompleted === true;
+        });
+
+        if (allCompleted) {
+          console.log(`   🏁 All ${allParticipants.size} participant(s) completed race ${raceId} (${raceData.title || 'Untitled'})`);
+          console.log(`      Auto-ending race...`);
+
+          // Update race to completed status
+          batch.update(db.collection('races').doc(raceId), {
+            statusId: 4, // Completed
+            actualEndTime: admin.firestore.Timestamp.now(),
+            status: 'completed',
+          });
+
+          console.log(`   ✅ Race ${raceId} queued for auto-end`);
+        } else {
+          const completedCount = allParticipants.docs.filter(doc => doc.data().isCompleted === true).length;
+          console.log(`   ⏳ Race ${raceId} still active (${completedCount}/${allParticipants.size} completed)`);
+        }
+      } catch (autoEndError) {
+        console.error(`   ⚠️ Error checking auto-end for race ${raceId}: ${autoEndError}`);
+        // Don't fail the whole operation if auto-end check fails
       }
     }
 
@@ -895,10 +938,10 @@ async function updateParticipant(batch, raceId, userId, participantData, stepsDe
     newDistance = currentDistance; // Don't go backwards
   }
 
-  // Validation: Cap distance at 110% of race total (allow GPS drift)
-  if (raceTotalDistance > 0 && newDistance > raceTotalDistance * 1.1) {
-    console.log(`   ⚠️ Distance exceeds race total, capping: ${newDistance.toFixed(2)}km → ${(raceTotalDistance * 1.1).toFixed(2)}km`);
-    newDistance = raceTotalDistance * 1.1;
+  // Validation: Cap distance at exactly race total (no GPS drift allowance)
+  if (raceTotalDistance > 0 && newDistance > raceTotalDistance) {
+    console.log(`   ⚠️ Distance exceeds race total, capping: ${newDistance.toFixed(2)}km → ${raceTotalDistance.toFixed(2)}km`);
+    newDistance = raceTotalDistance;
   }
 
   // Calculate remaining distance
@@ -920,10 +963,11 @@ async function updateParticipant(batch, raceId, userId, participantData, stepsDe
     }
   } else {
     // Fallback: use participant join time if race start time not available
-    console.log(`   ⚠️ No race start time available, using participant joinedAt as fallback`);
+    console.log(`   ⚠️ No race start time available (actualStartTime/startTime missing), using participant joinedAt as fallback`);
     const fallbackStartTime = participantData.joinedAt?.toDate() || new Date();
     const raceTimeMinutes = (Date.now() - fallbackStartTime.getTime()) / (1000 * 60);
     avgSpeed = raceTimeMinutes > 0 ? (newDistance / raceTimeMinutes) * 60 : 0;
+    console.log(`   📊 Fallback Average Speed: ${newDistance.toFixed(2)}km / ${raceTimeMinutes.toFixed(1)}min * 60 = ${avgSpeed.toFixed(2)} km/h`);
   }
 
   // Check if participant completed
