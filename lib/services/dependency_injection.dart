@@ -81,11 +81,11 @@ class DependencyInjection {
     Get.lazyPut<StepTrackingService>(() => StepTrackingService(), fenix: true);
 
     // Register RaceStepSyncService as lazy permanent singleton
-    // Syncs live pedometer steps to active race participants in real-time
-    // Depends on: PedometerService (must be initialized first)
-    // FIXED: Changed from Get.put to Get.lazyPut to respect dependency order
-    // The service will be initialized when first accessed, after PedometerService is ready
-    Get.lazyPut<RaceStepSyncService>(() => RaceStepSyncService(), fenix: true);
+    // ❌ DISABLED: Old client-side race step sync - now using Cloud Functions
+    // The Cloud Function (syncHealthDataToRaces) handles ALL step distribution server-side
+    // This eliminates baseline bugs, day rollover issues, and race conditions
+    // See: lib/services/race_step_reconciliation_service.dart for new implementation
+    // Get.lazyPut<RaceStepSyncService>(() => RaceStepSyncService(), fenix: true);
 
     // Register HomepageDataService as lazy permanent singleton
     // Will be initialized on first access (dashboard screen)

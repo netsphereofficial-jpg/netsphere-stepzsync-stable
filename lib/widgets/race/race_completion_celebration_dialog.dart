@@ -300,7 +300,7 @@ class _RaceCompletionCelebrationDialogState
                       child: Text(
                         _getCongratulationsText(),
                         style: GoogleFonts.poppins(
-                          fontSize: 32,
+                          fontSize: 24,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                           letterSpacing: 1.2,
@@ -588,7 +588,7 @@ class _RaceCompletionCelebrationDialogState
             Text(
               'YOU FINISHED 1ST PLACE!',
               style: GoogleFonts.poppins(
-                fontSize: 18,
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
                 letterSpacing: 1.0,
@@ -603,7 +603,7 @@ class _RaceCompletionCelebrationDialogState
     return Text(
       _getPositionText(),
       style: GoogleFonts.poppins(
-        fontSize: 20,
+        fontSize: 16,
         fontWeight: FontWeight.w600,
         color: Colors.black87,
       ),

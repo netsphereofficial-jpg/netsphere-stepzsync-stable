@@ -168,6 +168,7 @@ class _CompletedRacesScreenState extends State<CompletedRacesScreen>
   Widget _buildLoadingState() {
     return Column(
       children: [
+        SizedBox(height: 50,),
         Expanded(
           child: ListView.builder(
             itemCount: 5,
@@ -194,6 +195,7 @@ class _CompletedRacesScreenState extends State<CompletedRacesScreen>
       ),
       child: Column(
         children: [
+
           Row(
             children: [
               Container(
@@ -247,6 +249,7 @@ class _CompletedRacesScreenState extends State<CompletedRacesScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+
           Container(
             width: 100,
             height: 100,

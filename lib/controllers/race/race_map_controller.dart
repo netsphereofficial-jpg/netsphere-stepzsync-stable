@@ -1979,15 +1979,18 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
             print('✅ Step service ready for race tracking');
 
-            // Get RaceStepSyncService and start syncing
-            try {
-              final raceStepSyncService = Get.find<RaceStepSyncService>();
-              await raceStepSyncService.initialize();
-              await raceStepSyncService.startSyncing();
-              print('✅ RaceStepSyncService started successfully for race ${raceData.id}');
-            } catch (e) {
-              print('❌ Error starting RaceStepSyncService: $e');
-            }
+            // ❌ DISABLED: Old client-side race step sync - now using Cloud Functions
+            // The Cloud Function (syncHealthDataToRaces) handles ALL step distribution server-side
+            // This eliminates baseline bugs, day rollover issues, and race conditions
+            // See: lib/services/race_step_reconciliation_service.dart for new implementation
+            // try {
+            //   final raceStepSyncService = Get.find<RaceStepSyncService>();
+            //   await raceStepSyncService.initialize();
+            //   await raceStepSyncService.startSyncing();
+            //   print('✅ RaceStepSyncService started successfully for race ${raceData.id}');
+            // } catch (e) {
+            //   print('❌ Error starting RaceStepSyncService: $e');
+            // }
           } catch (e) {
             print('❌ Error starting defensive step tracking: $e');
           }
@@ -2076,15 +2079,18 @@ class MapController extends GetxController with WidgetsBindingObserver {
         if (isParticipant) {
           print('✅ Current user is participant - starting step tracking for race ${raceData.id}');
 
-          // Get RaceStepSyncService and start syncing
-          try {
-            final raceStepSyncService = Get.find<RaceStepSyncService>();
-            await raceStepSyncService.initialize();
-            await raceStepSyncService.startSyncing();
-            print('✅ RaceStepSyncService started successfully for race ${raceData.id}');
-          } catch (e) {
-            print('❌ Error starting RaceStepSyncService: $e');
-          }
+          // ❌ DISABLED: Old client-side race step sync - now using Cloud Functions
+          // The Cloud Function (syncHealthDataToRaces) handles ALL step distribution server-side
+          // This eliminates baseline bugs, day rollover issues, and race conditions
+          // See: lib/services/race_step_reconciliation_service.dart for new implementation
+          // try {
+          //   final raceStepSyncService = Get.find<RaceStepSyncService>();
+          //   await raceStepSyncService.initialize();
+          //   await raceStepSyncService.startSyncing();
+          //   print('✅ RaceStepSyncService started successfully for race ${raceData.id}');
+          // } catch (e) {
+          //   print('❌ Error starting RaceStepSyncService: $e');
+          // }
         } else {
           print('ℹ️ Current user is not a participant (checked ${participants.length} participants) - skipping step tracking');
         }

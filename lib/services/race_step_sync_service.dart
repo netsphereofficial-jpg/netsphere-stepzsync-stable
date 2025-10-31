@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:stepzsync/services/step_tracking_service.dart';
 import 'package:synchronized/synchronized.dart';
 import 'pedometer_service.dart';
 import 'race_service.dart';
@@ -13,17 +14,21 @@ import '../utils/race_validation_utils.dart';
 /// Race Baseline - Dual-layer tracking for robust race step synchronization
 ///
 /// This model uses a two-layer approach:
-/// 1. **Server State** (persistent): Last known steps on Firestore (source of truth)
-/// 2. **Session Steps** (volatile): Steps accumulated in this race during current app session
+/// 1. **Server State** (persistent): Last known steps/distance/calories on Firestore (source of truth)
+/// 2. **Session State** (volatile): Steps/distance/calories accumulated in this race during current app session
 ///
-/// Formula: totalRaceSteps = serverSteps + sessionRaceSteps
+/// Formula:
+/// - totalRaceSteps = serverSteps + sessionRaceSteps
+/// - totalRaceDistance = serverDistance + sessionRaceDistance
+/// - totalRaceCalories = serverCalories + sessionRaceCalories
 ///
 /// This ensures:
 /// - Races survive app restarts (server state persists)
-/// - Real-time tracking within session (session steps accumulate)
+/// - Real-time tracking within session (session metrics accumulate)
 /// - Multi-day races work correctly
 /// - Independent tracking for multiple simultaneous races
-/// - Survives pedometer resets (session steps track independently)
+/// - Survives pedometer resets (session metrics track independently)
+/// - Consistent distance/calories with home screen (uses HealthKit data)
 class RaceBaseline {
   final String raceId;
   final String raceTitle;
@@ -31,9 +36,17 @@ class RaceBaseline {
 
   // Persistent state (survives app restarts)
   int serverSteps;                       // Last known steps on server (SOURCE OF TRUTH)
+  double serverDistance;                 // Last known distance (km) on server
+  int serverCalories;                    // Last known calories on server
 
   // Session state (resets on app restart, accumulates during session)
   int sessionRaceSteps;                  // Steps walked in THIS RACE during current session
+  double sessionRaceDistance;            // Distance (km) walked in THIS RACE during current session
+  int sessionRaceCalories;               // Calories burned in THIS RACE during current session
+
+  // HealthKit baseline tracking (for delta calculation)
+  double healthKitBaselineDistance;      // HealthKit distance when race started (or last sync)
+  int healthKitBaselineCalories;         // HealthKit calories when race started (or last sync)
 
   // Completion tracking
   bool isCompleted;                      // Whether participant finished this race
@@ -44,7 +57,13 @@ class RaceBaseline {
     required this.raceTitle,
     required this.startTime,
     required this.serverSteps,
+    this.serverDistance = 0.0,
+    this.serverCalories = 0,
     required this.sessionRaceSteps,
+    this.sessionRaceDistance = 0.0,
+    this.sessionRaceCalories = 0,
+    this.healthKitBaselineDistance = 0.0,
+    this.healthKitBaselineCalories = 0,
     this.isCompleted = false,
     this.completedAt,
   });
@@ -56,7 +75,13 @@ class RaceBaseline {
       'raceTitle': raceTitle,
       'startTime': startTime.toIso8601String(),
       'serverSteps': serverSteps,
+      'serverDistance': serverDistance,
+      'serverCalories': serverCalories,
       'sessionRaceSteps': sessionRaceSteps,
+      'sessionRaceDistance': sessionRaceDistance,
+      'sessionRaceCalories': sessionRaceCalories,
+      'healthKitBaselineDistance': healthKitBaselineDistance,
+      'healthKitBaselineCalories': healthKitBaselineCalories,
       'isCompleted': isCompleted,
       'completedAt': completedAt?.toIso8601String(),
     };
@@ -67,11 +92,18 @@ class RaceBaseline {
       raceId: json['raceId'] as String,
       raceTitle: json['raceTitle'] as String,
       startTime: DateTime.parse(json['startTime'] as String),
-      // Load server steps from storage, will be refreshed from Firestore on startup
+      // Load server state from storage, will be refreshed from Firestore on startup
       serverSteps: json['serverSteps'] as int? ?? 0,
-      // ✅ CRITICAL FIX: Load session steps from storage to survive app restarts during pedometer resets
-      // This prevents step loss if app crashes after pedometer reset but before next sync
+      serverDistance: json['serverDistance'] as double? ?? 0.0,
+      serverCalories: json['serverCalories'] as int? ?? 0,
+      // ✅ CRITICAL FIX: Load session metrics from storage to survive app restarts during pedometer resets
+      // This prevents metric loss if app crashes after pedometer reset but before next sync
       sessionRaceSteps: json['sessionRaceSteps'] as int? ?? 0,
+      sessionRaceDistance: json['sessionRaceDistance'] as double? ?? 0.0,
+      sessionRaceCalories: json['sessionRaceCalories'] as int? ?? 0,
+      // Load HealthKit baselines
+      healthKitBaselineDistance: json['healthKitBaselineDistance'] as double? ?? 0.0,
+      healthKitBaselineCalories: json['healthKitBaselineCalories'] as int? ?? 0,
       isCompleted: json['isCompleted'] as bool? ?? false,
       completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'] as String) : null,
     );
@@ -246,20 +278,23 @@ class RaceStepSyncService extends GetxService {
       if (_pendingHealthKitSteps > 0 && _activeRaceIds.isNotEmpty) {
         dev.log('🔄 [RACE_SYNC] Applying $_pendingHealthKitSteps pending HealthKit steps to active races...');
 
-        // Add pending steps to cumulative counter
-        _cumulativeSteps += _pendingHealthKitSteps;
+        // ✅ CRITICAL FIX: Protect with lock to prevent race conditions with _refreshActiveRaces()
+        await _baselineUpdateLock.synchronized(() async {
+          // Add pending steps to cumulative counter
+          _cumulativeSteps += _pendingHealthKitSteps;
 
-        // Add to each active race's session steps
-        for (final raceId in _activeRaceIds) {
-          final baseline = _raceBaselines[raceId];
-          if (baseline != null) {
-            baseline.sessionRaceSteps += _pendingHealthKitSteps;
-            dev.log('   ✅ "${baseline.raceTitle}": +$_pendingHealthKitSteps steps from pending health sync');
+          // Add to each active race's session steps
+          for (final raceId in _activeRaceIds) {
+            final baseline = _raceBaselines[raceId];
+            if (baseline != null) {
+              baseline.sessionRaceSteps += _pendingHealthKitSteps;
+              dev.log('   ✅ "${baseline.raceTitle}": +$_pendingHealthKitSteps steps from pending health sync');
+            }
           }
-        }
 
-        // Save updated baselines
-        await _saveBaselines();
+          // Save updated baselines
+          await _saveBaselines();
+        });
 
         // Clear pending steps
         final appliedSteps = _pendingHealthKitSteps;
@@ -316,11 +351,14 @@ class RaceStepSyncService extends GetxService {
 
   /// Refresh list of active races for current user
   Future<void> _refreshActiveRaces() async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) return;
+    // ✅ CRITICAL FIX: Protect with lock to prevent race conditions with _performSync()
+    // This prevents concurrent modification of _activeRaceIds and _raceBaselines
+    await _baselineUpdateLock.synchronized(() async {
+      try {
+        final currentUser = _auth.currentUser;
+        if (currentUser == null) return;
 
-      dev.log('🔍 [RACE_SYNC] Refreshing active races for user: ${currentUser.uid}');
+        dev.log('🔍 [RACE_SYNC] Refreshing active races for user: ${currentUser.uid}');
 
       // Query races where:
       // 1. User is a participant (check participants subcollection)
@@ -388,10 +426,11 @@ class RaceStepSyncService extends GetxService {
       } else {
         dev.log('ℹ️ [RACE_SYNC] No active races for this user');
       }
-    } catch (e, stackTrace) {
-      dev.log('❌ [RACE_SYNC] Error refreshing active races: $e');
-      dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
-    }
+      } catch (e, stackTrace) {
+        dev.log('❌ [RACE_SYNC] Error refreshing active races: $e');
+        dev.log('📍 [RACE_SYNC] Stack trace: $stackTrace');
+      }
+    });
   }
 
   /// Set baseline for a race using dual-layer tracking
@@ -418,13 +457,36 @@ class RaceStepSyncService extends GetxService {
       // Fetch participant data including completion status (source of truth)
       final participantData = await _fetchParticipantData(raceId);
 
+      // ✅ NEW: Get current HealthKit baseline for distance and calories
+      double healthKitBaselineDistance = 0.0;
+      int healthKitBaselineCalories = 0;
+
+      try {
+        if (Get.isRegistered<StepTrackingService>()) {
+          final stepTrackingService = Get.find<StepTrackingService>();
+          healthKitBaselineDistance = stepTrackingService.todayDistance.value;
+          healthKitBaselineCalories = stepTrackingService.todayCalories.value;
+          dev.log('📍 [RACE_SYNC] HealthKit baseline: ${healthKitBaselineDistance.toStringAsFixed(2)} km, $healthKitBaselineCalories cal');
+        } else {
+          dev.log('⚠️ [RACE_SYNC] StepTrackingService not registered, using 0 for HealthKit baseline');
+        }
+      } catch (e) {
+        dev.log('⚠️ [RACE_SYNC] Error fetching HealthKit baseline: $e');
+      }
+
       // Create baseline with dual-layer tracking and completion status
       final baseline = RaceBaseline(
         raceId: raceId,
         raceTitle: raceTitle,
         startTime: raceStartTime,  // ✅ FIXED: Use actual race start time
         serverSteps: participantData.steps,  // Server state (persistent)
+        serverDistance: participantData.distance,  // ✅ NEW: Server distance
+        serverCalories: participantData.calories,  // ✅ NEW: Server calories
         sessionRaceSteps: 0,       // Start counting from 0 in this session
+        sessionRaceDistance: 0.0,  // ✅ NEW: Start distance from 0
+        sessionRaceCalories: 0,    // ✅ NEW: Start calories from 0
+        healthKitBaselineDistance: healthKitBaselineDistance,  // ✅ NEW: HealthKit baseline
+        healthKitBaselineCalories: healthKitBaselineCalories,  // ✅ NEW: HealthKit baseline
         isCompleted: participantData.isCompleted,  // ✅ Load completion status
         completedAt: participantData.completedAt,  // ✅ Load completion time
       );
@@ -436,7 +498,11 @@ class RaceStepSyncService extends GetxService {
       if (baseline.isCompleted) {
         dev.log('🏁 [RACE_SYNC] Loaded completed race: "$raceTitle" (finished ${baseline.completedAt})');
       } else {
-        dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle": server=${participantData.steps}, sessionSteps=0, started=${raceStartTime.toIso8601String()}');
+        dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle":');
+        dev.log('   Server: ${participantData.steps} steps, ${participantData.distance.toStringAsFixed(2)} km, ${participantData.calories} cal');
+        dev.log('   Session: 0 steps, 0.00 km, 0 cal');
+        dev.log('   HealthKit baseline: ${healthKitBaselineDistance.toStringAsFixed(2)} km, $healthKitBaselineCalories cal');
+        dev.log('   Started: ${raceStartTime.toIso8601String()}');
       }
     } catch (e) {
       dev.log('❌ [RACE_SYNC] Error setting baseline for race $raceId: $e');
@@ -458,12 +524,12 @@ class RaceStepSyncService extends GetxService {
 
   /// Fetch current server participant data for a race (SOURCE OF TRUTH)
   /// This is called on startup and when creating new race baselines
-  /// Returns steps, completion status, and completion time
-  Future<({int steps, bool isCompleted, DateTime? completedAt})> _fetchParticipantData(String raceId) async {
+  /// Returns steps, distance, calories, completion status, and completion time
+  Future<({int steps, double distance, int calories, bool isCompleted, DateTime? completedAt})> _fetchParticipantData(String raceId) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        return (steps: 0, isCompleted: false, completedAt: null);
+        return (steps: 0, distance: 0.0, calories: 0, isCompleted: false, completedAt: null);
       }
 
       final participantDoc = await _firestore
@@ -476,20 +542,22 @@ class RaceStepSyncService extends GetxService {
       if (participantDoc.exists) {
         final data = participantDoc.data()!;
         final steps = data['steps'] as int? ?? 0;
+        final distance = (data['distance'] as num?)?.toDouble() ?? 0.0;
+        final calories = data['calories'] as int? ?? 0;
         final isCompleted = data['isCompleted'] as bool? ?? false;
         final completedAt = data['completedAt'] != null
             ? (data['completedAt'] as Timestamp).toDate()
             : null;
 
-        dev.log('📥 [RACE_SYNC] Fetched participant data for race $raceId: $steps steps, completed=$isCompleted');
-        return (steps: steps, isCompleted: isCompleted, completedAt: completedAt);
+        dev.log('📥 [RACE_SYNC] Fetched participant data for race $raceId: $steps steps, ${distance.toStringAsFixed(2)} km, $calories cal, completed=$isCompleted');
+        return (steps: steps, distance: distance, calories: calories, isCompleted: isCompleted, completedAt: completedAt);
       } else {
         dev.log('📥 [RACE_SYNC] No participant doc for race $raceId, returning defaults');
-        return (steps: 0, isCompleted: false, completedAt: null);
+        return (steps: 0, distance: 0.0, calories: 0, isCompleted: false, completedAt: null);
       }
     } catch (e) {
       dev.log('❌ [RACE_SYNC] Error fetching participant data for race $raceId: $e');
-      return (steps: 0, isCompleted: false, completedAt: null);
+      return (steps: 0, distance: 0.0, calories: 0, isCompleted: false, completedAt: null);
     }
   }
 
@@ -498,6 +566,21 @@ class RaceStepSyncService extends GetxService {
   Future<void> _refreshServerStateForAllRaces() async {
     try {
       dev.log('🔄 [RACE_SYNC] Refreshing server state for ${_raceBaselines.length} race(s)...');
+
+      // ✅ CRITICAL: Get current HealthKit values to reset baseline (prevent double-counting on restart)
+      double currentHealthKitDistance = 0.0;
+      int currentHealthKitCalories = 0;
+
+      try {
+        if (Get.isRegistered<StepTrackingService>()) {
+          final stepTrackingService = Get.find<StepTrackingService>();
+          currentHealthKitDistance = stepTrackingService.todayDistance.value;
+          currentHealthKitCalories = stepTrackingService.todayCalories.value;
+          dev.log('📍 [RACE_SYNC] Current HealthKit: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
+        }
+      } catch (e) {
+        dev.log('⚠️ [RACE_SYNC] Error fetching current HealthKit data: $e');
+      }
 
       for (final entry in _raceBaselines.entries) {
         final raceId = entry.key;
@@ -508,10 +591,19 @@ class RaceStepSyncService extends GetxService {
 
         // Update baseline with server state
         baseline.serverSteps = participantData.steps;
+        baseline.serverDistance = participantData.distance;  // ✅ NEW: Sync distance
+        baseline.serverCalories = participantData.calories;  // ✅ NEW: Sync calories
         baseline.isCompleted = participantData.isCompleted;  // ✅ Sync completion status
         baseline.completedAt = participantData.completedAt;  // ✅ Sync completion time
 
-        dev.log('   ✅ "${baseline.raceTitle}": server=${participantData.steps} steps, completed=${participantData.isCompleted}');
+        // ✅ CRITICAL FIX: Reset HealthKit baseline to current value to prevent double-counting
+        // When app restarts, we've already written distance to server, so we need to reset
+        // the baseline to current HealthKit value so delta calculation starts fresh
+        baseline.healthKitBaselineDistance = currentHealthKitDistance;
+        baseline.healthKitBaselineCalories = currentHealthKitCalories;
+
+        dev.log('   ✅ "${baseline.raceTitle}": server=${participantData.steps} steps, ${participantData.distance.toStringAsFixed(2)} km, ${participantData.calories} cal, completed=${participantData.isCompleted}');
+        dev.log('      Reset HealthKit baseline to current: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
       }
 
       // Save updated baselines
@@ -657,13 +749,23 @@ class RaceStepSyncService extends GetxService {
         try {
           var baseline = _raceBaselines[raceId];
 
-          // Create baseline on-the-fly if missing (fixes new race bug)
+          // ✅ CRITICAL FIX: Create baseline on-the-fly if missing
+          // This is safe because we're inside _baselineUpdateLock which also protects _refreshActiveRaces()
+          // Baseline might be missing if:
+          // 1. Race was just created and _refreshActiveRaces() hasn't run yet
+          // 2. App crashed between race detection and baseline creation
           if (baseline == null) {
             dev.log('⚠️ [RACE_SYNC] No baseline for race $raceId, creating now...');
             final raceDoc = await _firestore.collection('races').doc(raceId).get();
             final raceTitle = raceDoc.data()?['title'] ?? 'Unknown Race';
             await _setRaceBaseline(raceId, raceTitle);
-            baseline = _raceBaselines[raceId]!;
+            baseline = _raceBaselines[raceId];
+
+            // If baseline is still null after creation, skip this race
+            if (baseline == null) {
+              dev.log('❌ [RACE_SYNC] Failed to create baseline for race $raceId, skipping');
+              continue;
+            }
           }
 
           // ✅ SKIP STEP SYNC FOR COMPLETED USERS (view-only mode)
@@ -693,15 +795,44 @@ class RaceStepSyncService extends GetxService {
             continue;
           }
 
-          // ✅ DEBUG: Log detailed step calculation breakdown
-          dev.log('   📊 Race: ${baseline.raceTitle}');
-          dev.log('      Server steps: ${baseline.serverSteps}');
-          dev.log('      Session steps: ${baseline.sessionRaceSteps}');
-          dev.log('      Step delta this cycle: +$stepDelta');
-          dev.log('      Total race steps: $totalRaceSteps');
+          // ✅ NEW: Calculate distance and calories using HealthKit baseline approach
+          // Get current HealthKit values
+          double currentHealthKitDistance = 0.0;
+          int currentHealthKitCalories = 0;
 
-          final raceDistance = totalRaceSteps * STEPS_TO_KM_FACTOR;
-          final raceCalories = (totalRaceSteps * STEPS_TO_CALORIES_FACTOR).round();
+          try {
+            if (Get.isRegistered<StepTrackingService>()) {
+              final stepTrackingService = Get.find<StepTrackingService>();
+              currentHealthKitDistance = stepTrackingService.todayDistance.value;
+              currentHealthKitCalories = stepTrackingService.todayCalories.value;
+            }
+          } catch (e) {
+            dev.log('⚠️ [RACE_SYNC] Error fetching HealthKit data: $e');
+          }
+
+          // Calculate distance delta since race started (or last health sync)
+          final healthKitDistanceDelta = currentHealthKitDistance - baseline.healthKitBaselineDistance;
+          final healthKitCaloriesDelta = currentHealthKitCalories - baseline.healthKitBaselineCalories;
+
+          // ✅ Total distance/calories formula:
+          // = server (persisted across restarts)
+          // + session (from health syncs during this session)
+          // + HealthKit delta (real-time pedometer distance since last health sync)
+          //
+          // Note: healthKitBaseline is updated whenever health sync propagates,
+          // so healthKitDelta only tracks distance walked via pedometer SINCE last sync
+          final raceDistance = baseline.serverDistance + baseline.sessionRaceDistance + healthKitDistanceDelta;
+          final raceCalories = baseline.serverCalories + baseline.sessionRaceCalories + healthKitCaloriesDelta;
+
+          // ✅ DEBUG: Log detailed calculation breakdown
+          dev.log('   📊 Race: ${baseline.raceTitle}');
+          dev.log('      Server: ${baseline.serverSteps} steps, ${baseline.serverDistance.toStringAsFixed(2)} km, ${baseline.serverCalories} cal');
+          dev.log('      Session: ${baseline.sessionRaceSteps} steps, ${baseline.sessionRaceDistance.toStringAsFixed(2)} km, ${baseline.sessionRaceCalories} cal');
+          dev.log('      Step delta this cycle: +$stepDelta');
+          dev.log('      HealthKit baseline: ${baseline.healthKitBaselineDistance.toStringAsFixed(2)} km, ${baseline.healthKitBaselineCalories} cal');
+          dev.log('      HealthKit current: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
+          dev.log('      HealthKit delta: +${healthKitDistanceDelta.toStringAsFixed(2)} km, +$healthKitCaloriesDelta cal');
+          dev.log('      Total: $totalRaceSteps steps, ${raceDistance.toStringAsFixed(2)} km, $raceCalories cal');
 
           // Calculate average speed
           final raceTime = DateTime.now().difference(baseline.startTime);
@@ -958,6 +1089,8 @@ class RaceStepSyncService extends GetxService {
     required int stepsDelta,
     required String requestId,
     required String source,
+    double distanceDelta = 0.0,  // ✅ NEW: Distance delta (km)
+    int caloriesDelta = 0,       // ✅ NEW: Calories delta
   }) async {
     try {
       // 1. Check if already processed (idempotency)
@@ -982,6 +1115,8 @@ class RaceStepSyncService extends GetxService {
       dev.log('   Request ID: $requestId');
       dev.log('   Source: $source');
       dev.log('   Steps delta: $stepsDelta');
+      dev.log('   Distance delta: ${distanceDelta.toStringAsFixed(2)} km');
+      dev.log('   Calories delta: $caloriesDelta');
 
       // 3. Check if service is running
       if (!isRunning.value) {
@@ -1012,13 +1147,42 @@ class RaceStepSyncService extends GetxService {
         _cumulativeSteps += stepsDelta;
         dev.log('   📊 [RACE_SYNC] Updated cumulative: $_cumulativeSteps (+$stepsDelta)');
 
-        // Add the delta to each race's session steps
+        // ✅ Get current HealthKit values to update baseline (prevent double-counting)
+        double currentHealthKitDistance = 0.0;
+        int currentHealthKitCalories = 0;
+
+        try {
+          if (Get.isRegistered<StepTrackingService>()) {
+            final stepTrackingService = Get.find<StepTrackingService>();
+            currentHealthKitDistance = stepTrackingService.todayDistance.value;
+            currentHealthKitCalories = stepTrackingService.todayCalories.value;
+          }
+        } catch (e) {
+          dev.log('⚠️ [RACE_SYNC] Error fetching HealthKit data: $e');
+        }
+
+        // Add the delta to each race's session steps, distance, and calories
         for (final raceId in _activeRaceIds) {
           final baseline = _raceBaselines[raceId];
           if (baseline != null) {
-            final before = baseline.sessionRaceSteps;
+            final beforeSteps = baseline.sessionRaceSteps;
+            final beforeDistance = baseline.sessionRaceDistance;
+            final beforeCalories = baseline.sessionRaceCalories;
+
             baseline.sessionRaceSteps += stepsDelta;
-            dev.log('   ✅ "${baseline.raceTitle}": session steps $before → ${baseline.sessionRaceSteps} (+$stepsDelta)');
+            baseline.sessionRaceDistance += distanceDelta;  // ✅ NEW: Add distance delta
+            baseline.sessionRaceCalories += caloriesDelta;  // ✅ NEW: Add calories delta
+
+            // ✅ CRITICAL FIX: Update HealthKit baseline to prevent double-counting
+            // When health sync adds distance, we must update the baseline so the delta in _performSync() becomes 0
+            baseline.healthKitBaselineDistance = currentHealthKitDistance;
+            baseline.healthKitBaselineCalories = currentHealthKitCalories;
+
+            dev.log('   ✅ "${baseline.raceTitle}": session updated:');
+            dev.log('      Steps: $beforeSteps → ${baseline.sessionRaceSteps} (+$stepsDelta)');
+            dev.log('      Distance: ${beforeDistance.toStringAsFixed(2)} → ${baseline.sessionRaceDistance.toStringAsFixed(2)} km (+${distanceDelta.toStringAsFixed(2)})');
+            dev.log('      Calories: $beforeCalories → ${baseline.sessionRaceCalories} (+$caloriesDelta)');
+            dev.log('      Updated HealthKit baseline to: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
           }
         }
 

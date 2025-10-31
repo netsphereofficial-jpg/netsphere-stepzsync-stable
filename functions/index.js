@@ -583,6 +583,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
     // Filter to races where user is a participant
     const userActiveRaces = [];
     for (const raceDoc of activeRacesSnapshot.docs) {
+      const raceData = raceDoc.data();
       const participantDoc = await raceDoc.ref
         .collection('participants')
         .doc(userId)
@@ -590,13 +591,24 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
 
       if (participantDoc.exists) {
         const participantData = participantDoc.data();
-        // Only sync to races where user hasn't completed yet
+
+        // ✅ DEFENSIVE CHECK: Only sync to races that are truly active and user hasn't completed
+        // statusId 3 = Active, statusId 6 = Paused (both allow step syncing)
+        // Once race ends (statusId 4), users who didn't finish are DNF (Did Not Finish)
         if (!participantData.isCompleted) {
+          // Double-check race status (defensive)
+          if (raceData.statusId !== 3 && raceData.statusId !== 6) {
+            console.log(`   ⚠️ Race ${raceDoc.id} has invalid statusId ${raceData.statusId}, skipping`);
+            continue;
+          }
+
           userActiveRaces.push({
             raceId: raceDoc.id,
-            raceData: raceDoc.data(),
+            raceData: raceData,
             participantData: participantData,
           });
+        } else {
+          console.log(`   ⏭️ User already completed race ${raceDoc.id}, skipping`);
         }
       }
     }
@@ -695,7 +707,8 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             cappedStepsDelta,
             cappedDistanceDelta,
             cappedCaloriesDelta,
-            raceData.totalDistance || 0
+            raceData.totalDistance || 0,
+            raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
           );
 
           // Update baseline with capped values
@@ -715,7 +728,8 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             stepsDelta,
             distanceDelta,
             caloriesDelta,
-            raceData.totalDistance || 0
+            raceData.totalDistance || 0,
+            raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
           );
 
           // 8. Update baseline to new totals (prevent future double-counting)
@@ -767,7 +781,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
 
 /**
  * Helper function to update ranks for all participants in a race
- * Sorts participants by distance and assigns ranks
+ * Sorts participants by distance with tie-breaking logic
  */
 async function updateRaceRanks(raceId) {
   const participantsSnapshot = await db.collection('races')
@@ -780,30 +794,81 @@ async function updateRaceRanks(raceId) {
     return;
   }
 
-  // Get all participants and sort by distance (descending)
-  const participants = participantsSnapshot.docs.map(doc => ({
-    userId: doc.id,
-    distance: doc.data().distance || 0,
-    ref: doc.ref,
-  }));
+  // Get all participants with full data for tie-breaking
+  const participants = participantsSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      userId: doc.id,
+      distance: data.distance || 0,
+      completedAt: data.completedAt || null,
+      lastUpdated: data.lastUpdated || null,
+      isCompleted: data.isCompleted || false,
+      ref: doc.ref,
+    };
+  });
 
-  participants.sort((a, b) => b.distance - a.distance);
+  // ✅ IMPROVED SORTING WITH TIE-BREAKING:
+  // 1. Primary: Sort by distance (descending) - higher distance = better rank
+  // 2. Tie-breaker for equal/similar distances (within 0.01 km):
+  //    - If both completed: Earlier completedAt timestamp wins
+  //    - If both incomplete: Later lastUpdated timestamp wins (more recent progress)
+  //    - Completed participants rank higher than incomplete at same distance
+  participants.sort((a, b) => {
+    // Primary sort: distance (descending)
+    const distanceDiff = b.distance - a.distance;
+
+    // If distances are significantly different (>0.01 km), use distance
+    if (Math.abs(distanceDiff) > 0.01) {
+      return distanceDiff;
+    }
+
+    // Distances are equal or very close - apply tie-breaking
+    console.log(`   🔀 Tie-breaking between ${a.userId} and ${b.userId} (both at ${a.distance.toFixed(2)}km)`);
+
+    // If both completed, earlier completion time wins
+    if (a.isCompleted && b.isCompleted && a.completedAt && b.completedAt) {
+      const completionDiff = a.completedAt.toMillis() - b.completedAt.toMillis();
+      console.log(`      Both completed - comparing timestamps: ${a.userId}=${a.completedAt.toDate().toISOString()} vs ${b.userId}=${b.completedAt.toDate().toISOString()}`);
+      return completionDiff; // Earlier completion = better rank (negative = a wins)
+    }
+
+    // If one completed and one didn't, completed wins
+    if (a.isCompleted && !b.isCompleted) {
+      console.log(`      ${a.userId} completed, ${b.userId} incomplete - ${a.userId} wins`);
+      return -1; // a wins
+    }
+    if (!a.isCompleted && b.isCompleted) {
+      console.log(`      ${b.userId} completed, ${a.userId} incomplete - ${b.userId} wins`);
+      return 1; // b wins
+    }
+
+    // Both incomplete - more recent update wins (they're still racing)
+    if (a.lastUpdated && b.lastUpdated) {
+      const updateDiff = b.lastUpdated.toMillis() - a.lastUpdated.toMillis();
+      console.log(`      Both incomplete - more recent update wins: ${a.userId}=${a.lastUpdated.toDate().toISOString()} vs ${b.userId}=${b.lastUpdated.toDate().toISOString()}`);
+      return updateDiff; // More recent update = better rank
+    }
+
+    // Fallback: maintain current order
+    return 0;
+  });
 
   // Update ranks using batch
   const rankBatch = db.batch();
   participants.forEach((participant, index) => {
     const newRank = index + 1;
     rankBatch.update(participant.ref, { rank: newRank });
+    console.log(`      Rank ${newRank}: ${participant.userId} - ${participant.distance.toFixed(2)}km (completed: ${participant.isCompleted})`);
   });
 
   await rankBatch.commit();
-  console.log(`   📊 Updated ranks for ${participants.length} participants`);
+  console.log(`   📊 Updated ranks for ${participants.length} participants with tie-breaking`);
 }
 
 /**
  * Helper function to update participant document with deltas
  */
-async function updateParticipant(batch, raceId, userId, participantData, stepsDelta, distanceDelta, caloriesDelta, raceTotalDistance) {
+async function updateParticipant(batch, raceId, userId, participantData, stepsDelta, distanceDelta, caloriesDelta, raceTotalDistance, raceStartTime) {
   const participantRef = db.collection('races')
     .doc(raceId)
     .collection('participants')
@@ -836,11 +901,30 @@ async function updateParticipant(batch, raceId, userId, participantData, stepsDe
     newDistance = raceTotalDistance * 1.1;
   }
 
-  // Calculate remaining distance and average speed
+  // Calculate remaining distance
   const remainingDistance = Math.max(0, raceTotalDistance - newDistance);
-  const raceStartTime = participantData.joinedAt?.toDate() || new Date();
-  const raceTimeMinutes = (Date.now() - raceStartTime.getTime()) / (1000 * 60);
-  const avgSpeed = raceTimeMinutes > 0 ? (newDistance / raceTimeMinutes) * 60 : 0;
+
+  // ✅ IMPROVED: Calculate average speed using RACE start time, not participant join time
+  // This gives accurate speed from when race actually started, not when user joined
+  let avgSpeed = 0;
+  if (raceStartTime) {
+    const startTime = raceStartTime.toDate ? raceStartTime.toDate() : new Date(raceStartTime);
+    const raceTimeMinutes = (Date.now() - startTime.getTime()) / (1000 * 60);
+
+    if (raceTimeMinutes > 0) {
+      // avgSpeed in km/h = (distance in km / time in minutes) * 60
+      avgSpeed = (newDistance / raceTimeMinutes) * 60;
+      console.log(`   📊 Average Speed Calculation: ${newDistance.toFixed(2)}km / ${raceTimeMinutes.toFixed(1)}min * 60 = ${avgSpeed.toFixed(2)} km/h`);
+    } else {
+      console.log(`   ⚠️ Race time is 0 or negative, cannot calculate average speed`);
+    }
+  } else {
+    // Fallback: use participant join time if race start time not available
+    console.log(`   ⚠️ No race start time available, using participant joinedAt as fallback`);
+    const fallbackStartTime = participantData.joinedAt?.toDate() || new Date();
+    const raceTimeMinutes = (Date.now() - fallbackStartTime.getTime()) / (1000 * 60);
+    avgSpeed = raceTimeMinutes > 0 ? (newDistance / raceTimeMinutes) * 60 : 0;
+  }
 
   // Check if participant completed
   const isCompleted = raceTotalDistance > 0 && newDistance >= raceTotalDistance;
