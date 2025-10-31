@@ -134,6 +134,38 @@ class StepDateUtils {
     final endDate = DateTime(end.year, end.month, end.day);
     return endDate.difference(startDate).inDays;
   }
+
+  /// Get effective start date for filter, respecting profile creation date
+  /// If the requested filter date is earlier than profile creation,
+  /// use profile creation date as the boundary
+  ///
+  /// Example: Profile created Oct 10, filter "Last 7 days" on Oct 15
+  /// - Requested start: Oct 8
+  /// - Profile created: Oct 10
+  /// - Returns: Oct 10 (profile creation is more recent, so use it)
+  static DateTime getEffectiveStartDate(String filter, DateTime profileCreatedAt) {
+    final dateRange = getDateRangeForFilter(filter);
+    final requestedStart = dateRange.start;
+    final profileCreationDate = DateTime(
+      profileCreatedAt.year,
+      profileCreatedAt.month,
+      profileCreatedAt.day,
+    );
+
+    // Return whichever is more recent (closer to today)
+    return requestedStart.isAfter(profileCreationDate)
+        ? requestedStart
+        : profileCreationDate;
+  }
+
+  /// Get effective date range for filter, respecting profile creation date
+  /// This ensures we never query data before the profile was created
+  static DateRange getEffectiveDateRange(String filter, DateTime profileCreatedAt) {
+    final dateRange = getDateRangeForFilter(filter);
+    final effectiveStart = getEffectiveStartDate(filter, profileCreatedAt);
+
+    return DateRange(start: effectiveStart, end: dateRange.end);
+  }
 }
 
 /// Date range model

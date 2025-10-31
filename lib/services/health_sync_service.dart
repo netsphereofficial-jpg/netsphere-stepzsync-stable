@@ -672,6 +672,140 @@ class HealthSyncService extends GetxController {
     }
   }
 
+  /// Fetch health data for a custom date range
+  /// Used for filter statistics (Last 7 days, Last 30 days, etc.)
+  /// Returns aggregated steps, distance, calories, and active time for the period
+  Future<Map<String, dynamic>?> getHealthDataForDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    try {
+      print('${HealthConfig.logPrefix} Fetching health data for range: ${startDate.toString().substring(0, 10)} to ${endDate.toString().substring(0, 10)}');
+
+      // Check availability and permissions
+      if (!isHealthAvailable.value) {
+        print('${HealthConfig.logPrefix} Health not available');
+        return null;
+      }
+
+      if (!hasPermissions.value) {
+        print('${HealthConfig.logPrefix} Health permissions not granted');
+        return null;
+      }
+
+      // Normalize dates to start of day and end of day
+      final start = DateTime(startDate.year, startDate.month, startDate.day, 0, 0, 0);
+      final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+
+      // ✅ Use aggregated query for steps (efficient and handles deduplication)
+      final totalSteps = await _health.getTotalStepsInInterval(start, end) ?? 0;
+
+      print('${HealthConfig.logPrefix} ✅ Fetched aggregated steps for range: $totalSteps steps');
+
+      // Build platform-specific health data types list
+      final List<HealthDataType> otherDataTypes = [
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+      ];
+
+      // Add platform-specific data types
+      if (Platform.isIOS) {
+        otherDataTypes.add(HealthDataType.DISTANCE_WALKING_RUNNING);
+        otherDataTypes.add(HealthDataType.EXERCISE_TIME);
+      } else if (Platform.isAndroid) {
+        otherDataTypes.add(HealthDataType.DISTANCE_DELTA);
+      }
+
+      // Fetch other health data points
+      final List<HealthDataPoint> healthData = await _health
+          .getHealthDataFromTypes(
+            types: otherDataTypes,
+            startTime: start,
+            endTime: end,
+          )
+          .timeout(
+            HealthConfig.syncTimeout,
+            onTimeout: () => throw TimeoutException('Health data fetch timeout'),
+          );
+
+      print('${HealthConfig.logPrefix} Fetched ${healthData.length} additional data points for range');
+
+      // Parse and aggregate other data
+      double distanceMeters = 0.0;
+      double caloriesKcal = 0.0;
+      int activeMinutes = 0;
+
+      for (final point in healthData) {
+        switch (point.type) {
+          case HealthDataType.DISTANCE_DELTA: // Android
+          case HealthDataType.DISTANCE_WALKING_RUNNING: // iOS
+            if (point.value is NumericHealthValue) {
+              distanceMeters += (point.value as NumericHealthValue).numericValue;
+            }
+            break;
+
+          case HealthDataType.ACTIVE_ENERGY_BURNED:
+            if (point.value is NumericHealthValue) {
+              caloriesKcal += (point.value as NumericHealthValue).numericValue;
+            }
+            break;
+
+          case HealthDataType.EXERCISE_TIME:
+            // iOS only
+            if (point.value is NumericHealthValue) {
+              activeMinutes += (point.value as NumericHealthValue).numericValue.toInt();
+            }
+            break;
+
+          default:
+            break;
+        }
+      }
+
+      // Convert units
+      final distanceKm = distanceMeters * HealthConfig.metersToKilometers;
+
+      // ✅ Fallback: Estimate if health data is missing
+      double finalDistance = distanceKm;
+      int finalCalories = caloriesKcal.round();
+      int finalActiveMinutes = activeMinutes;
+
+      if (distanceKm == 0.0 && totalSteps > 0) {
+        const stepsToKm = 0.000762;
+        finalDistance = totalSteps * stepsToKm;
+        print('${HealthConfig.logPrefix} ⚠️ No distance data, estimated from steps: ${finalDistance.toStringAsFixed(2)}km');
+      }
+
+      if (caloriesKcal == 0.0 && totalSteps > 0) {
+        const stepsToCalories = 0.04;
+        finalCalories = (totalSteps * stepsToCalories).round();
+        print('${HealthConfig.logPrefix} ⚠️ No calorie data, estimated from steps: $finalCalories cal');
+      }
+
+      if (finalActiveMinutes == 0 && totalSteps > 0) {
+        finalActiveMinutes = (totalSteps / 100).round();
+        final platform = Platform.isAndroid ? 'Android' : 'iOS';
+        print('${HealthConfig.logPrefix} [$platform] Estimated active minutes from steps: $finalActiveMinutes minutes');
+      }
+
+      // Calculate number of days in range
+      final days = end.difference(start).inDays + 1;
+
+      print('${HealthConfig.logPrefix} ✅ Range data: $totalSteps steps, ${finalDistance.toStringAsFixed(2)}km, $finalCalories cal, $finalActiveMinutes min over $days days');
+
+      return {
+        'totalSteps': totalSteps,
+        'totalDistance': finalDistance,
+        'totalCalories': finalCalories,
+        'totalActiveTime': finalActiveMinutes,
+        'totalDays': days,
+      };
+    } catch (e, stackTrace) {
+      print('${HealthConfig.logPrefix} ❌ Error fetching health data for date range: $e');
+      print('📍 Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
   @override
   void onClose() {
     _syncStatusController.close();

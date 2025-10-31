@@ -389,8 +389,8 @@ class StepDataRepository {
   }
 
   /// Get overall statistics by aggregating all daily_steps from Firebase
-  /// Returns aggregated totals: steps, distance, days, calories, active time
-  Future<Map<String, dynamic>> getOverallStatisticsFromFirebase() async {
+  /// Returns aggregated totals: steps, distance, days (based on profile creation), calories, active time
+  Future<Map<String, dynamic>> getOverallStatisticsFromFirebase({DateTime? profileCreatedAt}) async {
     try {
       if (_userId == null) {
         dev.log('⚠️ No user logged in, returning empty stats');
@@ -435,12 +435,24 @@ class StepDataRepository {
         totalActiveTime += (data['activeMinutes'] as int? ?? 0);
       }
 
-      dev.log('✅ Firebase aggregation complete: ${snapshot.docs.length} days, $totalSteps steps');
+      // ✅ NEW: Calculate days based on profile creation date, not document count
+      int totalDays;
+      if (profileCreatedAt != null) {
+        final now = DateTime.now();
+        totalDays = now.difference(profileCreatedAt).inDays + 1; // +1 to include first day
+        dev.log('✅ Calculated days from profile creation: $totalDays days (created: ${profileCreatedAt.toString().substring(0, 10)})');
+      } else {
+        // Fallback: Use document count if profile creation date not provided
+        totalDays = snapshot.docs.length;
+        dev.log('⚠️ Using document count as days (no profile creation date provided): $totalDays days');
+      }
+
+      dev.log('✅ Firebase aggregation complete: $totalDays days, $totalSteps steps, ${totalDistance.toStringAsFixed(2)} km');
 
       return {
         'totalSteps': totalSteps,
         'totalDistance': totalDistance,
-        'totalDays': snapshot.docs.length,
+        'totalDays': totalDays,
         'totalCalories': totalCalories,
         'totalActiveTime': totalActiveTime,
       };

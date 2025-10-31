@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:synchronized/synchronized.dart';
@@ -68,6 +69,9 @@ class StepTrackingService extends GetxService {
   Timer? _midnightCheckTimer;
   bool _isInitializing = false;
 
+  // ✅ Cache profile creation date for efficient queries
+  DateTime? _profileCreatedAt;
+
   // ================== CONCURRENCY CONTROL ==================
   /// Lock for state updates to prevent race conditions
   final Lock _stateUpdateLock = Lock();
@@ -117,20 +121,23 @@ class StepTrackingService extends GetxService {
 
       print('✅ Services obtained');
 
-      // Step 3: Load overall statistics first (for display)
+      // Step 3: Fetch and cache profile creation date
+      await _loadProfileCreationDate();
+
+      // Step 4: Load overall statistics first (for display)
       await _loadOverallStatistics();
 
-      // Step 4: Fetch today's HealthKit baseline (CRITICAL)
+      // Step 5: Fetch today's HealthKit baseline (CRITICAL)
       await _fetchHealthKitBaseline();
 
-      // Step 5: Initialize pedometer for real-time tracking
+      // Step 6: Initialize pedometer for real-time tracking
       await _initializePedometer();
 
-      // Step 6: Set up periodic sync and midnight check
+      // Step 7: Set up periodic sync and midnight check
       _setupPeriodicSync();
       _setupMidnightCheck();
 
-      // Step 7: Set up real-time listeners
+      // Step 8: Set up real-time listeners
       _setupPedometerListeners();
 
       isInitialized.value = true;
@@ -369,47 +376,147 @@ class StepTrackingService extends GetxService {
     });
   }
 
-  /// Load overall statistics from Firebase
-  /// Aggregates all daily_steps documents and includes today's real-time data
-  Future<void> _loadOverallStatistics() async {
+  /// Fetch and cache profile creation date from Firebase
+  /// This is used to calculate days since profile creation and for smart filter boundaries
+  Future<void> _loadProfileCreationDate() async {
     try {
-      print('📊 Loading overall statistics from Firebase...');
+      print('📅 Loading profile creation date...');
 
-      // Get aggregated stats from Firebase (all historical data)
-      final firebaseStats = await _repository.getOverallStatisticsFromFirebase();
-
-      // Check if today's data is already in Firebase (MUST query Firebase directly, not cache!)
-      final todayDate = DailyStepData.getTodayDate();
-      final todayInFirebase = await _repository.getDailyDataFromFirebaseDirectly(todayDate);
-
-      // If today's data exists in Firebase, we need to subtract it before adding real-time values
-      // to avoid double counting
-      int firebaseSteps = firebaseStats['totalSteps'] as int;
-      double firebaseDistance = firebaseStats['totalDistance'] as double;
-      int firebaseDays = firebaseStats['totalDays'] as int;
-
-      if (todayInFirebase != null) {
-        // Today exists in Firebase - don't count it as a new day
-        print('   📅 Today exists in Firebase with ${todayInFirebase.steps} steps');
-      } else {
-        // Today is not in Firebase yet, so count it as a new day
-        firebaseDays += 1;
-        print('   📅 Today not in Firebase yet - counting as new day');
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        print('⚠️ No user logged in, cannot fetch profile creation date');
+        return;
       }
 
-      // ✅ FIX: Overall stats = Firebase total (no adjustment needed)
-      // Firebase aggregation already includes all steps, including today
-      // We don't subtract and re-add because it causes the "0 steps" bug
-      overallSteps.value = firebaseSteps;
-      overallDistance.value = firebaseDistance;
-      overallDays.value = firebaseDays;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('user_profiles')
+          .doc(userId)
+          .get();
 
-      print('🔍 DEBUG: Overall stats from Firebase:');
-      print('   Firebase total steps: $firebaseSteps');
-      print('   Firebase total distance: ${firebaseDistance}km');
-      print('   Total days: $firebaseDays');
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        if (userData.containsKey('createdAt')) {
+          // Parse createdAt field (could be Timestamp or String)
+          final createdAtField = userData['createdAt'];
+          if (createdAtField is Timestamp) {
+            _profileCreatedAt = createdAtField.toDate();
+          } else if (createdAtField is String) {
+            _profileCreatedAt = DateTime.parse(createdAtField);
+          }
 
-      print('✅ Overall stats loaded: ${overallSteps.value} steps, ${overallDays.value} days');
+          if (_profileCreatedAt != null) {
+            print('✅ Profile created at: ${_profileCreatedAt!.toIso8601String().substring(0, 10)}');
+          }
+        } else {
+          print('⚠️ createdAt field not found in user profile, using fallback');
+          _useFallbackCreationDate();
+        }
+      } else {
+        print('⚠️ User profile not found, using fallback creation date');
+        _useFallbackCreationDate();
+      }
+    } catch (e) {
+      print('❌ Error loading profile creation date: $e');
+      _useFallbackCreationDate();
+    }
+  }
+
+  /// Fallback: Use earliest data date or today as profile creation date
+  Future<void> _useFallbackCreationDate() async {
+    try {
+      // Try to get earliest data date from Firebase
+      final firebaseStats = await _repository.getOverallStatisticsFromFirebase();
+      final totalDays = firebaseStats['totalDays'] as int? ?? 0;
+
+      if (totalDays > 0) {
+        // Estimate creation date based on existing data
+        _profileCreatedAt = DateTime.now().subtract(Duration(days: totalDays - 1));
+        print('📅 Using fallback creation date (estimated from data): ${_profileCreatedAt!.toIso8601String().substring(0, 10)}');
+      } else {
+        // No data exists, use today
+        _profileCreatedAt = DateTime.now();
+        print('📅 Using today as fallback creation date');
+      }
+    } catch (e) {
+      print('❌ Error in fallback creation date: $e');
+      _profileCreatedAt = DateTime.now();
+    }
+  }
+
+  /// Load overall statistics from Health Connect/HealthKit
+  /// ✅ NEW: Queries Health Connect/HealthKit directly from profile creation date
+  /// This ensures overall stats match the actual time period (days since profile creation)
+  Future<void> _loadOverallStatistics() async {
+    try {
+      print('📊 Loading overall statistics from Health Connect/HealthKit...');
+
+      // Check if profile creation date is available
+      if (_profileCreatedAt == null) {
+        print('⚠️ Profile creation date not available, using fallback');
+        // Fallback to Firebase-based calculation
+        final firebaseStats = await _repository.getOverallStatisticsFromFirebase();
+        overallSteps.value = firebaseStats['totalSteps'] as int;
+        overallDistance.value = firebaseStats['totalDistance'] as double;
+        overallDays.value = firebaseStats['totalDays'] as int;
+        print('✅ Overall stats (fallback): ${overallSteps.value} steps, ${overallDays.value} days');
+        return;
+      }
+
+      // Calculate days since profile creation
+      final now = DateTime.now();
+      final daysSinceCreation = now.difference(_profileCreatedAt!).inDays + 1;
+
+      print('📅 Profile created: ${_profileCreatedAt!.toString().substring(0, 10)}');
+      print('📅 Days since creation: $daysSinceCreation');
+
+      // ✅ Query Health Connect/HealthKit for entire period since profile creation
+      final healthData = await _healthSyncService.getHealthDataForDateRange(
+        _profileCreatedAt!,
+        now,
+      );
+
+      if (healthData != null) {
+        final healthSteps = healthData['totalSteps'] as int;
+        final healthDistance = healthData['totalDistance'] as double;
+
+        // ✅ SAFETY: If Health Connect/HealthKit returns 0 but we have Firebase data,
+        // use Firebase as fallback (user might have cleared health data)
+        if (healthSteps == 0 && daysSinceCreation > 1) {
+          print('⚠️ Health Connect/HealthKit returned 0 steps for multi-day period, checking Firebase fallback...');
+          final firebaseStats = await _repository.getOverallStatisticsFromFirebase(
+            profileCreatedAt: _profileCreatedAt,
+          );
+          final firebaseSteps = firebaseStats['totalSteps'] as int;
+
+          if (firebaseSteps > 0) {
+            print('✅ Using Firebase data as fallback (has historical data): $firebaseSteps steps');
+            overallSteps.value = firebaseSteps;
+            overallDistance.value = firebaseStats['totalDistance'] as double;
+            overallDays.value = daysSinceCreation;
+            return;
+          }
+        }
+
+        // Use Health Connect/HealthKit data
+        overallSteps.value = healthSteps;
+        overallDistance.value = healthDistance;
+        overallDays.value = daysSinceCreation; // Use calculated days, not returned days
+
+        print('✅ Overall stats from Health Connect/HealthKit:');
+        print('   Total steps: ${overallSteps.value}');
+        print('   Total distance: ${overallDistance.value.toStringAsFixed(2)}km');
+        print('   Total days: ${overallDays.value}');
+      } else {
+        print('⚠️ Health Connect/HealthKit data not available, using fallback');
+        // Fallback to Firebase
+        final firebaseStats = await _repository.getOverallStatisticsFromFirebase(
+          profileCreatedAt: _profileCreatedAt,
+        );
+        overallSteps.value = firebaseStats['totalSteps'] as int;
+        overallDistance.value = firebaseStats['totalDistance'] as double;
+        overallDays.value = firebaseStats['totalDays'] as int;
+        print('✅ Overall stats (fallback): ${overallSteps.value} steps, ${overallDays.value} days');
+      }
     } catch (e) {
       print('❌ Error loading overall statistics: $e');
     }
@@ -684,64 +791,58 @@ class StepTrackingService extends GetxService {
   }
 
   /// Get statistics for a specific filter period
-  /// Queries Firebase for the date range and includes today's real-time data
+  /// ✅ NEW: Queries Health Connect/HealthKit directly with smart date boundaries
+  /// Respects profile creation date - won't query data before profile was created
   /// Filters: "Today", "Last 7 days", "Last 30 days", "Last 60 days", "All time"
   Future<Map<String, dynamic>> getStatisticsForFilter(String filter) async {
     try {
       print('📊 Getting statistics for filter: $filter');
 
-      // Get Firebase stats for the filter period
-      final firebaseStats = await _repository.getStatisticsForFilter(filter);
-
-      int totalSteps = firebaseStats['totalSteps'] as int;
-      double totalDistance = firebaseStats['totalDistance'] as double;
-      int totalDays = firebaseStats['totalDays'] as int;
-      int totalCalories = firebaseStats['totalCalories'] as int;
-      int totalActiveTime = firebaseStats['totalActiveTime'] as int;
-
-      // Check if today is included in the filter period
-      final todayDate = DailyStepData.getTodayDate();
-      final dateRange = StepDateUtils.getDateRangeForFilter(filter);
-      final today = DateTime.now();
-      final todayStart = DateTime(today.year, today.month, today.day);
-
-      final todayIncluded = !todayStart.isBefore(dateRange.start) &&
-                           !todayStart.isAfter(dateRange.end);
-
-      if (todayIncluded) {
-        // Check if today's data is already in Firebase aggregation (MUST query Firebase directly!)
-        final todayInFirebase = await _repository.getDailyDataFromFirebaseDirectly(todayDate);
-
-        if (todayInFirebase != null) {
-          // Subtract today's Firebase data (we'll add real-time data instead)
-          totalSteps -= todayInFirebase.steps;
-          totalDistance -= todayInFirebase.distance;
-          totalCalories -= todayInFirebase.calories;
-          totalActiveTime -= todayInFirebase.activeMinutes;
-          // Don't subtract day count - today is still a valid day
-        } else {
-          // Today is not in Firebase yet, so we need to count it as a new day
-          totalDays += 1;
-        }
-
-        // Add today's real-time data
-        totalSteps += todaySteps.value;
-        totalDistance += todayDistance.value;
-        totalCalories += todayCalories.value;
-        totalActiveTime += todayActiveTime.value;
-
-        print('✅ Filter stats ($filter): $totalSteps steps, $totalDays days (includes today real-time)');
-      } else {
-        print('✅ Filter stats ($filter): $totalSteps steps, $totalDays days (historical only)');
+      // Special case: "Today" uses real-time data from step tracking service
+      if (filter.toLowerCase() == 'today') {
+        print('✅ Using real-time today data: ${todaySteps.value} steps');
+        return {
+          'totalSteps': todaySteps.value,
+          'totalDistance': todayDistance.value,
+          'totalDays': 1,
+          'totalCalories': todayCalories.value,
+          'totalActiveTime': todayActiveTime.value,
+        };
       }
 
-      return {
-        'totalSteps': totalSteps,
-        'totalDistance': totalDistance,
-        'totalDays': totalDays,
-        'totalCalories': totalCalories,
-        'totalActiveTime': totalActiveTime,
-      };
+      // For all other filters, query Health Connect/HealthKit directly
+      if (_profileCreatedAt == null) {
+        print('⚠️ Profile creation date not loaded yet, using fallback');
+        // Fallback to Firebase-based query
+        final firebaseStats = await _repository.getStatisticsForFilter(filter);
+        return firebaseStats;
+      }
+
+      // ✅ Get effective date range (respects profile creation as boundary)
+      final effectiveDateRange = StepDateUtils.getEffectiveDateRange(
+        filter,
+        _profileCreatedAt!,
+      );
+
+      print('📅 Effective date range: ${effectiveDateRange.start.toString().substring(0, 10)} to ${effectiveDateRange.end.toString().substring(0, 10)}');
+      print('   Original filter: $filter');
+      print('   Profile created: ${_profileCreatedAt!.toString().substring(0, 10)}');
+
+      // Query Health Connect/HealthKit for the date range
+      final healthData = await _healthSyncService.getHealthDataForDateRange(
+        effectiveDateRange.start,
+        effectiveDateRange.end,
+      );
+
+      if (healthData != null) {
+        print('✅ Filter stats from Health Connect/HealthKit ($filter): ${healthData['totalSteps']} steps, ${healthData['totalDays']} days');
+        return healthData;
+      } else {
+        print('⚠️ Health Connect/HealthKit data not available, using fallback');
+        // Fallback to Firebase if Health Connect/HealthKit not available
+        final firebaseStats = await _repository.getStatisticsForFilter(filter);
+        return firebaseStats;
+      }
     } catch (e) {
       print('❌ Error getting filter statistics: $e');
       return {
@@ -890,6 +991,9 @@ class StepTrackingService extends GetxService {
       'pedometerDiagnostics': _pedometerService.getDiagnostics(),
     };
   }
+
+  /// Get profile creation date (for filter boundaries and day calculations)
+  DateTime? get profileCreatedAt => _profileCreatedAt;
 
   @override
   void onClose() async {
