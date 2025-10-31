@@ -49,39 +49,11 @@ class RaceMapScreen extends StatelessWidget {
         }
       },
       child: Obx(() {
-        // Check if we should show winner/DNF screen
-        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-        bool currentUserCompleted = false;
-
-        if (currentUserId != null && mapController.participantsList.isNotEmpty) {
-          final currentUserParticipant = mapController.participantsList.firstWhere(
-            (p) => p.userId == currentUserId,
-            orElse: () => Participant(
-              userId: '',
-              userName: '',
-              distance: 0,
-              remainingDistance: mapController.raceModel.value?.totalDistance ?? 0,
-              rank: 0,
-              steps: 0,
-              isCompleted: false,
-            ),
-          );
-          currentUserCompleted = currentUserParticipant.isCompleted;
-        }
-
-        final remainingDistanceZero = mapController.raceModel.value != null &&
-            mapController.raceModel.value!.remainingDistance! <= 0;
-
-        final currentUserFinished = currentUserCompleted || remainingDistanceZero;
-
-        // Use raceEnded flag instead of status to prevent flickering (matches body logic)
-        final raceCompleted = mapController.raceEnded.value;
-
-        final showDNFScreen = raceCompleted && !currentUserFinished && !mapController.isViewOnlyMode.value;
-        final showWinnerScreen = currentUserFinished && raceCompleted && !mapController.isViewOnlyMode.value;
+        // ✅ IMPROVED: Centralized completion check logic (no duplication)
+        final completionState = _getCompletionState(mapController);
 
         // Hide app bar when showing winner or DNF screen
-        final shouldShowAppBar = !showDNFScreen && !showWinnerScreen;
+        final shouldShowAppBar = !completionState.showDNFScreen && !completionState.showWinnerScreen;
 
         return Scaffold(
           appBar: shouldShowAppBar ? CustomAppBar(
@@ -244,56 +216,16 @@ class RaceMapScreen extends StatelessWidget {
 
           body: SafeArea(
             child: Obx(() {
-            // Show winner screen only if:
-            // 1. Current user has finished (remainingDistance <= 0 OR isCompleted flag), OR
-            // 2. Race is completed (statusId == 4)
+            // ✅ IMPROVED: Use centralized completion state (prevents duplicate code and race conditions)
+            final completionState = _getCompletionState(mapController);
 
-            // Check if current user has completed from participant data
-            final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-            bool currentUserCompleted = false;
-
-            if (currentUserId != null && mapController.participantsList.isNotEmpty) {
-              final currentUserParticipant = mapController.participantsList.firstWhere(
-                (p) => p.userId == currentUserId,
-                orElse: () => Participant(
-                  userId: '',
-                  userName: '',
-                  distance: 0,
-                  remainingDistance: mapController.raceModel.value?.totalDistance ?? 0,
-                  rank: 0,
-                  steps: 0,
-                  isCompleted: false,
-                ),
-              );
-              currentUserCompleted = currentUserParticipant.isCompleted;
-            }
-
-            // Also check remainingDistance for backward compatibility
-            final remainingDistanceZero = mapController.raceModel.value != null &&
-                mapController.raceModel.value!.remainingDistance! <= 0;
-
-            final currentUserFinished = currentUserCompleted || remainingDistanceZero;
-
-            // Use raceEnded flag instead of status to prevent flickering
-            final raceCompleted = mapController.raceEnded.value;
-
-            // Show DNF screen if race ended but user didn't finish
-            final showDNFScreen = raceCompleted &&
-                !currentUserFinished &&
-                !mapController.isViewOnlyMode.value;
-
-            // Show WinnerWidget ONLY if user finished
-            final showWinnerScreen = currentUserFinished &&
-                mapController.raceEnded.value && // Also use raceEnded for winners
-                !mapController.isViewOnlyMode.value;
-
-            if (showDNFScreen) {
+            if (completionState.showDNFScreen) {
               return DNFWidget(
                 size: size,
                 raceModel: raceModel,
                 mapController: mapController,
               );
-            } else if (showWinnerScreen) {
+            } else if (completionState.showWinnerScreen) {
               return WinnerWidget(
                 size: size,
                 raceModel: raceModel,
@@ -2313,5 +2245,70 @@ class _CountdownDialogState extends State<_CountdownDialog>
       ),
     );
   }
+
+  /// ✅ IMPROVED: Centralized completion state logic to prevent DNF/Winner screen flicker
+  /// This method checks completion state in ONE place, eliminating race conditions
+  _CompletionState _getCompletionState(MapController mapController) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    bool currentUserCompleted = false;
+
+    // Check if current user has completed from participant data
+    if (currentUserId != null && mapController.participantsList.isNotEmpty) {
+      final currentUserParticipant = mapController.participantsList.firstWhere(
+        (p) => p.userId == currentUserId,
+        orElse: () => Participant(
+          userId: '',
+          userName: '',
+          distance: 0,
+          remainingDistance: mapController.raceModel.value?.totalDistance ?? 0,
+          rank: 0,
+          steps: 0,
+          isCompleted: false,
+        ),
+      );
+      currentUserCompleted = currentUserParticipant.isCompleted;
+    }
+
+    // Also check remainingDistance for backward compatibility
+    final remainingDistanceZero = mapController.raceModel.value != null &&
+        mapController.raceModel.value!.remainingDistance! <= 0;
+
+    // ✅ FIX: Prioritize isCompleted flag over remainingDistance
+    // The optimistic update in controller sets isCompleted=true immediately
+    // This ensures Winner screen shows instantly without DNF flicker
+    final currentUserFinished = currentUserCompleted || remainingDistanceZero;
+
+    // Use raceEnded flag instead of status to prevent flickering
+    final raceCompleted = mapController.raceEnded.value;
+
+    // Show DNF screen if race ended but user didn't finish
+    final showDNFScreen = raceCompleted &&
+        !currentUserFinished &&
+        !mapController.isViewOnlyMode.value;
+
+    // Show WinnerWidget ONLY if user finished
+    final showWinnerScreen = currentUserFinished &&
+        raceCompleted &&
+        !mapController.isViewOnlyMode.value;
+
+    return _CompletionState(
+      showDNFScreen: showDNFScreen,
+      showWinnerScreen: showWinnerScreen,
+      currentUserFinished: currentUserFinished,
+    );
+  }
+}
+
+/// Helper class to hold completion state
+class _CompletionState {
+  final bool showDNFScreen;
+  final bool showWinnerScreen;
+  final bool currentUserFinished;
+
+  _CompletionState({
+    required this.showDNFScreen,
+    required this.showWinnerScreen,
+    required this.currentUserFinished,
+  });
 }
 

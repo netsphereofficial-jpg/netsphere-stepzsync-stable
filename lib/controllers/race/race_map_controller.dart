@@ -465,6 +465,24 @@ class MapController extends GetxController with WidgetsBindingObserver {
         print("Race completed! Remaining distance: ${remainingDistance}km");
         print("📸 Capturing map snapshot before showing winner screen...");
 
+        // ✅ FIX: Optimistically set isCompleted flag BEFORE waiting for Firebase
+        // This prevents DNF screen flicker by ensuring currentUserFinished=true immediately
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        if (currentUserId != null && participantsList.isNotEmpty) {
+          final myParticipantIndex = participantsList.indexWhere((p) => p.userId == currentUserId);
+          if (myParticipantIndex != -1) {
+            print("✅ Setting isCompleted=true optimistically for ${participantsList[myParticipantIndex].userName}");
+            final updatedParticipant = participantsList[myParticipantIndex].copyWith(
+              isCompleted: true,
+              remainingDistance: 0.0,
+            );
+            // Update in place to trigger reactive UI
+            final updatedList = List<Participant>.from(participantsList);
+            updatedList[myParticipantIndex] = updatedParticipant;
+            participantsList.value = updatedList;
+          }
+        }
+
         // Mark race as ended (prevents flickering)
         raceEnded.value = true;
 
