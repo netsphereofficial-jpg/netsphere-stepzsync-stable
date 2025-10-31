@@ -9,6 +9,7 @@ import 'pedometer_service.dart';
 import 'pedometer_permission_monitor.dart';
 import 'health_sync_service.dart';
 import 'health_sync_coordinator.dart';
+import 'race_step_reconciliation_service.dart';
 import 'database_controller.dart';
 import 'race_bot_service.dart';
 import 'cache_service.dart';
@@ -66,6 +67,12 @@ class DependencyInjection {
     // Coordinates all health-to-race step propagation with deduplication
     // Registered immediately (not lazy) to ensure availability during cold start
     Get.put<HealthSyncCoordinator>(HealthSyncCoordinator(), permanent: true);
+
+    // ✅ NEW ARCHITECTURE: Register RaceStepReconciliationService as IMMEDIATE permanent singleton
+    // Uses Cloud Functions for server-side baseline management
+    // Replaces client-side delta calculation with simple total data sync
+    // Eliminates app restart bugs, day rollover bugs, and double-counting bugs
+    Get.put<RaceStepReconciliationService>(RaceStepReconciliationService(), permanent: true);
 
     // Register StepTrackingService as lazy permanent singleton
     // Will be initialized on first access (dashboard screen)

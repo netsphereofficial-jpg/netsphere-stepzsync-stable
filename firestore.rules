@@ -1,7 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default: Allow authenticated users
+    // ============================================================================
+    // HEALTH BASELINES - Server-Side Step Tracking (NEW)
+    // ============================================================================
+    // Users can only read their own baselines
+    // Only Cloud Functions can write (enforced by Functions running with admin privileges)
+    match /users/{userId}/health_baselines/{raceId} {
+      // Users can read their own health baselines
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Only Cloud Functions can write (they use admin SDK)
+      // Regular clients should NOT be able to modify baselines directly
+      allow write: if false;
+    }
+
+    // Default: Allow authenticated users for other collections
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

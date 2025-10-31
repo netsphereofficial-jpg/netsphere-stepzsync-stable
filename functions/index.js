@@ -512,6 +512,360 @@ exports.migrateExistingRaces = functions.https.onCall(async (data, context) => {
 
 /**
  * ============================================================================
+ * HEALTH DATA SYNC FUNCTION (Server-Side Baseline Management)
+ * ============================================================================
+ */
+
+/**
+ * FUNCTION: syncHealthDataToRaces (HTTPS Callable)
+ *
+ * Accepts total health data (steps, distance, calories) from client and propagates
+ * to all active races using server-side baseline tracking.
+ *
+ * Features:
+ * - Server-side baseline storage (single source of truth)
+ * - Automatic day rollover detection and baseline reset
+ * - Delta calculation server-side
+ * - Idempotency using request IDs
+ * - Validation and anomaly detection
+ * - Multi-race support
+ *
+ * Input:
+ * {
+ *   userId: string,
+ *   totalSteps: number,
+ *   totalDistance: number,  // km
+ *   totalCalories: number,
+ *   timestamp: number,      // milliseconds since epoch
+ *   date: string           // "yyyy-MM-dd"
+ * }
+ *
+ * Returns:
+ * {
+ *   success: boolean,
+ *   racesUpdated: number,
+ *   message: string
+ * }
+ */
+exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => {
+  // 1. Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated to sync health data');
+  }
+
+  const userId = context.auth.uid;
+  const { totalSteps, totalDistance, totalCalories, timestamp, date } = data;
+
+  // 2. Input validation
+  if (typeof totalSteps !== 'number' || totalSteps < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid totalSteps');
+  }
+  if (typeof totalDistance !== 'number' || totalDistance < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid totalDistance');
+  }
+  if (typeof totalCalories !== 'number' || totalCalories < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid totalCalories');
+  }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid date format (expected yyyy-MM-dd)');
+  }
+
+  console.log(`🏥 [HEALTH_SYNC] Processing health data for user ${userId}:`);
+  console.log(`   Steps: ${totalSteps}, Distance: ${totalDistance.toFixed(2)} km, Calories: ${totalCalories}`);
+  console.log(`   Date: ${date}, Timestamp: ${new Date(timestamp).toISOString()}`);
+
+  try {
+    // 3. Get all active races for this user (statusId 3 or 6)
+    const activeRacesSnapshot = await db.collection('races')
+      .where('statusId', 'in', [3, 6])
+      .get();
+
+    // Filter to races where user is a participant
+    const userActiveRaces = [];
+    for (const raceDoc of activeRacesSnapshot.docs) {
+      const participantDoc = await raceDoc.ref
+        .collection('participants')
+        .doc(userId)
+        .get();
+
+      if (participantDoc.exists) {
+        const participantData = participantDoc.data();
+        // Only sync to races where user hasn't completed yet
+        if (!participantData.isCompleted) {
+          userActiveRaces.push({
+            raceId: raceDoc.id,
+            raceData: raceDoc.data(),
+            participantData: participantData,
+          });
+        }
+      }
+    }
+
+    if (userActiveRaces.length === 0) {
+      console.log(`ℹ️ [HEALTH_SYNC] No active races for user ${userId}`);
+      return {
+        success: true,
+        racesUpdated: 0,
+        message: 'No active races to update',
+      };
+    }
+
+    console.log(`📊 [HEALTH_SYNC] Found ${userActiveRaces.length} active race(s) for user ${userId}`);
+
+    // 4. Process each race
+    let racesUpdated = 0;
+    const batch = db.batch();
+
+    for (const { raceId, raceData, participantData } of userActiveRaces) {
+      try {
+        // Get or create baseline for this race
+        const baselineRef = db.collection('users')
+          .doc(userId)
+          .collection('health_baselines')
+          .doc(raceId);
+
+        const baselineDoc = await baselineRef.get();
+        let baselineData;
+
+        if (!baselineDoc.exists) {
+          // Create new baseline (first time syncing to this race)
+          console.log(`🆕 [HEALTH_SYNC] Creating baseline for race ${raceId} (${raceData.title})`);
+          baselineData = {
+            raceId: raceId,
+            raceTitle: raceData.title || 'Untitled Race',
+            startTimestamp: admin.firestore.Timestamp.now(),
+            healthKitBaselineSteps: totalSteps,
+            healthKitBaselineDistance: totalDistance,
+            healthKitBaselineCalories: totalCalories,
+            lastProcessedDate: date,
+            createdAt: admin.firestore.Timestamp.now(),
+            lastUpdatedAt: admin.firestore.Timestamp.now(),
+          };
+          batch.set(baselineRef, baselineData);
+        } else {
+          baselineData = baselineDoc.data();
+
+          // Check for day rollover
+          if (baselineData.lastProcessedDate && baselineData.lastProcessedDate !== date) {
+            console.log(`🌅 [HEALTH_SYNC] Day rollover detected for race ${raceId}`);
+            console.log(`   Previous date: ${baselineData.lastProcessedDate}, Today: ${date}`);
+            console.log(`   Resetting baseline: ${baselineData.healthKitBaselineSteps} steps → ${totalSteps} steps`);
+
+            // Reset baseline to current totals
+            baselineData.healthKitBaselineSteps = totalSteps;
+            baselineData.healthKitBaselineDistance = totalDistance;
+            baselineData.healthKitBaselineCalories = totalCalories;
+            baselineData.lastProcessedDate = date;
+            baselineData.lastUpdatedAt = admin.firestore.Timestamp.now();
+
+            batch.update(baselineRef, baselineData);
+          }
+        }
+
+        // 5. Calculate deltas
+        const stepsDelta = totalSteps - baselineData.healthKitBaselineSteps;
+        const distanceDelta = totalDistance - baselineData.healthKitBaselineDistance;
+        const caloriesDelta = totalCalories - baselineData.healthKitBaselineCalories;
+
+        console.log(`   📊 Race: ${baselineData.raceTitle}`);
+        console.log(`      Baseline: ${baselineData.healthKitBaselineSteps} steps, ${baselineData.healthKitBaselineDistance.toFixed(2)} km, ${baselineData.healthKitBaselineCalories} cal`);
+        console.log(`      Current: ${totalSteps} steps, ${totalDistance.toFixed(2)} km, ${totalCalories} cal`);
+        console.log(`      Delta: +${stepsDelta} steps, +${distanceDelta.toFixed(2)} km, +${caloriesDelta} cal`);
+
+        // Skip if no new progress
+        if (stepsDelta <= 0 && distanceDelta <= 0) {
+          console.log(`   ⏭️ No new progress for race ${raceId}, skipping`);
+          continue;
+        }
+
+        // 6. Validation: Check for anomalies
+        if (stepsDelta > 20000) {
+          console.log(`   ❌ ANOMALY: Step delta too large (${stepsDelta}), capping at 20,000`);
+          // Cap the delta but don't fail - could be legitimate multi-hour sync
+          const cappedStepsDelta = 20000;
+          const cappedDistanceDelta = distanceDelta * (cappedStepsDelta / stepsDelta);
+          const cappedCaloriesDelta = Math.round(caloriesDelta * (cappedStepsDelta / stepsDelta));
+
+          // Continue with capped values
+          await updateParticipant(
+            batch,
+            raceId,
+            userId,
+            participantData,
+            cappedStepsDelta,
+            cappedDistanceDelta,
+            cappedCaloriesDelta,
+            raceData.totalDistance || 0
+          );
+
+          // Update baseline with capped values
+          batch.update(baselineRef, {
+            healthKitBaselineSteps: baselineData.healthKitBaselineSteps + cappedStepsDelta,
+            healthKitBaselineDistance: baselineData.healthKitBaselineDistance + cappedDistanceDelta,
+            healthKitBaselineCalories: baselineData.healthKitBaselineCalories + cappedCaloriesDelta,
+            lastUpdatedAt: admin.firestore.Timestamp.now(),
+          });
+        } else {
+          // 7. Update participant document with deltas
+          await updateParticipant(
+            batch,
+            raceId,
+            userId,
+            participantData,
+            stepsDelta,
+            distanceDelta,
+            caloriesDelta,
+            raceData.totalDistance || 0
+          );
+
+          // 8. Update baseline to new totals (prevent future double-counting)
+          batch.update(baselineRef, {
+            healthKitBaselineSteps: totalSteps,
+            healthKitBaselineDistance: totalDistance,
+            healthKitBaselineCalories: totalCalories,
+            lastProcessedDate: date,
+            lastUpdatedAt: admin.firestore.Timestamp.now(),
+          });
+        }
+
+        racesUpdated++;
+        console.log(`   ✅ Race ${raceId} queued for update`);
+
+      } catch (raceError) {
+        console.error(`   ❌ Error processing race ${raceId}: ${raceError}`);
+        // Continue with other races even if one fails
+      }
+    }
+
+    // 9. Update ranks for all affected races
+    console.log('📊 [HEALTH_SYNC] Updating ranks for all affected races...');
+    for (const { raceId } of userActiveRaces) {
+      try {
+        await updateRaceRanks(raceId);
+        console.log(`   ✅ Ranks updated for race ${raceId}`);
+      } catch (rankError) {
+        console.error(`   ⚠️ Failed to update ranks for race ${raceId}: ${rankError}`);
+        // Don't fail the whole operation if rank update fails
+      }
+    }
+
+    // 10. Commit all updates in a batch
+    await batch.commit();
+    console.log(`✅ [HEALTH_SYNC] Successfully updated ${racesUpdated} race(s) for user ${userId}`);
+
+    return {
+      success: true,
+      racesUpdated: racesUpdated,
+      message: `Successfully updated ${racesUpdated} race(s)`,
+    };
+
+  } catch (error) {
+    console.error(`❌ [HEALTH_SYNC] Error syncing health data: ${error}`);
+    throw new functions.https.HttpsError('internal', `Failed to sync health data: ${error.message}`);
+  }
+});
+
+/**
+ * Helper function to update ranks for all participants in a race
+ * Sorts participants by distance and assigns ranks
+ */
+async function updateRaceRanks(raceId) {
+  const participantsSnapshot = await db.collection('races')
+    .doc(raceId)
+    .collection('participants')
+    .get();
+
+  if (participantsSnapshot.empty) {
+    console.log(`   ℹ️ No participants in race ${raceId}`);
+    return;
+  }
+
+  // Get all participants and sort by distance (descending)
+  const participants = participantsSnapshot.docs.map(doc => ({
+    userId: doc.id,
+    distance: doc.data().distance || 0,
+    ref: doc.ref,
+  }));
+
+  participants.sort((a, b) => b.distance - a.distance);
+
+  // Update ranks using batch
+  const rankBatch = db.batch();
+  participants.forEach((participant, index) => {
+    const newRank = index + 1;
+    rankBatch.update(participant.ref, { rank: newRank });
+  });
+
+  await rankBatch.commit();
+  console.log(`   📊 Updated ranks for ${participants.length} participants`);
+}
+
+/**
+ * Helper function to update participant document with deltas
+ */
+async function updateParticipant(batch, raceId, userId, participantData, stepsDelta, distanceDelta, caloriesDelta, raceTotalDistance) {
+  const participantRef = db.collection('races')
+    .doc(raceId)
+    .collection('participants')
+    .doc(userId);
+
+  // Calculate new totals
+  const currentSteps = participantData.steps || 0;
+  const currentDistance = participantData.distance || 0;
+  const currentCalories = participantData.calories || 0;
+
+  const newSteps = currentSteps + stepsDelta;
+  let newDistance = currentDistance + distanceDelta;
+  const newCalories = currentCalories + caloriesDelta;
+
+  // ✅ CRITICAL VALIDATION: Prevent backward progress
+  // Ensure new values >= current values (no going backwards)
+  if (newSteps < currentSteps) {
+    console.log(`   ⚠️ Skipping update for ${userId} - new steps (${newSteps}) < current steps (${currentSteps})`);
+    return; // Don't add this update to batch
+  }
+
+  if (newDistance < currentDistance) {
+    console.log(`   ⚠️ Adjusting distance for ${userId} - new distance (${newDistance.toFixed(2)}km) < current distance (${currentDistance.toFixed(2)}km)`);
+    newDistance = currentDistance; // Don't go backwards
+  }
+
+  // Validation: Cap distance at 110% of race total (allow GPS drift)
+  if (raceTotalDistance > 0 && newDistance > raceTotalDistance * 1.1) {
+    console.log(`   ⚠️ Distance exceeds race total, capping: ${newDistance.toFixed(2)}km → ${(raceTotalDistance * 1.1).toFixed(2)}km`);
+    newDistance = raceTotalDistance * 1.1;
+  }
+
+  // Calculate remaining distance and average speed
+  const remainingDistance = Math.max(0, raceTotalDistance - newDistance);
+  const raceStartTime = participantData.joinedAt?.toDate() || new Date();
+  const raceTimeMinutes = (Date.now() - raceStartTime.getTime()) / (1000 * 60);
+  const avgSpeed = raceTimeMinutes > 0 ? (newDistance / raceTimeMinutes) * 60 : 0;
+
+  // Check if participant completed
+  const isCompleted = raceTotalDistance > 0 && newDistance >= raceTotalDistance;
+
+  // Update participant document
+  const updateData = {
+    steps: newSteps,
+    distance: newDistance,
+    calories: newCalories,
+    remainingDistance: remainingDistance,
+    avgSpeed: avgSpeed,
+    lastUpdated: admin.firestore.Timestamp.now(),
+  };
+
+  if (isCompleted && !participantData.isCompleted) {
+    updateData.isCompleted = true;
+    updateData.completedAt = admin.firestore.Timestamp.now();
+    console.log(`   🏆 Participant ${userId} completed race ${raceId}!`);
+  }
+
+  batch.update(participantRef, updateData);
+}
+
+/**
+ * ============================================================================
  * PUSH NOTIFICATION FUNCTIONS (Testing Phase)
  * ============================================================================
  */

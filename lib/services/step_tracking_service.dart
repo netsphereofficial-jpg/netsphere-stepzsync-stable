@@ -11,6 +11,7 @@ import '../utils/step_date_utils.dart';
 import 'pedometer_service.dart';
 import 'health_sync_service.dart';
 import 'health_sync_coordinator.dart';
+import 'race_step_reconciliation_service.dart';
 
 /// Main Step Tracking Service - Orchestrates all step tracking functionality
 ///
@@ -190,24 +191,25 @@ class StepTrackingService extends GetxService {
 
         print('✅ HealthKit baseline: $_healthKitBaselineSteps steps, ${_healthKitBaselineDistance}km');
 
-        // Propagate to active races using centralized coordinator
-        // This prevents duplicate counting through request ID deduplication
-        if (Get.isRegistered<HealthSyncCoordinator>()) {
+        // ✅ NEW ARCHITECTURE: Use Cloud Functions for server-side baseline management
+        // Send total health data (not deltas) to Cloud Function, which handles all baseline tracking
+        if (Get.isRegistered<RaceStepReconciliationService>()) {
           try {
-            final coordinator = Get.find<HealthSyncCoordinator>();
-            await coordinator.propagateHealthStepsToRaces(
-              steps: _healthKitBaselineSteps,
-              source: 'HealthKitBaseline',
+            final reconciliationService = Get.find<RaceStepReconciliationService>();
+            await reconciliationService.syncHealthDataToRaces(
+              totalSteps: _healthKitBaselineSteps,
+              totalDistance: _healthKitBaselineDistance,
+              totalCalories: _healthKitBaselineCalories,
             );
-            print('✅ Propagated HealthKit baseline to races via coordinator');
+            print('✅ Synced health data to races via Cloud Function');
           } catch (e) {
-            print('⚠️ Could not propagate steps to races: $e');
+            print('⚠️ Could not sync health data to races: $e');
           }
         } else {
-          print('⏳ HealthSyncCoordinator not registered yet');
+          print('⏳ RaceStepReconciliationService not registered yet');
         }
 
-        // Note: _lastPropagatedToRaces tracker is now managed by HealthSyncCoordinator
+        // Note: All baseline tracking now handled server-side via Cloud Functions
 
         // CONFLICT RESOLUTION: Check if Firebase has different value
         final todayDate = currentDate.value;
@@ -766,21 +768,24 @@ class StepTrackingService extends GetxService {
       }
     });
 
-    // Propagate to active races using centralized coordinator (OUTSIDE lock to prevent deadlock)
-    if (Get.isRegistered<HealthSyncCoordinator>()) {
+    // ✅ NEW ARCHITECTURE: Use Cloud Functions for server-side baseline management
+    // Send total health data (not deltas) to Cloud Function, which handles all baseline tracking
+    if (Get.isRegistered<RaceStepReconciliationService>()) {
       try {
-        final coordinator = Get.find<HealthSyncCoordinator>();
-        await coordinator.propagateHealthStepsToRaces(
-          steps: _healthKitBaselineSteps,
-          source: 'ManualHealthSync',
+        final reconciliationService = Get.find<RaceStepReconciliationService>();
+        await reconciliationService.syncHealthDataToRaces(
+          totalSteps: _healthKitBaselineSteps,
+          totalDistance: _healthKitBaselineDistance,
+          totalCalories: _healthKitBaselineCalories,
+          forceSync: true,  // Force sync on manual health sync
         );
-        print('✅ Propagated health sync to races via coordinator');
+        print('✅ Synced health data to races via Cloud Function');
       } catch (e) {
-        print('⚠️ Could not propagate steps to races: $e');
+        print('⚠️ Could not sync health data to races: $e');
       }
     }
 
-    // Note: _lastPropagatedToRaces tracker is now managed by HealthSyncCoordinator
+    // Note: All baseline tracking now handled server-side via Cloud Functions
   }
 
   /// Force refresh from HealthKit
