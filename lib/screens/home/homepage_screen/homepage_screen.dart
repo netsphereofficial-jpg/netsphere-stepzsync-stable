@@ -58,6 +58,7 @@ class _HomepageScreenState extends State<HomepageScreen> {
     _initializeCore();
     _setupStepCountListener();
     _setupSyncListeners();
+    _setupNavigationListener();
   }
 
   void _initializeControllers() {
@@ -264,6 +265,11 @@ class _HomepageScreenState extends State<HomepageScreen> {
     );
   }
 
+  void _setupNavigationListener() {
+    // No longer needed - we use onBeforeNavigate callback instead
+    // This is handled by passing a callback to ActionButtonsGridWidget
+  }
+
   @override
   void dispose() {
     print('🗑️ HomepageScreen: Starting disposal...');
@@ -357,6 +363,12 @@ class _HomepageScreenState extends State<HomepageScreen> {
                         activeJoinedRaceCount: dataService.activeJoinedRaceCount,
                         quickRaceCount: dataService.quickRaceCount,
                         pendingInvitesCount: dataService.pendingInvitesCount,
+                        onBeforeNavigate: () {
+                          // Close dropdown before navigating to race screens
+                          if (isDropdownOpen.value) {
+                            _hideDropdownOverlay();
+                          }
+                        },
                       )
                           : const ActionButtonsGridSkeletonWidget()),
                       const SizedBox(height: 16),

@@ -10,6 +10,7 @@ class ActionButtonsGridWidget extends StatelessWidget {
   final RxInt activeJoinedRaceCount;
   final RxInt quickRaceCount;
   final RxInt pendingInvitesCount;
+  final VoidCallback? onBeforeNavigate;
 
   const ActionButtonsGridWidget({
     super.key,
@@ -17,6 +18,7 @@ class ActionButtonsGridWidget extends StatelessWidget {
     required this.activeJoinedRaceCount,
     required this.quickRaceCount,
     required this.pendingInvitesCount,
+    this.onBeforeNavigate,
   });
 
   @override
@@ -148,6 +150,8 @@ class ActionButtonsGridWidget extends StatelessWidget {
         if (isLocked) {
           GuestUpgradeDialog.show(featureName: title);
         } else {
+          // Call onBeforeNavigate callback before navigating (e.g., to close dropdowns)
+          onBeforeNavigate?.call();
           onTap();
         }
       },

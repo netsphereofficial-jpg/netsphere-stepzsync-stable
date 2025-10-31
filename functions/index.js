@@ -177,6 +177,23 @@ exports.onParticipantUpdated = functions.firestore
           updateData.activeParticipantCount = admin.firestore.FieldValue.increment(-1);
         }
         console.log(`🏆 Participant ${userId} completed race ${raceId}`);
+
+        // ✅ FIX: Check if this is the FIRST finisher to trigger countdown timer
+        const raceDoc = await raceRef.get();
+        if (raceDoc.exists) {
+          const raceData = raceDoc.data();
+          const currentCompletedCount = raceData.completedParticipantCount || 0;
+          const totalParticipants = raceData.participantCount || 0;
+
+          // If this is the first completion AND there are other participants still racing
+          if (currentCompletedCount === 0 && totalParticipants > 1 && raceData.statusId === 3) {
+            console.log(`🎯 First finisher in race ${raceId}! Starting countdown timer (statusId: 3 → 6)`);
+            updateData.statusId = 6; // Start countdown for remaining participants
+            updateData.status = 'Ending'; // Update status string
+            updateData.firstFinisherTime = admin.firestore.FieldValue.serverTimestamp();
+            console.log(`⏱️ Countdown timer started for race ${raceId}`);
+          }
+        }
       }
 
       // ✅ NEW: Detect rank changes (overtaking)

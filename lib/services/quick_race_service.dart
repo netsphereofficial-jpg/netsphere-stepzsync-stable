@@ -94,10 +94,13 @@ class QuickRaceService {
     }
   }
 
-  QuickRaceModel _createQuickRaceModel(int participantCount) {
+  QuickRaceModel _createQuickRaceModel(int participantCount, {double distance = 1.0}) {
     final now = DateTime.now();
     final raceTypeLabel = participantCount == 4 ? '1v3' :
                          participantCount == 6 ? '1v5' : '1v7';
+
+    // Calculate duration based on distance
+    int duration = _calculateDurationByDistance(distance);
 
     // ✅ OPTIMIZED: Don't initialize with participants array - use subcollection only
     return QuickRaceModel(
@@ -109,9 +112,26 @@ class QuickRaceService {
       participants: [], // Empty - participants stored in subcollection
       status: participantCount == 1 ? 'ready' : 'waiting',
       createdBy: currentUserId!,
-      distance: 1.0, // 1km quick sprint
-      duration: 30, // 30 minutes
+      distance: distance,
+      duration: duration,
     );
+  }
+
+  /// Calculate duration (cutoff time) based on race distance
+  /// Returns duration in minutes
+  int _calculateDurationByDistance(double distanceKm) {
+    if (distanceKm <= 1.0) {
+      return 10; // 1 km: 10 minutes
+    } else if (distanceKm <= 3.0) {
+      return 30; // 3 km: 30 minutes (around 25-30 minutes)
+    } else if (distanceKm <= 5.0) {
+      return 50; // 5 km: 50 minutes (around 40-50 minutes)
+    } else if (distanceKm <= 7.0) {
+      return 70; // 7 km: 70 minutes (around 55-70 minutes)
+    } else {
+      // For distances > 7km, scale proportionally (10 minutes per km)
+      return (distanceKm * 10).round();
+    }
   }
 
   Future<void> _createParticipantDocument(String raceId, String userId) async {

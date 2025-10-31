@@ -384,6 +384,9 @@ class QuickRaceController extends GetxController {
       final startCoords = _getStartCoordinates();
       final startAddress = _getStartAddress();
 
+      // Calculate duration based on distance with appropriate cutoff times
+      int durationMinutes = _calculateDurationByDistance(selectedDistance.value);
+
       // Calculate end point through nearby POIs (monuments, parks, malls, etc.)
       log('🗺️ Calculating route through nearby POIs...');
       final endPoint = await _calculateEndPointWithPOI(
@@ -443,9 +446,9 @@ class QuickRaceController extends GetxController {
         endAddress: endAddress,
         isPrivate: false, // Always public
         raceScheduleTime: 'Active', // Started immediately
-        raceDeadline: DateTime.now().add(Duration(minutes: 5)).toIso8601String(), // 5 minutes for testing (change to hours: 12 for production)
+        raceDeadline: DateTime.now().add(Duration(minutes: durationMinutes)).toIso8601String(),
         durationHrs: 0,
-        durationMins: 5, // Fixed 5 minutes for testing (change to 720 minutes for 12 hours in production)
+        durationMins: durationMinutes,
         genderPreferenceId: 0, // Any gender
         organizerUserId: currentUser.uid,
         organizerName: currentUser.displayName ??
@@ -640,6 +643,23 @@ class QuickRaceController extends GetxController {
       'lat': lat2 * 180 / dart_math.pi,
       'lng': lng2 * 180 / dart_math.pi,
     };
+  }
+
+  /// Calculate duration (cutoff time) based on race distance
+  /// Returns duration in minutes
+  int _calculateDurationByDistance(double distanceKm) {
+    if (distanceKm <= 1.0) {
+      return 10; // 1 km: 10 minutes
+    } else if (distanceKm <= 3.0) {
+      return 30; // 3 km: 30 minutes (around 25-30 minutes)
+    } else if (distanceKm <= 5.0) {
+      return 50; // 5 km: 50 minutes (around 40-50 minutes)
+    } else if (distanceKm <= 7.0) {
+      return 70; // 7 km: 70 minutes (around 55-70 minutes)
+    } else {
+      // For distances > 7km, scale proportionally (10 minutes per km)
+      return (distanceKm * 10).round();
+    }
   }
 
 }
