@@ -408,15 +408,38 @@ exports.onRaceStatusChangedStats = functions.firestore
           doc => doc.data().isCompleted
         ).length;
 
-        // Update race with final statistics
+        // ✅ NEW: Save final leaderboard snapshot for permanent storage
+        const finalLeaderboard = participantsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            userId: doc.id,
+            userName: data.userName || data.displayName || 'Unknown',
+            rank: data.rank || 999,
+            distance: data.distance || 0,
+            steps: data.steps || 0,
+            isCompleted: data.isCompleted || false,
+            completedAt: data.completedAt || null,
+            avgSpeed: data.avgSpeed || 0,
+            profilePicture: data.profilePicture || null,
+          };
+        });
+
+        // Save top 3 for podium display (quick access)
+        const podium = finalLeaderboard.slice(0, 3);
+
+        // Update race with final statistics and leaderboard snapshot
         await change.after.ref.update({
           raceCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
           finalParticipantCount: totalParticipants,
           finalCompletedCount: completedParticipants,
           completionRate: totalParticipants > 0 ? (completedParticipants / totalParticipants * 100) : 0,
+          finalLeaderboard: finalLeaderboard, // Full leaderboard
+          podium: podium, // Top 3 for quick access
         });
 
         console.log(`✅ [Stats] Race ${raceId} final stats: ${completedParticipants}/${totalParticipants} completed (${(completedParticipants/totalParticipants*100).toFixed(1)}%)`);
+        console.log(`📊 [Stats] Saved final leaderboard with ${finalLeaderboard.length} participants`);
+        console.log(`🏆 [Stats] Podium: 1st=${podium[0]?.userName}, 2nd=${podium[1]?.userName}, 3rd=${podium[2]?.userName}`);
       }
 
       // Race cancelled (statusId changed to 7 = CANCELLED)
