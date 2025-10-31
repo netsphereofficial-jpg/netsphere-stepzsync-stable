@@ -1025,9 +1025,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
       if (participant == null) return 1;
 
-      // ✅ Smart caching: Cache key includes distance + participant count
-      // This ensures cache invalidates on ANY meaningful change
-      final cacheKey = '${currentUserId}_${participant.distance.toStringAsFixed(3)}_${participantsList.length}';
+      // ✅ FIX: Cache key must include rank value to detect rank changes
+      // Previous key didn't include rank, causing stale rank display
+      final cacheKey = '${currentUserId}_${participant.rank}_${participant.distance.toStringAsFixed(3)}_${participantsList.length}';
 
       if (_cachedUserRankKey == cacheKey && _cachedUserRank != null) {
         return _cachedUserRank!; // Return cached value (no log spam)
@@ -1886,11 +1886,13 @@ class MapController extends GetxController with WidgetsBindingObserver {
         }
       }
 
-      // ✅ CALCULATE RANKS LOCALLY based on distance (real-time ranking)
-      final participantsWithRanks = _calculateLocalRanks(participantsWithNames);
+      // ✅ FIX: Don't calculate ranks client-side - use server-calculated ranks from Firebase
+      // The Cloud Function (updateRaceRanks) calculates ranks with proper tie-breaking logic
+      // Client-side calculation was causing both devices to show rank 1 due to race conditions
+      // participantsWithRanks = _calculateLocalRanks(participantsWithNames); // REMOVED
 
       // Update participants list which will trigger reactive UI updates
-      participantsList.value = participantsWithRanks;
+      participantsList.value = participantsWithNames;
 
       // Update current user's race data if found
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
@@ -1910,32 +1912,36 @@ class MapController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// ❌ DEPRECATED: Client-side rank calculation removed
+  /// Ranks are now calculated server-side by Cloud Function (updateRaceRanks)
+  /// This prevents race conditions where both devices show rank 1
+  ///
   /// Calculate ranks locally based on distance (real-time ranking for UI)
   /// This doesn't write to Firestore - just calculates ranks for display
-  List<Participant> _calculateLocalRanks(List<Participant> participants) {
-    // Sort by distance (descending - highest distance first)
-    final sorted = List<Participant>.from(participants);
-    sorted.sort((a, b) => b.distance.compareTo(a.distance));
-
-    print('📊 Calculating local ranks:');
-
-    // Assign ranks and create new participant objects with updated ranks
-    final rankedParticipants = <Participant>[];
-    for (int i = 0; i < sorted.length; i++) {
-      final newRank = i + 1;
-      final participant = sorted[i];
-
-      // Only update rank if it changed
-      final updatedParticipant = participant.rank != newRank
-          ? participant.copyWith(rank: newRank)
-          : participant;
-
-      rankedParticipants.add(updatedParticipant);
-      print('   ${newRank}. ${participant.userName}: ${participant.distance}km (rank: ${participant.rank} → $newRank)');
-    }
-
-    return rankedParticipants;
-  }
+  // List<Participant> _calculateLocalRanks(List<Participant> participants) {
+  //   // Sort by distance (descending - highest distance first)
+  //   final sorted = List<Participant>.from(participants);
+  //   sorted.sort((a, b) => b.distance.compareTo(a.distance));
+  //
+  //   print('📊 Calculating local ranks:');
+  //
+  //   // Assign ranks and create new participant objects with updated ranks
+  //   final rankedParticipants = <Participant>[];
+  //   for (int i = 0; i < sorted.length; i++) {
+  //     final newRank = i + 1;
+  //     final participant = sorted[i];
+  //
+  //     // Only update rank if it changed
+  //     final updatedParticipant = participant.rank != newRank
+  //         ? participant.copyWith(rank: newRank)
+  //         : participant;
+  //
+  //     rankedParticipants.add(updatedParticipant);
+  //     print('   ${newRank}. ${participant.userName}: ${participant.distance}km (rank: ${participant.rank} → $newRank)');
+  //   }
+  //
+  //   return rankedParticipants;
+  // }
 
   /// Defensive check to start step tracking if race is already active when user enters
   Future<void> _checkAndStartStepTrackingForActiveRace(RaceData raceData) async {
