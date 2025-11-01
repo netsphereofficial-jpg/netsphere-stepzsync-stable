@@ -1912,37 +1912,6 @@ class MapController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  /// ❌ DEPRECATED: Client-side rank calculation removed
-  /// Ranks are now calculated server-side by Cloud Function (updateRaceRanks)
-  /// This prevents race conditions where both devices show rank 1
-  ///
-  /// Calculate ranks locally based on distance (real-time ranking for UI)
-  /// This doesn't write to Firestore - just calculates ranks for display
-  // List<Participant> _calculateLocalRanks(List<Participant> participants) {
-  //   // Sort by distance (descending - highest distance first)
-  //   final sorted = List<Participant>.from(participants);
-  //   sorted.sort((a, b) => b.distance.compareTo(a.distance));
-  //
-  //   print('📊 Calculating local ranks:');
-  //
-  //   // Assign ranks and create new participant objects with updated ranks
-  //   final rankedParticipants = <Participant>[];
-  //   for (int i = 0; i < sorted.length; i++) {
-  //     final newRank = i + 1;
-  //     final participant = sorted[i];
-  //
-  //     // Only update rank if it changed
-  //     final updatedParticipant = participant.rank != newRank
-  //         ? participant.copyWith(rank: newRank)
-  //         : participant;
-  //
-  //     rankedParticipants.add(updatedParticipant);
-  //     print('   ${newRank}. ${participant.userName}: ${participant.distance}km (rank: ${participant.rank} → $newRank)');
-  //   }
-  //
-  //   return rankedParticipants;
-  // }
-
   /// Defensive check to start step tracking if race is already active when user enters
   Future<void> _checkAndStartStepTrackingForActiveRace(RaceData raceData) async {
     try {
