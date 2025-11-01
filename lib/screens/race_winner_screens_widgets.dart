@@ -188,48 +188,60 @@ class WinnerWidget extends StatelessWidget {
 
                     SizedBox(height: 32),
 
-                    // Info Text
-                    Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.appColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: AppColors.appColor,
-                            size: 20,
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "Watch others racing and see live updates!",
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.buttonBlack,
+                    // Info Text - conditional based on participant count
+                    if (mapController.participantsList.length > 1)
+                      Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.appColor.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: AppColors.appColor,
+                              size: 20,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "Watch others racing and see live updates!",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.buttonBlack,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
 
                     SizedBox(height: 24),
 
-                    // View Results Button - Always enabled
-                    CustomButton(
-                      btnTitle: "View Race Map",
-                      onPress: () async {
-                        await _handleViewResults(
-                          context,
-                          raceModel!,
-                          mapController.participantsList,
-                        );
-                      },
-                    ),
+                    // Check if there's only one participant (solo race)
+                    // If solo, skip "View Race Map" and go straight to leaderboard
+                    if (mapController.participantsList.length == 1)
+                      CustomButton(
+                        btnTitle: "View Leaderboard",
+                        onPress: () {
+                          // Navigate to completed races screen (which shows leaderboard)
+                          Get.back(); // Close winner widget
+                        },
+                      )
+                    else
+                      // View Results Button - Show for multi-participant races
+                      CustomButton(
+                        btnTitle: "View Race Map",
+                        onPress: () async {
+                          await _handleViewResults(
+                            context,
+                            raceModel!,
+                            mapController.participantsList,
+                          );
+                        },
+                      ),
 
                     SizedBox(height: 20),
                   ],
