@@ -226,8 +226,11 @@ class WinnerWidget extends StatelessWidget {
                       CustomButton(
                         btnTitle: "View Leaderboard",
                         onPress: () {
-                          // Navigate to completed races screen (which shows leaderboard)
-                          Get.back(); // Close winner widget
+                          // Navigate to RaceWinnersScreen to show leaderboard
+                          Get.off(() => RaceWinnersScreen(
+                            raceData: raceModel,
+                            participants: mapController.participantsList.toList(),
+                          ));
                         },
                       )
                     else
