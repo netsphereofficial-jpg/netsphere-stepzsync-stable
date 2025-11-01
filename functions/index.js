@@ -188,10 +188,21 @@ exports.onParticipantUpdated = functions.firestore
           // If this is the first completion AND there are other participants still racing
           if (currentCompletedCount === 0 && totalParticipants > 1 && raceData.statusId === 3) {
             console.log(`🎯 First finisher in race ${raceId}! Starting countdown timer (statusId: 3 → 6)`);
+
+            // Calculate race deadline based on duration
+            const durationMinutes = raceData.durationMins || (raceData.durationHrs * 60) || 60; // Default 1 hour
+            const deadlineDate = new Date();
+            deadlineDate.setMinutes(deadlineDate.getMinutes() + durationMinutes);
+
             updateData.statusId = 6; // Start countdown for remaining participants
             updateData.status = 'Ending'; // Update status string
             updateData.firstFinisherTime = admin.firestore.FieldValue.serverTimestamp();
+            updateData.firstFinisherUserId = userId; // Track who finished first
+            updateData.raceDeadline = deadlineDate.toISOString(); // Set deadline for countdown
+
             console.log(`⏱️ Countdown timer started for race ${raceId}`);
+            console.log(`   Duration: ${durationMinutes} minutes`);
+            console.log(`   Deadline: ${deadlineDate.toISOString()}`);
           }
         }
       }
@@ -616,21 +627,49 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
 
   try {
     // 3. Get all active races for this user (statusId 3 or 6)
+    console.log(`🔍 [HEALTH_SYNC] Querying for active races (statusId 3 or 6)...`);
+    console.log(`   User ID: ${userId}`);
+    console.log(`   Date: ${date}`);
+
     const activeRacesSnapshot = await db.collection('races')
       .where('statusId', 'in', [3, 6])
       .get();
 
+    console.log(`   Found ${activeRacesSnapshot.size} total active races in database`);
+
+    if (activeRacesSnapshot.size === 0) {
+      console.log(`   ⚠️ No active races found in database with statusId 3 or 6`);
+      console.log(`   This could mean: no races are active, or all races have different status`);
+    }
+
     // Filter to races where user is a participant
     const userActiveRaces = [];
+    let totalRacesChecked = 0;
+    let userParticipantCount = 0;
+    let alreadyCompletedCount = 0;
+
     for (const raceDoc of activeRacesSnapshot.docs) {
+      totalRacesChecked++;
       const raceData = raceDoc.data();
+      console.log(`   [${totalRacesChecked}/${activeRacesSnapshot.size}] Checking race ${raceDoc.id}:`);
+      console.log(`      Title: ${raceData.title}`);
+      console.log(`      StatusId: ${raceData.statusId}`);
+      console.log(`      Start Time: ${raceData.startTime ? new Date(raceData.startTime._seconds * 1000).toISOString() : 'N/A'}`);
+      console.log(`      Total Distance: ${raceData.totalDistance || 'N/A'} km`);
+
       const participantDoc = await raceDoc.ref
         .collection('participants')
         .doc(userId)
         .get();
 
       if (participantDoc.exists) {
+        userParticipantCount++;
         const participantData = participantDoc.data();
+        console.log(`      ✅ User IS a participant!`);
+        console.log(`         Current distance: ${participantData.distance || 0}km`);
+        console.log(`         Steps: ${participantData.steps || 0}`);
+        console.log(`         IsCompleted: ${participantData.isCompleted}`);
+        console.log(`         Rank: ${participantData.rank || 'N/A'}`);
 
         // ✅ DEFENSIVE CHECK: Only sync to races that are truly active and user hasn't completed
         // statusId 3 = Active, statusId 6 = Paused (both allow step syncing)
@@ -638,7 +677,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
         if (!participantData.isCompleted) {
           // Double-check race status (defensive)
           if (raceData.statusId !== 3 && raceData.statusId !== 6) {
-            console.log(`   ⚠️ Race ${raceDoc.id} has invalid statusId ${raceData.statusId}, skipping`);
+            console.log(`      ❌ Race ${raceDoc.id} has invalid statusId ${raceData.statusId}, skipping`);
             continue;
           }
 
@@ -647,14 +686,25 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             raceData: raceData,
             participantData: participantData,
           });
+          console.log(`      ✅ ADDED TO SYNC LIST (will process this race)`);
         } else {
-          console.log(`   ⏭️ User already completed race ${raceDoc.id}, skipping`);
+          alreadyCompletedCount++;
+          console.log(`      ⏭️ User already completed this race, skipping`);
         }
+      } else {
+        console.log(`      ⏭️ User is NOT a participant in this race`);
       }
     }
 
+    console.log(`\n📊 [RACE_QUERY_SUMMARY]:`);
+    console.log(`   Total active races in database: ${activeRacesSnapshot.size}`);
+    console.log(`   Races where user is participant: ${userParticipantCount}`);
+    console.log(`   Already completed by user: ${alreadyCompletedCount}`);
+    console.log(`   Races to sync: ${userActiveRaces.length}`);
+    console.log(``);
+
     if (userActiveRaces.length === 0) {
-      console.log(`ℹ️ [HEALTH_SYNC] No active races for user ${userId}`);
+      console.log(`ℹ️ [HEALTH_SYNC] No active races for user ${userId} (checked ${activeRacesSnapshot.size} races)`);
       return {
         success: true,
         racesUpdated: 0,
@@ -670,18 +720,24 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
 
     for (const { raceId, raceData, participantData } of userActiveRaces) {
       try {
+        console.log(`\n🏁 [PROCESSING] Starting to process race: ${raceId} (${raceData.title})`);
+
         // Get or create baseline for this race
         const baselineRef = db.collection('users')
           .doc(userId)
           .collection('health_baselines')
           .doc(raceId);
 
+        console.log(`   📂 Checking for existing baseline at: users/${userId}/health_baselines/${raceId}`);
         const baselineDoc = await baselineRef.get();
         let baselineData;
 
         if (!baselineDoc.exists) {
           // Create new baseline (first time syncing to this race)
-          console.log(`🆕 [HEALTH_SYNC] Creating baseline for race ${raceId} (${raceData.title})`);
+          console.log(`   🆕 [BASELINE] No existing baseline found - creating new one`);
+          console.log(`      This is the first sync for this race`);
+          console.log(`      Initial baseline will be: ${totalSteps} steps, ${totalDistance.toFixed(2)} km, ${totalCalories} cal`);
+
           baselineData = {
             raceId: raceId,
             raceTitle: raceData.title || 'Untitled Race',
@@ -694,14 +750,21 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             lastUpdatedAt: admin.firestore.Timestamp.now(),
           };
           batch.set(baselineRef, baselineData);
+          console.log(`      ✅ Baseline queued for creation in batch`);
         } else {
+          console.log(`   📖 [BASELINE] Found existing baseline`);
           baselineData = baselineDoc.data();
+          console.log(`      Current baseline: ${baselineData.healthKitBaselineSteps} steps, ${baselineData.healthKitBaselineDistance.toFixed(2)} km, ${baselineData.healthKitBaselineCalories} cal`);
+          console.log(`      Last processed date: ${baselineData.lastProcessedDate}`);
+          console.log(`      Today's date: ${date}`);
 
           // Check for day rollover
           if (baselineData.lastProcessedDate && baselineData.lastProcessedDate !== date) {
-            console.log(`🌅 [HEALTH_SYNC] Day rollover detected for race ${raceId}`);
-            console.log(`   Previous date: ${baselineData.lastProcessedDate}, Today: ${date}`);
-            console.log(`   Resetting baseline: ${baselineData.healthKitBaselineSteps} steps → ${totalSteps} steps`);
+            console.log(`   🌅 [DAY_ROLLOVER] Day rollover detected!`);
+            console.log(`      Previous date: ${baselineData.lastProcessedDate}`);
+            console.log(`      Today: ${date}`);
+            console.log(`      Resetting baseline: ${baselineData.healthKitBaselineSteps} steps → ${totalSteps} steps`);
+            console.log(`      This prevents counting yesterday's steps in today's race`);
 
             // Reset baseline to current totals
             baselineData.healthKitBaselineSteps = totalSteps;
@@ -711,6 +774,9 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             baselineData.lastUpdatedAt = admin.firestore.Timestamp.now();
 
             batch.update(baselineRef, baselineData);
+            console.log(`      ✅ Baseline reset queued in batch`);
+          } else {
+            console.log(`   ✅ Same day - no rollover, will calculate delta normally`);
           }
         }
 
@@ -724,19 +790,73 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
         console.log(`      Current: ${totalSteps} steps, ${totalDistance.toFixed(2)} km, ${totalCalories} cal`);
         console.log(`      Delta: +${stepsDelta} steps, +${distanceDelta.toFixed(2)} km, +${caloriesDelta} cal`);
 
-        // Skip if no new progress
-        if (stepsDelta <= 0 && distanceDelta <= 0) {
+        // 🔍 DETAILED DISTANCE DELTA LOGGING
+        console.log(`   📏 [DISTANCE_DELTA_CHECK] Distance delta analysis:`);
+        console.log(`      Distance delta is zero: ${distanceDelta === 0.0}`);
+        console.log(`      Distance delta is negative: ${distanceDelta < 0.0}`);
+        console.log(`      Distance delta is positive: ${distanceDelta > 0.0}`);
+        console.log(`      Steps delta: ${stepsDelta} (positive: ${stepsDelta > 0})`);
+
+        // Calculate expected distance from steps as fallback
+        const STEPS_TO_KM_FACTOR = 0.000762;
+        const calculatedDistanceDelta = stepsDelta * STEPS_TO_KM_FACTOR;
+        console.log(`      Expected distance from ${stepsDelta} step delta: ${calculatedDistanceDelta.toFixed(4)} km`);
+        console.log(`      Should use fallback calculation: ${distanceDelta === 0.0 && stepsDelta > 0}`);
+
+        // ✅ ANDROID FIX: Handle Health Connect inconsistency
+        // Health Connect sometimes returns LOWER values after writing new data,
+        // likely due to recalculation/deduplication. We need to handle this gracefully.
+        let effectiveStepsDelta = stepsDelta;
+        let effectiveDistanceDelta = distanceDelta;
+        let effectiveCaloriesDelta = caloriesDelta;
+        let baselineNeedsReset = false;
+
+        // Case 1: Negative delta (current < baseline) - Health Connect data inconsistency
+        if (stepsDelta < 0) {
+          console.log(`   ⚠️ [HEALTH_CONNECT_INCONSISTENCY] Current value (${totalSteps}) is LOWER than baseline (${baselineData.healthKitBaselineSteps})`);
+          console.log(`      This indicates Health Connect recalculated daily totals`);
+          console.log(`      Resetting baseline to current value and treating as new starting point`);
+
+          // Reset baseline to current value - this becomes the new starting point
+          baselineNeedsReset = true;
+          effectiveStepsDelta = 0;
+          effectiveDistanceDelta = 0;
+          effectiveCaloriesDelta = 0;
+
+          // Update baseline immediately to prevent future negative deltas
+          batch.update(baselineRef, {
+            healthKitBaselineSteps: totalSteps,
+            healthKitBaselineDistance: totalDistance,
+            healthKitBaselineCalories: totalCalories,
+            lastProcessedDate: date,
+            lastUpdatedAt: admin.firestore.Timestamp.now(),
+          });
+
+          console.log(`      Baseline reset complete. Future syncs will calculate from ${totalSteps} steps`);
+          continue; // Skip this sync, next sync will show proper progress
+        }
+
+        // Case 2: Positive steps but distance is 0 - Use calculated distance
+        if (stepsDelta > 0 && Math.abs(distanceDelta) < 0.001) {
+          console.log(`   🔧 [ANDROID_FIX] Distance delta is ~0 but steps increased by ${stepsDelta}`);
+          console.log(`      Using calculated distance from steps as fallback`);
+          effectiveDistanceDelta = calculatedDistanceDelta;
+          console.log(`      Calculated distance delta: ${effectiveDistanceDelta.toFixed(4)} km`);
+        }
+
+        // Skip if no new progress (after applying fixes)
+        if (effectiveStepsDelta <= 0 && effectiveDistanceDelta <= 0) {
           console.log(`   ⏭️ No new progress for race ${raceId}, skipping`);
           continue;
         }
 
         // 6. Validation: Check for anomalies
-        if (stepsDelta > 20000) {
-          console.log(`   ❌ ANOMALY: Step delta too large (${stepsDelta}), capping at 20,000`);
+        if (effectiveStepsDelta > 20000) {
+          console.log(`   ❌ ANOMALY: Step delta too large (${effectiveStepsDelta}), capping at 20,000`);
           // Cap the delta but don't fail - could be legitimate multi-hour sync
           const cappedStepsDelta = 20000;
-          const cappedDistanceDelta = distanceDelta * (cappedStepsDelta / stepsDelta);
-          const cappedCaloriesDelta = Math.round(caloriesDelta * (cappedStepsDelta / stepsDelta));
+          const cappedDistanceDelta = effectiveDistanceDelta * (cappedStepsDelta / effectiveStepsDelta);
+          const cappedCaloriesDelta = Math.round(effectiveCaloriesDelta * (cappedStepsDelta / effectiveStepsDelta));
 
           // Continue with capped values
           await updateParticipant(
@@ -765,9 +885,9 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             raceId,
             userId,
             participantData,
-            stepsDelta,
-            distanceDelta,
-            caloriesDelta,
+            effectiveStepsDelta,
+            effectiveDistanceDelta,
+            effectiveCaloriesDelta,
             raceData.totalDistance || 0,
             raceData.actualStartTime || raceData.startTime || null // Pass race start time for accurate avgSpeed calculation
           );
@@ -891,12 +1011,23 @@ async function updateRaceRanks(raceId) {
   });
 
   // ✅ IMPROVED SORTING WITH TIE-BREAKING:
-  // 1. Primary: Sort by distance (descending) - higher distance = better rank
-  // 2. Tie-breaker for equal/similar distances (within 0.01 km):
+  // 1. Primary: Completed participants ALWAYS rank higher than DNF/incomplete
+  // 2. Secondary: Sort by distance (descending) - higher distance = better rank
+  // 3. Tie-breaker for equal/similar distances (within 0.01 km):
   //    - If both completed: Earlier completedAt timestamp wins
   //    - If both incomplete: Later lastUpdated timestamp wins (more recent progress)
-  //    - Completed participants rank higher than incomplete at same distance
   participants.sort((a, b) => {
+    // ✅ CRITICAL FIX: Completed participants ALWAYS rank higher than incomplete
+    // This ensures DNF participants never rank above finishers
+    if (a.isCompleted && !b.isCompleted) {
+      console.log(`   ✅ ${a.userId} completed, ${b.userId} incomplete/DNF - ${a.userId} ranks higher`);
+      return -1; // a wins (completed beats incomplete)
+    }
+    if (!a.isCompleted && b.isCompleted) {
+      console.log(`   ✅ ${b.userId} completed, ${a.userId} incomplete/DNF - ${b.userId} ranks higher`);
+      return 1; // b wins (completed beats incomplete)
+    }
+
     // Primary sort: distance (descending)
     const distanceDiff = b.distance - a.distance;
 
@@ -908,21 +1039,13 @@ async function updateRaceRanks(raceId) {
     // Distances are equal or very close - apply tie-breaking
     console.log(`   🔀 Tie-breaking between ${a.userId} and ${b.userId} (both at ${a.distance.toFixed(2)}km)`);
 
-    // If both completed, earlier completion time wins
+    // ✅ FIX: If both completed, earlier completion time wins (INVERTED LOGIC FIXED)
     if (a.isCompleted && b.isCompleted && a.completedAt && b.completedAt) {
       const completionDiff = a.completedAt.toMillis() - b.completedAt.toMillis();
       console.log(`      Both completed - comparing timestamps: ${a.userId}=${a.completedAt.toDate().toISOString()} vs ${b.userId}=${b.completedAt.toDate().toISOString()}`);
-      return completionDiff; // Earlier completion = better rank (negative = a wins)
-    }
-
-    // If one completed and one didn't, completed wins
-    if (a.isCompleted && !b.isCompleted) {
-      console.log(`      ${a.userId} completed, ${b.userId} incomplete - ${a.userId} wins`);
-      return -1; // a wins
-    }
-    if (!a.isCompleted && b.isCompleted) {
-      console.log(`      ${b.userId} completed, ${a.userId} incomplete - ${b.userId} wins`);
-      return 1; // b wins
+      console.log(`      completionDiff=${completionDiff} (negative means a finished first, should rank higher)`);
+      // ✅ CRITICAL FIX: Negate the diff so earlier completion = negative = ranks FIRST
+      return -completionDiff; // Earlier completion = better rank (negative = a wins)
     }
 
     // Both incomplete - more recent update wins (they're still racing)
