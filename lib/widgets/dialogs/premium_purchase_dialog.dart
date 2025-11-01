@@ -70,10 +70,10 @@ class _PremiumPurchaseDialogContentState
       backgroundColor: Colors.transparent,
       elevation: 0,
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.88,
-        constraints: BoxConstraints(maxWidth: 420),
+        width: MediaQuery.of(context).size.width * 0.85,
+        constraints: BoxConstraints(maxWidth: 380),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),
@@ -83,7 +83,7 @@ class _PremiumPurchaseDialogContentState
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(24),
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -113,6 +113,30 @@ class _PremiumPurchaseDialogContentState
                   ),
                   child: Stack(
                     children: [
+                      // Close button
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Get.back(),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                       // Decorative snowflakes
                       Positioned(
                         top: 10,
@@ -149,12 +173,12 @@ class _PremiumPurchaseDialogContentState
 
                       // Main content
                       Padding(
-                        padding: EdgeInsets.fromLTRB(24, 28, 24, 20),
+                        padding: EdgeInsets.fromLTRB(20, 24, 20, 16),
                         child: Column(
                           children: [
                             // Christmas tree with glow effect
                             Container(
-                              padding: EdgeInsets.all(14),
+                              padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.25),
                                 shape: BoxShape.circle,
@@ -168,14 +192,14 @@ class _PremiumPurchaseDialogContentState
                               ),
                               child: Text(
                                 '🎄',
-                                style: TextStyle(fontSize: 36),
+                                style: TextStyle(fontSize: 32),
                               ),
                             ),
-                            SizedBox(height: 14),
+                            SizedBox(height: 12),
                             Text(
                               'Christmas Special',
                               style: GoogleFonts.poppins(
-                                fontSize: 26,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
                                 letterSpacing: 0.8,
@@ -227,7 +251,7 @@ class _PremiumPurchaseDialogContentState
 
                 // Content with better spacing
                 Padding(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 20),
                   child: Column(
                     children: [
                       // Pricing Section with better layout
@@ -239,7 +263,7 @@ class _PremiumPurchaseDialogContentState
                               Text(
                                 '\$600',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 20,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.grey[400],
                                   decoration: TextDecoration.lineThrough,
@@ -254,11 +278,11 @@ class _PremiumPurchaseDialogContentState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
-                                    padding: EdgeInsets.only(top: 8),
+                                    padding: EdgeInsets.only(top: 6),
                                     child: Text(
                                       '\$',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 28,
+                                        fontSize: 24,
                                         fontWeight: FontWeight.w800,
                                         color: Color(0xFF16A34A),
                                       ),
@@ -267,7 +291,7 @@ class _PremiumPurchaseDialogContentState
                                   Text(
                                     '299',
                                     style: GoogleFonts.poppins(
-                                      fontSize: 64,
+                                      fontSize: 56,
                                       fontWeight: FontWeight.w900,
                                       color: Color(0xFF16A34A),
                                       height: 0.85,
@@ -276,7 +300,7 @@ class _PremiumPurchaseDialogContentState
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 8),
+                              SizedBox(height: 6),
                               // Lifetime badge with better shadow
                               Container(
                                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -348,11 +372,11 @@ class _PremiumPurchaseDialogContentState
                         ],
                       ),
 
-                      SizedBox(height: 24),
+                      SizedBox(height: 20),
 
                       // Features - Better styling
                       Container(
-                        padding: EdgeInsets.all(16),
+                        padding: EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
@@ -376,12 +400,12 @@ class _PremiumPurchaseDialogContentState
                         ),
                       ),
 
-                      SizedBox(height: 20),
+                      SizedBox(height: 18),
 
                       // CTA Button with better styling
                       Container(
                         width: double.infinity,
-                        height: 56,
+                        height: 52,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [Color(0xFFDC143C), Color(0xFFB91C1C)],
@@ -412,13 +436,13 @@ class _PremiumPurchaseDialogContentState
                             children: [
                               Text(
                                 '🎁',
-                                style: TextStyle(fontSize: 22),
+                                style: TextStyle(fontSize: 20),
                               ),
-                              SizedBox(width: 10),
+                              SizedBox(width: 8),
                               Text(
                                 'Claim Christmas Offer',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 17,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w800,
                                   color: Colors.white,
                                   letterSpacing: 0.3,
