@@ -195,6 +195,19 @@ class StepTrackingService extends GetxService {
         // Send total health data (not deltas) to Cloud Function, which handles all baseline tracking
         if (Get.isRegistered<RaceStepReconciliationService>()) {
           try {
+            print('🔍 [STEP_TRACKING] Preparing to sync health data to races:');
+            print('   Baseline Steps: $_healthKitBaselineSteps');
+            print('   Baseline Distance: $_healthKitBaselineDistance km');
+            print('   Baseline Calories: $_healthKitBaselineCalories');
+            print('   Distance is zero: ${_healthKitBaselineDistance == 0.0}');
+            print('   Distance is null/empty: ${_healthKitBaselineDistance == null || _healthKitBaselineDistance == 0.0}');
+
+            // Calculate what distance SHOULD be based on steps
+            const double STEPS_TO_KM = 0.000762;
+            final calculatedDistance = _healthKitBaselineSteps * STEPS_TO_KM;
+            print('   Calculated distance from steps: ${calculatedDistance.toStringAsFixed(4)} km');
+            print('   Using health distance: ${_healthKitBaselineDistance > 0.0}');
+
             final reconciliationService = Get.find<RaceStepReconciliationService>();
             await reconciliationService.syncHealthDataToRaces(
               totalSteps: _healthKitBaselineSteps,
@@ -772,6 +785,12 @@ class StepTrackingService extends GetxService {
     // Send total health data (not deltas) to Cloud Function, which handles all baseline tracking
     if (Get.isRegistered<RaceStepReconciliationService>()) {
       try {
+        print('🔍 [UPDATE_FROM_HEALTH_SYNC] Syncing updated health data to races:');
+        print('   Updated Steps: $_healthKitBaselineSteps');
+        print('   Updated Distance: $_healthKitBaselineDistance km');
+        print('   Updated Calories: $_healthKitBaselineCalories');
+        print('   Distance is zero: ${_healthKitBaselineDistance == 0.0}');
+
         final reconciliationService = Get.find<RaceStepReconciliationService>();
         await reconciliationService.syncHealthDataToRaces(
           totalSteps: _healthKitBaselineSteps,

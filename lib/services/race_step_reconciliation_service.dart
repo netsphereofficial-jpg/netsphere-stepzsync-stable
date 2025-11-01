@@ -94,6 +94,18 @@ class RaceStepReconciliationService extends GetxService {
       dev.log('🏥 [RACE_RECONCILIATION] Syncing health data to races:');
       dev.log('   Steps: $totalSteps, Distance: ${totalDistance.toStringAsFixed(2)} km, Calories: $totalCalories');
 
+      // 🔍 DETAILED DISTANCE LOGGING
+      dev.log('📏 [DISTANCE_CHECK] Distance value breakdown:');
+      dev.log('   Raw distance value: $totalDistance');
+      dev.log('   Distance is zero: ${totalDistance == 0.0}');
+      dev.log('   Distance is positive: ${totalDistance > 0.0}');
+
+      // Calculate expected distance from steps as fallback
+      const double STEPS_TO_KM_FACTOR = 0.000762;
+      final calculatedDistance = totalSteps * STEPS_TO_KM_FACTOR;
+      dev.log('   Expected distance from $totalSteps steps: ${calculatedDistance.toStringAsFixed(4)} km');
+      dev.log('   Difference from health data: ${(totalDistance - calculatedDistance).abs().toStringAsFixed(4)} km');
+
       // 4. Prepare payload
       final now = DateTime.now();
       final dateString = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -106,6 +118,13 @@ class RaceStepReconciliationService extends GetxService {
         'timestamp': now.millisecondsSinceEpoch,
         'date': dateString,
       };
+
+      dev.log('📦 [PAYLOAD] Prepared payload for Cloud Function:');
+      dev.log('   userId: ${currentUser.uid}');
+      dev.log('   totalSteps: $totalSteps');
+      dev.log('   totalDistance: $totalDistance');
+      dev.log('   totalCalories: $totalCalories');
+      dev.log('   date: $dateString');
 
       // 5. Call Cloud Function
       dev.log('☁️ [RACE_RECONCILIATION] Calling syncHealthDataToRaces Cloud Function...');
