@@ -352,11 +352,15 @@ class StepTrackingService extends GetxService {
 
       todaySteps.value = combinedSteps;
 
-      // Calculate distance (use HealthKit baseline if available, otherwise estimate)
+      // Calculate distance
+      // When Health Connect/HealthKit provides distance data, use it directly
+      // The health data already includes all steps, so we don't add pedometer increments
+      // Only fall back to step-based calculation when health distance is unavailable
       if (_healthKitBaselineDistance > 0) {
-        final incrementalDistance = incrementalSteps * _stepsToKmFactor;
-        todayDistance.value = _healthKitBaselineDistance + incrementalDistance;
+        // Use Health Connect/HealthKit distance directly (already includes all activity)
+        todayDistance.value = _healthKitBaselineDistance;
       } else {
+        // Fallback: Estimate distance from combined steps when health distance not available
         todayDistance.value = combinedSteps * _stepsToKmFactor;
       }
 
