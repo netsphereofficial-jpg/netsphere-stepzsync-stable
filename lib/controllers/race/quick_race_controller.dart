@@ -662,4 +662,16 @@ class QuickRaceController extends GetxController {
     }
   }
 
+  /// Get formatted duration string for the UI based on selected distance
+  String get formattedDuration {
+    final durationMins = _calculateDurationByDistance(selectedDistance.value);
+    if (durationMins < 60) {
+      return '$durationMins Min';
+    } else {
+      final hours = durationMins ~/ 60;
+      final mins = durationMins % 60;
+      return mins > 0 ? '$hours Hr $mins Min' : '$hours Hour${hours > 1 ? 's' : ''}';
+    }
+  }
+
 }

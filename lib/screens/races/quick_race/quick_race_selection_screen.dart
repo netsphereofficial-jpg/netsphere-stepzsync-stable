@@ -210,7 +210,7 @@ class QuickRaceSelectionScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildQuickStat(Icons.timer, '12 Hours', 'Duration'),
+              _buildQuickStat(Icons.timer, controller.formattedDuration, 'Duration'),
               Container(width: 1, height: 30, color: Colors.grey[300]),
               _buildQuickStat(Icons.public, 'Public', 'Visibility'),
               Container(width: 1, height: 30, color: Colors.grey[300]),
