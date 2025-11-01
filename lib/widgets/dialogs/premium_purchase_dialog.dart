@@ -452,24 +452,6 @@ class _PremiumPurchaseDialogContentState
                           ),
                         ),
                       ),
-
-                      SizedBox(height: 10),
-
-                      // Maybe Later button
-                      TextButton(
-                        onPressed: () => Get.back(),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                        ),
-                        child: Text(
-                          'Maybe Later',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
