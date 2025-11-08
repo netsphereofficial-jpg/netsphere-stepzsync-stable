@@ -558,7 +558,7 @@ class RaceWinnersScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Race Complete!',
+                      'Race Finished!',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -625,7 +625,7 @@ class RaceWinnersScreen extends StatelessWidget {
                             const Icon(Icons.emoji_events, size: 16, color: Colors.white),
                             const SizedBox(width: 6),
                             Text(
-                              'Top 3 Finishers',
+                              'Top 3 Performers',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
