@@ -209,41 +209,66 @@ class HallOfFameService {
   ) async {
     List<LeaderboardEntry> entries = [];
 
+    log('🔧 Building leaderboard entries from ${docs.length} documents...');
+
     for (int i = 0; i < docs.length; i++) {
       final doc = docs[i];
-      final userXP = UserXP.fromFirestore(doc);
+      log('📄 Processing doc ${i + 1}/${docs.length}: ${doc.id}');
 
-      // Get user profile for display name and avatar
-      final userProfile = await _getUserProfile(userXP.userId);
+      try {
+        final userXP = UserXP.fromFirestore(doc);
+        log('   ✓ UserXP parsed: userId=${userXP.userId}, totalXP=${userXP.totalXP}, racesWon=${userXP.racesWon}');
 
-      if (userProfile != null) {
-        entries.add(LeaderboardEntry(
-          userId: userXP.userId,
-          userName: userProfile.fullName ?? userProfile.username ?? 'Unknown User',
-          profilePicture: userProfile.profilePicture,
-          totalXP: userXP.totalXP,
-          level: userXP.level,
-          rank: i + 1, // Position in this list
-          racesCompleted: userXP.racesCompleted,
-          racesWon: userXP.racesWon,
-          podiumFinishes: userXP.podiumFinishes,
-          country: userProfile.country,
-          city: userProfile.city,
-        ));
+        // Get user profile for display name and avatar
+        final userProfile = await _getUserProfile(userXP.userId);
+
+        if (userProfile != null) {
+          log('   ✓ UserProfile found: ${userProfile.fullName ?? userProfile.username ?? "Unknown"}');
+          entries.add(LeaderboardEntry(
+            userId: userXP.userId,
+            userName: userProfile.fullName ?? userProfile.username ?? 'Unknown User',
+            profilePicture: userProfile.profilePicture,
+            totalXP: userXP.totalXP,
+            level: userXP.level,
+            rank: i + 1, // Position in this list
+            racesCompleted: userXP.racesCompleted,
+            racesWon: userXP.racesWon,
+            podiumFinishes: userXP.podiumFinishes,
+            country: userProfile.country,
+            city: userProfile.city,
+          ));
+          log('   ✓ Entry added successfully');
+        } else {
+          log('   ✗ UserProfile is null for userId=${userXP.userId} - ENTRY SKIPPED!');
+        }
+      } catch (e, stackTrace) {
+        log('   ✗ Error processing document ${doc.id}: $e');
+        log('   Stack trace: $stackTrace');
       }
     }
 
+    log('🏁 Completed building entries: ${entries.length} out of ${docs.length} documents');
     return entries;
   }
 
   /// Get user profile data
   Future<UserProfile?> _getUserProfile(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
-      if (!doc.exists) return null;
-      return UserProfile.fromFirestore(doc);
-    } catch (e) {
-      log('❌ Error fetching user profile for $userId: $e');
+      log('      🔍 Fetching user profile for userId: $userId');
+      final doc = await _firestore.collection('user_profiles').doc(userId).get();
+
+      if (!doc.exists) {
+        log('      ✗ User document does not exist in user_profiles collection for userId: $userId');
+        return null;
+      }
+
+      log('      ✓ User document found, parsing UserProfile...');
+      final profile = UserProfile.fromFirestore(doc);
+      log('      ✓ UserProfile parsed successfully: ${profile.fullName ?? profile.username ?? "no name"}');
+      return profile;
+    } catch (e, stackTrace) {
+      log('      ❌ Error fetching user profile for $userId: $e');
+      log('      Stack trace: $stackTrace');
       return null;
     }
   }

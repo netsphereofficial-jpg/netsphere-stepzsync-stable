@@ -195,17 +195,21 @@ class ProfileViewScreen extends StatelessWidget {
               showBadge: true,
               badgeText: "View your fitness milestones",
               onTap: () {
-                // TODO: Navigate to achievements
+                Get.toNamed('/achievements');
               },
             ),
-            buildProfileRow(
-              icon: IconPaths.card,
-              label: "Subscription Plans",
-              showBadge: true,
-              badgeText: "Manage your premium features",
-              onTap: () {
-                Get.to(() => SubscriptionScreen());
-              },
+            // Temporarily hidden for testing
+            Visibility(
+              visible: false,
+              child: buildProfileRow(
+                icon: IconPaths.card,
+                label: "Subscription Plans",
+                showBadge: true,
+                badgeText: "Manage your premium features",
+                onTap: () {
+                  Get.to(() => SubscriptionScreen());
+                },
+              ),
             ),
             SizedBox(height: 20),
           ],

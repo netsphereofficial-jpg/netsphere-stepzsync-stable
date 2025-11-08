@@ -572,7 +572,9 @@ class SubscriptionController extends GetxController {
   }
 
   /// Check if user has premium access
-  bool get hasPremiumAccess => currentSubscription.value.isPremium;
+  /// TODO: REMOVE THIS OVERRIDE AFTER TESTING - ALWAYS RETURNS TRUE FOR TESTING
+  bool get hasPremiumAccess => true; // Temporarily always true for testing
+  // bool get hasPremiumAccess => currentSubscription.value.isPremium; // Original code
 
   /// Save successful purchase to Firebase
   Future<void> _saveSubscriptionToFirebase(PurchaseDetails purchase, SubscriptionPlan plan) async {
@@ -703,16 +705,20 @@ class SubscriptionController extends GetxController {
   }
 
   /// Feature access methods
+  /// TODO: REMOVE THIS OVERRIDE AFTER TESTING - ALWAYS RETURNS TRUE FOR TESTING
   bool hasFeatureAccess(String featureKey) {
-    return currentSubscription.value.hasFeature(featureKey);
+    return true; // Temporarily always true for testing
+    // return currentSubscription.value.hasFeature(featureKey); // Original code
   }
 
   T? getFeature<T>(String featureKey) {
     return currentSubscription.value.getFeature<T>(featureKey);
   }
 
+  /// TODO: REMOVE THIS OVERRIDE AFTER TESTING - ALWAYS RETURNS 999 FOR TESTING
   int getFeatureLimit(String featureKey) {
-    return currentSubscription.value.getFeature<int>(featureKey) ?? 0;
+    return 999; // Temporarily unlimited for testing
+    // return currentSubscription.value.getFeature<int>(featureKey) ?? 0; // Original code
   }
 
   /// Check specific features

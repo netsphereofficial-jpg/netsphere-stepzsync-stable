@@ -126,7 +126,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
 
   /// Check and show premium purchase dialog if conditions are met
   /// Waits 15 seconds after cold start to avoid interfering with syncs
+  /// TODO: REMOVE THIS COMMENT AFTER TESTING - DISABLED FOR TESTING PURPOSES
   Future<void> _checkAndShowPremiumDialog() async {
+    // TEMPORARILY DISABLED FOR TESTING - UNCOMMENT TO RE-ENABLE
+    print('💎 [MAIN_NAV] Premium dialog disabled for testing');
+    return;
+
+    /* ORIGINAL CODE - UNCOMMENT AFTER TESTING
     try {
       // Skip if guest user
       if (GuestUtils.isGuest()) {
@@ -174,6 +180,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     } catch (e) {
       print('❌ [MAIN_NAV] Error checking/showing premium dialog: $e');
     }
+    */
   }
 
   @override

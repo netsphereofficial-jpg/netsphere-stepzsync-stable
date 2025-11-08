@@ -1,55 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
-import 'package:confetti/confetti.dart';
 import '../../core/constants/text_styles.dart';
-import '../../controllers/hall_of_fame_controller.dart';
-import '../../models/xp_models.dart';
-import '../../services/hall_of_fame_service.dart';
-import 'widgets/champion_display_case.dart';
-import 'widgets/trophy_shelf.dart';
-import 'widgets/seasonal_champions_timeline.dart';
-import 'widgets/spotlight_painter.dart';
+import '../../controllers/achievements_controller.dart';
+import '../../models/achievement_models.dart';
+import '../hall_of_fame/widgets/spotlight_painter.dart';
+import 'widgets/celebration_overlay.dart';
+import 'widgets/stats_summary_card.dart';
+import 'widgets/achievement_card.dart';
 
-class HallOfFameScreen extends StatefulWidget {
-  const HallOfFameScreen({super.key});
+class AchievementsScreen extends StatefulWidget {
+  const AchievementsScreen({super.key});
 
   @override
-  State<HallOfFameScreen> createState() => _HallOfFameScreenState();
+  State<AchievementsScreen> createState() => _AchievementsScreenState();
 }
 
-class _HallOfFameScreenState extends State<HallOfFameScreen>
+class _AchievementsScreenState extends State<AchievementsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late ConfettiController _confettiController;
-  final HallOfFameController controller = Get.put(HallOfFameController());
-
-  final List<Map<String, dynamic>> categories = [
-    {
-      'title': 'XP Titans',
-      'subtitle': 'Top XP',
-      'icon': Icons.bolt,
-      'color': Color(0xFFFFD700), // Gold
-    },
-    {
-      'title': 'Most Active',
-      'subtitle': 'Races',
-      'icon': Icons.directions_run,
-      'color': Color(0xFF2759FF), // Blue
-    },
-    {
-      'title': 'Podium Club',
-      'subtitle': 'Top 3s',
-      'icon': Icons.military_tech,
-      'color': Color(0xFFC0C0C0), // Silver
-    },
-    {
-      'title': 'Champions',
-      'subtitle': 'Winners',
-      'icon': Icons.emoji_events,
-      'color': Color(0xFFCD7F32), // Bronze
-    },
-  ];
+  final AchievementsController controller = Get.put(AchievementsController());
 
   @override
   void initState() {
@@ -58,21 +28,11 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat();
-
-    _confettiController = ConfettiController(
-      duration: const Duration(seconds: 3),
-    );
-
-    // Trigger confetti on screen load
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _confettiController.play();
-    });
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _confettiController.dispose();
     super.dispose();
   }
 
@@ -89,7 +49,7 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
           onPressed: () => Get.back(),
         ),
         title: Text(
-          'Hall of Fame',
+          'My Achievements',
           style: AppTextStyles.heroHeading.copyWith(
             color: const Color(0xFFFFD700),
             fontSize: 24,
@@ -126,52 +86,57 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
             },
           ),
 
-          // Confetti overlay
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirection: 3.14 / 2, // Down
-              emissionFrequency: 0.05,
-              numberOfParticles: 20,
-              gravity: 0.3,
-              colors: const [
-                Color(0xFFFFD700),
-                Color(0xFFC0C0C0),
-                Color(0xFFCD7F32),
-                Color(0xFF2759FF),
-              ],
-            ),
-          ),
-
           // Main content
           SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return _buildLoadingState();
+              }
 
-                // Category tabs
-                _buildCategoryTabs(),
+              if (controller.hasError.value) {
+                return _buildErrorState();
+              }
 
-                const SizedBox(height: 16),
+              return Column(
+                children: [
+                  const SizedBox(height: 20),
 
-                // Content area
-                Expanded(
-                  child: Obx(() {
-                    if (controller.isLoading.value) {
-                      return _buildLoadingState();
-                    }
+                  // Stats summary
+                  StatsSummaryCard(
+                    unlockedCount: controller.unlockedCount.value,
+                    totalCount: controller.totalCount.value,
+                    completionPercentage: controller.completionPercentage.value,
+                    latestUnlocked: controller.latestUnlocked,
+                  ),
 
-                    if (controller.hasError.value) {
-                      return _buildErrorState();
-                    }
+                  const SizedBox(height: 8),
 
-                    return _buildCategoryContent();
-                  }),
-                ),
-              ],
-            ),
+                  // Category tabs
+                  _buildCategoryTabs(),
+
+                  const SizedBox(height: 16),
+
+                  // Achievement grid
+                  Expanded(
+                    child: _buildAchievementGrid(),
+                  ),
+                ],
+              );
+            }),
           ),
+
+          // Celebration overlay (first visit only)
+          Obx(() {
+            if (controller.isFirstVisit.value && !controller.isLoading.value) {
+              return CelebrationOverlay(
+                unlockedCount: controller.unlockedCount.value,
+                onDismiss: () {
+                  controller.markCelebrationShown();
+                },
+              );
+            }
+            return const SizedBox.shrink();
+          }),
         ],
       ),
     );
@@ -181,13 +146,13 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
     return SizedBox(
       height: 80,
       child: Obx(() {
-        final selectedIndex = controller.selectedCategoryIndex.value; // Read observable here
+        final selectedIndex = controller.selectedCategoryIndex.value;
         return ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: categories.length,
+          itemCount: AchievementCategory.values.length,
           itemBuilder: (context, index) {
-            final category = categories[index];
+            final category = AchievementCategory.values[index];
             final isSelected = selectedIndex == index;
 
             return GestureDetector(
@@ -196,15 +161,15 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
                 margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: isSelected
                       ? LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            category['color'].withOpacity(0.3),
-                            category['color'].withOpacity(0.1),
+                            const Color(0xFFFFD700).withOpacity(0.3),
+                            const Color(0xFFFFD700).withOpacity(0.1),
                           ],
                         )
                       : LinearGradient(
@@ -216,14 +181,14 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
-                        ? category['color'].withOpacity(0.5)
+                        ? const Color(0xFFFFD700).withOpacity(0.5)
                         : Colors.white.withOpacity(0.1),
                     width: isSelected ? 2 : 1,
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: category['color'].withOpacity(0.3),
+                            color: const Color(0xFFFFD700).withOpacity(0.3),
                             blurRadius: 15,
                             spreadRadius: 2,
                           ),
@@ -234,14 +199,18 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      category['icon'],
-                      color: isSelected ? category['color'] : Colors.white.withOpacity(0.5),
-                      size: 24,
+                    Text(
+                      category.icon,
+                      style: TextStyle(
+                        fontSize: 22,
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.5),
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      category['title'],
+                      category.displayName,
                       style: AppTextStyles.bodyMedium.copyWith(
                         fontSize: 10.5,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
@@ -254,25 +223,23 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      category['subtitle'],
+                      controller.categoryCount,
                       style: AppTextStyles.bodySmall.copyWith(
                         fontSize: 8.5,
                         color: isSelected
-                            ? category['color'].withOpacity(0.8)
+                            ? const Color(0xFFFFD700).withOpacity(0.8)
                             : Colors.white.withOpacity(0.4),
                         height: 1.0,
                       ),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
-              ).animate(target: isSelected ? 1 : 0)
-                .scale(
-                  begin: const Offset(1.0, 1.0),
-                  end: const Offset(1.05, 1.05),
-                  duration: 200.ms,
-                ),
+              ).animate(target: isSelected ? 1 : 0).scale(
+                    begin: const Offset(1.0, 1.0),
+                    end: const Offset(1.05, 1.05),
+                    duration: 200.ms,
+                  ),
             );
           },
         );
@@ -280,145 +247,37 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
     );
   }
 
-  Widget _buildCategoryContent() {
+  Widget _buildAchievementGrid() {
     return Obx(() {
-      final selectedIndex = controller.selectedCategoryIndex.value;
+      final achievements = controller.filteredAchievements;
 
-      if (controller.isCurrentCategoryLoading) {
-        return _buildLoadingState();
+      if (achievements.isEmpty) {
+        return _buildEmptyState();
       }
 
-      final data = controller.currentCategoryData;
-
-      return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(top: 50),
-        child: Column(
-          children: [
-            // Render content based on category (reordered to match new category order)
-            if (selectedIndex == 0) _buildXPContent(data),        // XP Titans
-            if (selectedIndex == 1) _buildWinnersContent(data),    // Most Active (by races completed)
-            if (selectedIndex == 2) _buildPodiumContent(data),     // Podium Club
-            if (selectedIndex == 3) _buildWinnersContent(data),    // Champions (actual winners)
-
-            const SizedBox(height: 40),
-          ],
+      return GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.85,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
         ),
+        itemCount: achievements.length,
+        itemBuilder: (context, index) {
+          final achievement = achievements[index];
+          final isUnlocked = controller.unlockedAchievements.contains(achievement);
+          final progress = controller.getAchievementProgress(achievement);
+
+          return AchievementCard(
+            achievement: achievement,
+            isUnlocked: isUnlocked,
+            progress: progress,
+            index: index,
+          );
+        },
       );
     });
-  }
-
-  Widget _buildWinnersContent(List data) {
-    if (data.isEmpty) return _buildEmptyState('No winners yet');
-
-    final entries = List<LeaderboardEntry>.from(data);
-    final top3 = entries.take(3).toList();
-    final rest = entries.length > 3 ? entries.skip(3).toList() : <LeaderboardEntry>[];
-
-    return Column(
-      children: [
-        // Top 3 champions
-        ...top3.asMap().entries.map((entry) {
-          final index = entry.key;
-          final winner = entry.value;
-          return ChampionDisplayCase(
-            entry: winner,
-            rank: index + 1,
-            statLabel: 'Wins',
-            statValue: winner.racesWon,
-            secondaryStatLabel: 'Win Rate',
-            secondaryStatValue: '${controller.getWinRate(winner).toStringAsFixed(1)}%',
-          );
-        }),
-
-        const SizedBox(height: 20),
-
-        // Rest of the winners
-        if (rest.isNotEmpty)
-          TrophyShelf(
-            entries: rest,
-            statLabel: 'Wins',
-            getStatValue: (entry) => entry.racesWon,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildPodiumContent(List data) {
-    if (data.isEmpty) return _buildEmptyState('No podium finishers yet');
-
-    final entries = List<LeaderboardEntry>.from(data);
-    final top3 = entries.take(3).toList();
-    final rest = entries.length > 3 ? entries.skip(3).toList() : <LeaderboardEntry>[];
-
-    return Column(
-      children: [
-        ...top3.asMap().entries.map((entry) {
-          final index = entry.key;
-          final finisher = entry.value;
-          return ChampionDisplayCase(
-            entry: finisher,
-            rank: index + 1,
-            statLabel: 'Podiums',
-            statValue: finisher.podiumFinishes,
-            secondaryStatLabel: 'Wins',
-            secondaryStatValue: '${finisher.racesWon}',
-          );
-        }),
-
-        const SizedBox(height: 20),
-
-        if (rest.isNotEmpty)
-          TrophyShelf(
-            entries: rest,
-            statLabel: 'Podiums',
-            getStatValue: (entry) => entry.podiumFinishes,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildXPContent(List data) {
-    if (data.isEmpty) return _buildEmptyState('No XP earners yet');
-
-    final entries = List<LeaderboardEntry>.from(data);
-    final top3 = entries.take(3).toList();
-    final rest = entries.length > 3 ? entries.skip(3).toList() : <LeaderboardEntry>[];
-
-    return Column(
-      children: [
-        ...top3.asMap().entries.map((entry) {
-          final index = entry.key;
-          final earner = entry.value;
-          return ChampionDisplayCase(
-            entry: earner,
-            rank: index + 1,
-            statLabel: 'Total XP',
-            statValue: earner.totalXP,
-            secondaryStatLabel: 'Avg XP',
-            secondaryStatValue: controller.getAverageXPPerRace(earner).toStringAsFixed(0),
-          );
-        }),
-
-        const SizedBox(height: 20),
-
-        if (rest.isNotEmpty)
-          TrophyShelf(
-            entries: rest,
-            statLabel: 'XP',
-            getStatValue: (entry) => entry.totalXP,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildChampionsContent(List data) {
-    if (data.isEmpty) {
-      return _buildEmptyState('No seasonal champions yet');
-    }
-
-    final champions = List<SeasonChampion>.from(data);
-    return SeasonalChampionsTimeline(champions: champions);
   }
 
   Widget _buildLoadingState() {
@@ -451,15 +310,15 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
           ),
           const SizedBox(height: 24),
           Text(
-            'Loading Hall of Fame...',
+            'Loading Achievements...',
             style: AppTextStyles.bodyMedium.copyWith(
               color: Colors.white.withOpacity(0.7),
               fontSize: 16,
             ),
           ),
         ],
-      ).animate(onPlay: (controller) => controller.repeat())
-        .shimmer(duration: 2000.ms, color: const Color(0xFFFFD700).withOpacity(0.3)),
+      ).animate(onPlay: (controller) => controller.repeat()).shimmer(
+          duration: 2000.ms, color: const Color(0xFFFFD700).withOpacity(0.3)),
     );
   }
 
@@ -512,7 +371,7 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
     );
   }
 
-  Widget _buildEmptyState(String message) {
+  Widget _buildEmptyState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40.0),
@@ -526,7 +385,7 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
             ),
             const SizedBox(height: 24),
             Text(
-              message,
+              'No Achievements Yet',
               style: AppTextStyles.heroHeading.copyWith(
                 fontSize: 22,
                 color: Colors.white.withOpacity(0.5),
@@ -535,7 +394,7 @@ class _HallOfFameScreenState extends State<HallOfFameScreen>
             ),
             const SizedBox(height: 12),
             Text(
-              'Be the first to achieve greatness!',
+              'Start racing to unlock achievements!',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: Colors.white.withOpacity(0.4),
                 fontSize: 14,

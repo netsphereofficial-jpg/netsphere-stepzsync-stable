@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../controllers/notification_controller.dart';
+import '../screens/achievements/achievements_screen.dart';
 import '../screens/active_races/active_races_screen.dart';
 import '../screens/hall_of_fame/hall_of_fame_screen.dart';
 import '../screens/marathon/marathon_screen.dart';
@@ -22,6 +23,7 @@ class AppRoutes {
   static const String marathonRaces = '/marathon-races';
   static const String raceInvites = '/race-invites';
   static const String hallOfFame = '/hall-of-fame';
+  static const String achievements = '/achievements';
   static const String raceDetails = '/race-details';
   static const String notifications = '/notifications';
   static const String adminLogin = '/admin-login';
@@ -74,6 +76,12 @@ class AppRoutes {
     GetPage(
       name: hallOfFame,
       page: () => const HallOfFameScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: achievements,
+      page: () => const AchievementsScreen(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),

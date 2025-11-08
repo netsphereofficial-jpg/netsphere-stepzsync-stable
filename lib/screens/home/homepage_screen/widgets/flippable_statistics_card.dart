@@ -504,36 +504,40 @@ class _FlippableStatisticsCardState extends State<FlippableStatisticsCard>
         ),
 
         // Flip indicator badge (top-right, next to filter) - compact icon only
-        Positioned(
-          top: 12,
-          left: 135,
-          child: GestureDetector(
-            onTap: () {
-              if (!widget.isDropdownOpen.value) {
-                _toggleFlip();
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFCDFF49).withValues(alpha: 1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: const Color(0xFFCDFF49).withValues(alpha: 0.6),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black,
-                    blurRadius: 8,
-                    spreadRadius: 0,
+        // Temporarily hidden for testing
+        Visibility(
+          visible: false,
+          child: Positioned(
+            top: 12,
+            left: 135,
+            child: GestureDetector(
+              onTap: () {
+                if (!widget.isDropdownOpen.value) {
+                  _toggleFlip();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCDFF49).withValues(alpha: 1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFCDFF49).withValues(alpha: 0.6),
+                    width: 1.5,
                   ),
-                ],
-              ),
-              child: Icon(
-                Icons.bar_chart_rounded,
-                size: 20,
-                color: Colors.black,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black,
+                      blurRadius: 8,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.bar_chart_rounded,
+                  size: 20,
+                  color: Colors.black,
+                ),
               ),
             ),
           ),
