@@ -68,9 +68,9 @@ class RaceShareService {
 
     return '''Join me in "$title"!
 
-Distance: $distance km
-Location: $location
-Schedule: $time
+📏 Distance: $distance km
+📍 Location: $location
+📅 Schedule: $time
 
 Download StepzSync and search for race ID: $raceId
 
