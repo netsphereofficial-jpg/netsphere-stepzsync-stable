@@ -623,25 +623,30 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
         console.log(`         IsCompleted: ${participantData.isCompleted}`);
         console.log(`         Rank: ${participantData.rank || 'N/A'}`);
 
-        // ✅ DEFENSIVE CHECK: Only sync to races that are truly active and user hasn't completed
+        // ✅ DEFENSIVE CHECK: Only sync to races that are truly active
         // statusId 3 = Active, statusId 6 = Paused (both allow step syncing)
         // Once race ends (statusId 4), users who didn't finish are DNF (Did Not Finish)
-        if (!participantData.isCompleted) {
-          // Double-check race status (defensive)
-          if (raceData.statusId !== 3 && raceData.statusId !== 6) {
-            console.log(`      ❌ Race ${raceDoc.id} has invalid statusId ${raceData.statusId}, skipping`);
-            continue;
-          }
 
-          userActiveRaces.push({
-            raceId: raceDoc.id,
-            raceData: raceData,
-            participantData: participantData,
-          });
-          console.log(`      ✅ ADDED TO SYNC LIST (will process this race)`);
-        } else {
+        // Double-check race status (defensive)
+        if (raceData.statusId !== 3 && raceData.statusId !== 6) {
+          console.log(`      ❌ Race ${raceDoc.id} has invalid statusId ${raceData.statusId}, skipping`);
+          continue;
+        }
+
+        // ✅ CRITICAL FIX: Process ALL active races, even if participant completed
+        // The monotonic validation later will prevent decreasing steps
+        // This allows fixing corrupted data where steps reset to 0 but isCompleted=true
+        userActiveRaces.push({
+          raceId: raceDoc.id,
+          raceData: raceData,
+          participantData: participantData,
+        });
+
+        if (participantData.isCompleted) {
           alreadyCompletedCount++;
-          console.log(`      ⏭️ User already completed this race, skipping`);
+          console.log(`      ⚠️ User completed this race but still processing (allows fixing corrupted data)`);
+        } else {
+          console.log(`      ✅ ADDED TO SYNC LIST (will process this race)`);
         }
       } else {
         console.log(`      ⏭️ User is NOT a participant in this race`);
@@ -698,6 +703,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             healthKitBaselineDistance: totalDistance,
             healthKitBaselineCalories: totalCalories,
             lastProcessedDate: date,
+            maxParticipantStepsEverSeen: participantData.steps || 0,  // ✅ Track max steps for monotonic validation
             createdAt: admin.firestore.Timestamp.now(),
             lastUpdatedAt: admin.firestore.Timestamp.now(),
           };
@@ -810,6 +816,24 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
           const cappedDistanceDelta = effectiveDistanceDelta * (cappedStepsDelta / effectiveStepsDelta);
           const cappedCaloriesDelta = Math.round(effectiveCaloriesDelta * (cappedStepsDelta / effectiveStepsDelta));
 
+          const currentParticipantSteps = participantData.steps || 0;
+          const newParticipantStepsCapped = currentParticipantSteps + cappedStepsDelta;
+
+          // ✅ MONOTONIC VALIDATION: Prevent steps from DECREASING
+          // Compare new value against CURRENT value, not historical max
+          // This allows recovery from data corruption (steps reset to 0)
+          if (newParticipantStepsCapped < currentParticipantSteps) {
+            console.log(`   ❌ [MONOTONIC_VALIDATION] REJECTED: Attempt to decrease participant steps!`);
+            console.log(`      Current steps: ${currentParticipantSteps}`);
+            console.log(`      New capped steps: ${newParticipantStepsCapped}`);
+            console.log(`      This indicates negative delta from Health Connect recalculation`);
+            continue;  // Skip this race
+          }
+
+          // Track maximum steps ever seen for debugging/analytics
+          const maxStepsEverSeen = baselineData.maxParticipantStepsEverSeen || 0;
+          console.log(`   📊 [MONOTONIC_CHECK] Current: ${currentParticipantSteps}, New: ${newParticipantStepsCapped}, Max ever: ${maxStepsEverSeen}`);
+
           // Continue with capped values
           await updateParticipant(
             batch,
@@ -828,10 +852,29 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             healthKitBaselineSteps: baselineData.healthKitBaselineSteps + cappedStepsDelta,
             healthKitBaselineDistance: baselineData.healthKitBaselineDistance + cappedDistanceDelta,
             healthKitBaselineCalories: baselineData.healthKitBaselineCalories + cappedCaloriesDelta,
+            maxParticipantStepsEverSeen: Math.max(maxStepsEverSeen, newParticipantStepsCapped),  // ✅ Update max steps
             lastUpdatedAt: admin.firestore.Timestamp.now(),
           });
         } else {
           // 7. Update participant document with deltas
+          const currentParticipantSteps = participantData.steps || 0;
+          const newParticipantSteps = currentParticipantSteps + effectiveStepsDelta;
+
+          // ✅ MONOTONIC VALIDATION: Prevent steps from DECREASING
+          // Compare new value against CURRENT value, not historical max
+          // This allows recovery from data corruption (steps reset to 0)
+          if (newParticipantSteps < currentParticipantSteps) {
+            console.log(`   ❌ [MONOTONIC_VALIDATION] REJECTED: Attempt to decrease participant steps!`);
+            console.log(`      Current steps: ${currentParticipantSteps}`);
+            console.log(`      New steps: ${newParticipantSteps}`);
+            console.log(`      This indicates negative delta from Health Connect recalculation`);
+            continue;  // Skip this race
+          }
+
+          // Track maximum steps ever seen for debugging/analytics
+          const maxStepsEverSeen = baselineData.maxParticipantStepsEverSeen || 0;
+          console.log(`   📊 [MONOTONIC_CHECK] Current: ${currentParticipantSteps}, New: ${newParticipantSteps}, Max ever: ${maxStepsEverSeen}`);
+
           await updateParticipant(
             batch,
             raceId,
@@ -849,6 +892,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             healthKitBaselineSteps: totalSteps,
             healthKitBaselineDistance: totalDistance,
             healthKitBaselineCalories: totalCalories,
+            maxParticipantStepsEverSeen: Math.max(maxStepsEverSeen, newParticipantSteps),  // ✅ Update max steps
             lastProcessedDate: date,
             lastUpdatedAt: admin.firestore.Timestamp.now(),
           });
@@ -918,7 +962,69 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
       }
     }
 
-    // 10. Commit all updates in a batch
+    // 10. ✅ CRITICAL FIX: Re-validate participant data before batch commit
+    // This prevents race condition where another device updated data between read and write
+    console.log(`🔒 [RACE_CONDITION_PROTECTION] Re-validating participant data before batch commit...`);
+    let validationFailures = 0;
+
+    for (const { raceId, participantData } of userActiveRaces) {
+      try {
+        // Re-read current participant data from Firestore
+        const currentParticipantDoc = await db.collection('races')
+          .doc(raceId)
+          .collection('participants')
+          .doc(userId)
+          .get();
+
+        if (!currentParticipantDoc.exists) {
+          console.log(`   ⚠️ [${raceId}] Participant doc no longer exists, skipping validation`);
+          continue;
+        }
+
+        const currentData = currentParticipantDoc.data();
+        const originalSteps = participantData.steps || 0;
+        const currentSteps = currentData.steps || 0;
+
+        // Check if server was updated by another device/session between read and write
+        if (currentSteps > originalSteps) {
+          console.log(`   ❌ [${raceId}] RACE CONDITION DETECTED!`);
+          console.log(`      Original steps (when we read): ${originalSteps}`);
+          console.log(`      Current steps (on server now): ${currentSteps}`);
+          console.log(`      Server was updated by another device/session!`);
+          console.log(`      ABORTING this batch to prevent data corruption`);
+
+          validationFailures++;
+
+          // Return failure to trigger retry with fresh data
+          return {
+            success: false,
+            racesUpdated: 0,
+            message: `Race condition detected - server updated between read and write. Please retry.`,
+          };
+        } else if (currentSteps === originalSteps) {
+          console.log(`   ✅ [${raceId}] Validation passed: steps unchanged (${currentSteps})`);
+        } else {
+          // currentSteps < originalSteps - should not happen, but log it
+          console.log(`   ⚠️ [${raceId}] Unexpected: current steps (${currentSteps}) < original (${originalSteps})`);
+        }
+      } catch (validationError) {
+        console.error(`   ❌ Error validating race ${raceId}: ${validationError}`);
+        // Continue - don't let validation errors block the batch
+      }
+    }
+
+    if (validationFailures > 0) {
+      console.log(`❌ [VALIDATION] ${validationFailures} race(s) failed validation, batch aborted`);
+      return {
+        success: false,
+        racesUpdated: 0,
+        message: `Validation failed for ${validationFailures} race(s) - data may have changed`,
+      };
+    }
+
+    console.log(`✅ [VALIDATION] All races passed validation, proceeding with batch commit`);
+
+    // 11. Commit all updates in a batch
     await batch.commit();
     console.log(`✅ [HEALTH_SYNC] Successfully updated ${racesUpdated} race(s) for user ${userId}`);
 
