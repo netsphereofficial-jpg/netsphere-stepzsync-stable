@@ -100,7 +100,7 @@ class LoginController extends GetxController {
   String get headerTitle {
     switch (authMode.value) {
       case AuthMode.login:
-        return 'Welcome Back!';
+        return 'Welcome';
       case AuthMode.signup:
         return 'Create Account';
       case AuthMode.forgotPassword:
@@ -347,7 +347,6 @@ class LoginController extends GetxController {
                 email: email,
                 password: password,
               );
-              _showSuccess('Welcome Back!', 'Signed in with existing account');
             } else {
               rethrow;
             }
@@ -392,7 +391,6 @@ class LoginController extends GetxController {
 
         if (isProfileCompleted) {
           // Profile completed - go to home
-          _showSuccess('Welcome!', 'Signed in successfully');
           Get.offAll(() => HomeScreen());
         } else {
           // Profile incomplete - go to profile setup
@@ -539,8 +537,6 @@ class LoginController extends GetxController {
             AuthWrapper.clearCache();
             await _auth.signOut();
             userCredential = await _auth.signInWithProvider(googleProvider);
-
-            _showSuccess('Welcome Back!', 'Signed in with existing account');
           } else {
             rethrow;
           }
@@ -563,7 +559,6 @@ class LoginController extends GetxController {
         print('📋 Profile completion status: $isProfileCompleted');
 
         if (isProfileCompleted) {
-          _showSuccess('Welcome Back!', 'Signed in successfully');
           Get.offAll(() => HomeScreen());
         } else {
           print('📝 Navigating to ProfileScreen for setup');
@@ -704,8 +699,6 @@ class LoginController extends GetxController {
             AuthWrapper.clearCache();
             await _auth.signOut();
             userCredential = await _auth.signInWithCredential(oauthCredential);
-
-            _showSuccess('Welcome Back!', 'Signed in with existing account');
           } else {
             rethrow;
           }
@@ -738,7 +731,6 @@ class LoginController extends GetxController {
         print('📋 Profile completion status: $isProfileCompleted');
 
         if (isProfileCompleted) {
-          _showSuccess('Welcome Back!', 'Signed in successfully');
           Get.offAll(() => HomeScreen());
         } else {
           print('📝 Navigating to ProfileScreen for setup');
