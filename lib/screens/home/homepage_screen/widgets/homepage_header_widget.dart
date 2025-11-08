@@ -22,38 +22,45 @@ class HomepageHeaderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Profile Picture - Dynamic with user image - Clickable to navigate to profile
-        GestureDetector(
-          onTap: () {
-            // Navigate to profile tab (index 4)
-            final homeController = Get.find<HomeController>();
-            homeController.changeIndex(4);
-          },
-          child: Obx(() => ProfileImageWidget(
-            imageUrl: profileImageUrl.value.isNotEmpty ? profileImageUrl.value : null,
-            size: 64,
-            borderColor: const Color(0xFFCDFF49),
-            borderWidth: 2,
-          )),
-        ),
-        const SizedBox(width: 12),
-
-        // Welcome Text
+        // Profile Section - Clickable to navigate to profile
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Obx(() => Text(
-                'Hi, ${userName.value}',
-                style: AppTextStyles.heroHeading,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              )),
-              Text(
-                "It's Time To Challenge Your Limits",
-                style: AppTextStyles.bodyMedium,
-              ),
-            ],
+          child: GestureDetector(
+            onTap: () {
+              // Navigate to profile tab (index 4)
+              final homeController = Get.find<HomeController>();
+              homeController.changeIndex(4);
+            },
+            child: Row(
+              children: [
+                // Profile Picture - Dynamic with user image
+                Obx(() => ProfileImageWidget(
+                  imageUrl: profileImageUrl.value.isNotEmpty ? profileImageUrl.value : null,
+                  size: 64,
+                  borderColor: const Color(0xFFCDFF49),
+                  borderWidth: 2,
+                )),
+                const SizedBox(width: 12),
+
+                // Welcome Text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Obx(() => Text(
+                        'Hi, ${userName.value}',
+                        style: AppTextStyles.heroHeading,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      )),
+                      Text(
+                        "It's Time To Challenge Your Limits",
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 
