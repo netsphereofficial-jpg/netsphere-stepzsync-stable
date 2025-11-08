@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 import '../core/models/race_data_model.dart';
 import '../widgets/dialogs/share_options_dialog.dart';
 
@@ -62,18 +63,51 @@ class RaceShareService {
     final title = race.title ?? 'this race';
     final distance = (race.totalDistance ?? 0.0).toStringAsFixed(1);
     final location = race.startAddress ?? 'Unknown Location';
-    final time = race.raceScheduleTime ?? 'TBD';
+    final time = _formatScheduleTime(race.raceScheduleTime);
     final raceId = race.id ?? '';
 
     return '''Join me in "$title"!
 
-📏 Distance: $distance km
-📍 Location: $location
-📅 Schedule: $time
+Distance: $distance km
+Location: $location
+Schedule: $time
 
 Download StepzSync and search for race ID: $raceId
 
 Let's race together!''';
+  }
+
+  /// Format schedule time for external sharing
+  static String _formatScheduleTime(String? scheduleTime) {
+    if (scheduleTime == null || scheduleTime.isEmpty) {
+      return 'TBD';
+    }
+
+    try {
+      // Try to parse as ISO format (2025-11-09T02:59:02.645963)
+      final DateTime dateTime = DateTime.parse(scheduleTime);
+      return DateFormat('MMM dd, yyyy at h:mm a').format(dateTime);
+    } catch (e) {
+      try {
+        // Try to parse the format "dd/MM/yyyy at hh:mm a"
+        if (scheduleTime.contains(' at ')) {
+          final parts = scheduleTime.split(' at ');
+          if (parts.length >= 2) {
+            final datePart = parts[0];
+            final timePart = parts[1];
+            final DateTime date = DateFormat('dd/MM/yyyy').parse(datePart);
+            final formattedDate = DateFormat('MMM dd, yyyy').format(date);
+            return '$formattedDate at $timePart';
+          }
+        }
+        // If no " at " separator, try standard format
+        final DateTime dateTime = DateFormat('dd-MM-yyyy hh:mm a').parse(scheduleTime);
+        return DateFormat('MMM dd, yyyy at h:mm a').format(dateTime);
+      } catch (e2) {
+        debugPrint('⚠️ Could not parse schedule time: $scheduleTime');
+        return scheduleTime; // Return as-is if parsing fails
+      }
+    }
   }
 
   /// Get share message for a race (legacy method for in-app use)
