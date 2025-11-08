@@ -170,8 +170,9 @@ class XPService {
       final race = RaceModel.fromFirestore(raceDoc);
 
       // Get all participants
+      // ✅ FIXED: Standardized to use races subcollection
       final participantsSnapshot = await _firestore
-          .collection('race_participants')
+          .collection('races')
           .doc(raceId)
           .collection('participants')
           .get();

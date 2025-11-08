@@ -186,6 +186,15 @@ class RacesListController extends GetxController {
           // ✅ Use pre-loaded participants (no additional query needed!)
           final participants = participantsByRace[doc.id] ?? [];
 
+          // 🐛 DEBUG: Log participant assignment
+          log('🔍 [RACES_LIST] Race: ${raceData.title} (${doc.id})');
+          log('   Participants found: ${participants.length}');
+          if (participants.isNotEmpty) {
+            for (var p in participants) {
+              log('      - ${p.userId} (${p.userName}) - Steps: ${p.steps}, Calories: ${p.calories}, Rank: ${p.rank}');
+            }
+          }
+
           // Update race with participants
           final updatedRace = raceData.copyWith(participants: participants);
           newRaces.add(updatedRace);

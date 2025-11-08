@@ -377,6 +377,7 @@ class LeaderboardEntry {
   final int rank;
   final int racesCompleted;
   final int racesWon;
+  final int podiumFinishes;
   final String? country;
   final String? city;
 
@@ -389,6 +390,7 @@ class LeaderboardEntry {
     required this.rank,
     this.racesCompleted = 0,
     this.racesWon = 0,
+    this.podiumFinishes = 0,
     this.country,
     this.city,
   });
@@ -407,6 +409,7 @@ class LeaderboardEntry {
       rank: rank,
       racesCompleted: userXP.racesCompleted,
       racesWon: userXP.racesWon,
+      podiumFinishes: userXP.podiumFinishes,
       country: userXP.country,
       city: userXP.city,
     );
@@ -422,6 +425,7 @@ class LeaderboardEntry {
       'rank': rank,
       'racesCompleted': racesCompleted,
       'racesWon': racesWon,
+      'podiumFinishes': podiumFinishes,
       'country': country,
       'city': city,
     };
@@ -437,6 +441,7 @@ class LeaderboardEntry {
       rank: json['rank'] ?? 0,
       racesCompleted: json['racesCompleted'] ?? 0,
       racesWon: json['racesWon'] ?? 0,
+      podiumFinishes: json['podiumFinishes'] ?? 0,
       country: json['country'],
       city: json['city'],
     );

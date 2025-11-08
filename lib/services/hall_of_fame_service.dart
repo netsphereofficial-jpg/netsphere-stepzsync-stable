@@ -15,17 +15,35 @@ class HallOfFameService {
 
       final snapshot = await _firestore
           .collection('user_xp')
-          .orderBy('racesWon', descending: true)
+          .orderBy('totalXP', descending: true) // Changed from racesWon to totalXP
           .limit(limit)
           .get();
 
+      log('📊 user_xp collection has ${snapshot.docs.length} documents');
+      if (snapshot.docs.isNotEmpty) {
+        // Log first document for debugging
+        final firstDoc = snapshot.docs.first.data();
+        log('📄 Sample user_xp doc: racesWon=${firstDoc['racesWon']}, totalXP=${firstDoc['totalXP']}, podiumFinishes=${firstDoc['podiumFinishes']}');
+      }
+
       if (snapshot.docs.isEmpty) {
-        log('⚠️ No winners data found');
+        log('⚠️ No data found in user_xp');
         return [];
       }
 
-      final entries = await _buildLeaderboardEntries(snapshot.docs);
-      log('✅ Fetched ${entries.length} top winners');
+      // Filter out users with 0 totalXP
+      final docsWithXP = snapshot.docs.where((doc) {
+        final data = doc.data();
+        return (data['totalXP'] ?? 0) > 0;
+      }).toList();
+
+      if (docsWithXP.isEmpty) {
+        log('⚠️ No users with XP > 0');
+        return [];
+      }
+
+      final entries = await _buildLeaderboardEntries(docsWithXP);
+      log('✅ Fetched ${entries.length} users with XP');
       return entries;
     } catch (e, stackTrace) {
       log('❌ Error fetching top winners: $e');
@@ -44,6 +62,8 @@ class HallOfFameService {
           .orderBy('podiumFinishes', descending: true)
           .limit(limit)
           .get();
+
+      log('📊 Podium query returned ${snapshot.docs.length} documents');
 
       if (snapshot.docs.isEmpty) {
         log('⚠️ No podium finishers data found');

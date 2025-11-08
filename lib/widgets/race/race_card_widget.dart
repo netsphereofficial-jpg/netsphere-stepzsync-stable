@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -337,14 +339,39 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
     final currentUserId = controller.auth.currentUser?.uid;
     final totalDistance = widget.race.totalDistance ?? 1.0;
 
+    // 🐛 DEBUG: Log participant data for debugging
+    developer.log('🔍 [RACE_CARD] Looking for participant data:');
+    developer.log('   Race: ${widget.race.title} (${widget.race.id})');
+    developer.log('   Current User ID: $currentUserId');
+    developer.log('   Participants array: ${widget.race.participants != null ? "exists (${widget.race.participants!.length} items)" : "NULL"}');
+
+    if (widget.race.participants != null && widget.race.participants!.isNotEmpty) {
+      developer.log('   Participant User IDs in array:');
+      for (var p in widget.race.participants!) {
+        developer.log('      - ${p.userId} (${p.userName}) - Steps: ${p.steps}, Calories: ${p.calories}, Rank: ${p.rank}');
+      }
+    }
+
     // Get current user's participant data
-    final currentParticipant = widget.race.participants?.firstWhere(
-      (p) => p.userId == currentUserId,
-      orElse: () => Participant(
+    // 🐛 FIX: Use lastWhere instead of firstWhere to get the most recent participant data
+    // This handles cases where duplicate participant entries exist (most recent one has correct data)
+    Participant? currentParticipant;
+    try {
+      currentParticipant = widget.race.participants?.lastWhere(
+        (p) => p.userId == currentUserId,
+      );
+    } catch (e) {
+      developer.log('⚠️ [RACE_CARD] Participant NOT FOUND - using default zeros');
+      currentParticipant = Participant(
         userId: '', userName: '', distance: 0, remainingDistance: totalDistance,
         rank: 0, steps: 0, calories: 0, avgSpeed: 0.0
-      ),
-    );
+      );
+    }
+
+    developer.log('   ✅ Current participant found: ${currentParticipant?.userId == currentUserId}');
+    if (currentParticipant != null) {
+      developer.log('      Steps: ${currentParticipant.steps}, Distance: ${currentParticipant.distance}, Calories: ${currentParticipant.calories}, Rank: ${currentParticipant.rank}');
+    }
 
     // Use participant data for user-specific metrics
     final remainingDistance = currentParticipant?.remainingDistance ?? totalDistance - (currentParticipant?.distance ?? 0.0);
@@ -408,13 +435,18 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
     final currentUserId = controller.auth.currentUser?.uid;
 
     // Get current user's participant data
-    final currentParticipant = widget.race.participants?.firstWhere(
-      (p) => p.userId == currentUserId,
-      orElse: () => Participant(
+    // 🐛 FIX: Use lastWhere instead of firstWhere to get the most recent participant data
+    Participant? currentParticipant;
+    try {
+      currentParticipant = widget.race.participants?.lastWhere(
+        (p) => p.userId == currentUserId,
+      );
+    } catch (e) {
+      currentParticipant = Participant(
         userId: '', userName: '', distance: 0, remainingDistance: 0,
         rank: 0, steps: 0, calories: 0, avgSpeed: 0.0
-      ),
-    );
+      );
+    }
 
     // Get completion metrics
     final finalRank = currentParticipant?.rank ?? 0;

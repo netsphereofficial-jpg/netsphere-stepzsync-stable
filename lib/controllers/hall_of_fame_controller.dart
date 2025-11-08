@@ -40,7 +40,7 @@ class HallOfFameController extends GetxController {
       log('📊 Loading all Hall of Fame categories...');
 
       // Load all categories in parallel for better performance
-      final results = await Future.wait([
+      await Future.wait([
         loadTopWinners(),
         loadTopPodiumFinishers(),
         loadTopXPEarners(),
@@ -129,13 +129,13 @@ class HallOfFameController extends GetxController {
   List<dynamic> get currentCategoryData {
     switch (selectedCategoryIndex.value) {
       case 0:
-        return topWinners;
+        return topXPEarners;      // XP Titans
       case 1:
-        return topPodiumFinishers;
+        return topWinners;        // Most Active
       case 2:
-        return topXPEarners;
+        return topPodiumFinishers; // Podium Club
       case 3:
-        return seasonalChampions;
+        return topWinners;        // Champions (same as Most Active for now)
       default:
         return [];
     }
@@ -145,13 +145,13 @@ class HallOfFameController extends GetxController {
   bool get isCurrentCategoryLoading {
     switch (selectedCategoryIndex.value) {
       case 0:
-        return winnersLoading.value;
-      case 1:
-        return podiumLoading.value;
-      case 2:
         return xpLoading.value;
+      case 1:
+        return winnersLoading.value;
+      case 2:
+        return podiumLoading.value;
       case 3:
-        return championsLoading.value;
+        return winnersLoading.value;
       default:
         return false;
     }

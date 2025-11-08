@@ -237,7 +237,8 @@ void main() async {
  *   // ... all other race fields
  * }
  *
- * 2. RACE PARTICIPANTS: race_participants/{raceId}/participants/{userId}
+ * 2. RACE PARTICIPANTS: races/{raceId}/participants/{userId}
+ * ✅ UPDATED: Standardized collection path (previously used race_participants)
  * {
  *   "userId": "creator_id",
  *   "raceId": "race_id",
@@ -298,7 +299,7 @@ void main() async {
  * CREATOR AUTO-JOIN:
  * ==================
  * When a race is created, the creator is automatically:
- * - Added to race_participants with role="creator" and status="joined"
+ * - Added to races/{raceId}/participants with role="creator" and status="joined"
  * - Added to user_races with role="creator"
  * - Initialized with default progress values (steps=0, distance=0, etc.)
  */

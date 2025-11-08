@@ -127,9 +127,10 @@ class FirebaseService {
 
       batch.set(raceRef, finalRaceData);
 
-      // Create participant document in race_participants/{raceId}/{userId}
+      // Create participant document in races/{raceId}/participants/{userId}
+      // ✅ FIXED: Standardized to use races subcollection instead of race_participants
       DocumentReference participantRef = firestore
-          .collection('race_participants')
+          .collection('races')
           .doc(raceId)
           .collection('participants')
           .doc(userId);
@@ -206,8 +207,9 @@ class FirebaseService {
 
     try {
       // ✅ OPTIMIZED: Check if user already exists using subcollection
+      // ✅ FIXED: Standardized to use races subcollection
       final existingParticipant = await firestore
-          .collection('race_participants')
+          .collection('races')
           .doc(raceId)
           .collection('participants')
           .doc(userId)
@@ -241,8 +243,9 @@ class FirebaseService {
       }
 
       // Add participant document
+      // ✅ FIXED: Standardized to use races subcollection instead of race_participants
       DocumentReference participantRef = firestore
-          .collection('race_participants')
+          .collection('races')
           .doc(raceId)
           .collection('participants')
           .doc(userId);
@@ -328,8 +331,9 @@ class FirebaseService {
       log('🔍 Removing participant $userId from race $raceId');
 
       // Remove participant document
+      // ✅ FIXED: Standardized to use races subcollection
       DocumentReference participantRef = firestore
-          .collection('race_participants')
+          .collection('races')
           .doc(raceId)
           .collection('participants')
           .doc(userId);
@@ -368,8 +372,9 @@ class FirebaseService {
     await ensureInitialized();
 
     try {
+      // ✅ FIXED: Standardized to use races subcollection
       DocumentReference participantRef = firestore
-          .collection('race_participants')
+          .collection('races')
           .doc(raceId)
           .collection('participants')
           .doc(userId);
@@ -390,15 +395,16 @@ class FirebaseService {
   }
 
   /// Get race participants stream for real-time updates
+  /// ✅ FIXED: Standardized to use races subcollection
   Stream<QuerySnapshot> getRaceParticipantsStream(String raceId) {
     if (!_isInitialized) {
       return Stream.fromFuture(ensureInitialized()).asyncExpand((_) =>
         _isInitialized
-          ? firestore.collection('race_participants').doc(raceId).collection('participants').snapshots()
+          ? firestore.collection('races').doc(raceId).collection('participants').snapshots()
           : const Stream.empty()
       );
     }
-    return firestore.collection('race_participants').doc(raceId).collection('participants').snapshots();
+    return firestore.collection('races').doc(raceId).collection('participants').snapshots();
   }
 
   /// Get user races stream for real-time updates
@@ -575,15 +581,16 @@ class FirebaseService {
   }
 
   /// Get real-time participant progress for a specific user in a race
+  /// ✅ FIXED: Standardized to use races subcollection
   Stream<DocumentSnapshot?> getParticipantProgressStream(String raceId, String userId) {
     if (!_isInitialized) {
       return Stream.fromFuture(ensureInitialized()).asyncExpand((_) =>
         _isInitialized
-          ? firestore.collection('race_participants').doc(raceId).collection('participants').doc(userId).snapshots()
+          ? firestore.collection('races').doc(raceId).collection('participants').doc(userId).snapshots()
           : const Stream.empty()
       );
     }
-    return firestore.collection('race_participants').doc(raceId).collection('participants').doc(userId).snapshots();
+    return firestore.collection('races').doc(raceId).collection('participants').doc(userId).snapshots();
   }
 
   /// Get user's active races stream (races that are not completed or left)
@@ -601,16 +608,17 @@ class FirebaseService {
   }
 
   /// Get race leaderboard stream (sorted by steps or distance)
+  /// ✅ FIXED: Standardized to use races subcollection
   Stream<QuerySnapshot> getRaceLeaderboardStream(String raceId, {String orderBy = 'steps'}) {
     if (!_isInitialized) {
       return Stream.fromFuture(ensureInitialized()).asyncExpand((_) =>
         _isInitialized
-          ? firestore.collection('race_participants').doc(raceId).collection('participants')
+          ? firestore.collection('races').doc(raceId).collection('participants')
               .orderBy(orderBy, descending: true).snapshots()
           : const Stream.empty()
       );
     }
-    return firestore.collection('race_participants').doc(raceId).collection('participants')
+    return firestore.collection('races').doc(raceId).collection('participants')
         .orderBy(orderBy, descending: true).snapshots();
   }
 

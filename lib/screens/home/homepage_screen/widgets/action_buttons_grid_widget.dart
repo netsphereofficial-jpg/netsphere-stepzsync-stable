@@ -83,15 +83,9 @@ class ActionButtonsGridWidget extends StatelessWidget {
         'icon': Icons.star,
         'bgColor': const Color(0xFFE8FEEA),
         'iconColor': const Color(0xFF35B555),
-        'onTap': () => Get.snackbar(
-          'Coming Soon!',
-          'Hall of Fame feature is under development',
-          backgroundColor: const Color(0xFF35B555),
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
-        ),
+        'onTap': () => Get.toNamed('/hall-of-fame'),
         'showCount': false,
-        'guestAccess': false, // 🔒 Restrict for guests
+        'guestAccess': true, // ✅ Free for all users
         'featureName': 'hall_of_fame',
       },
     ];
