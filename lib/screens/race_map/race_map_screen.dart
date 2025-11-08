@@ -1087,7 +1087,9 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
 
       case 4:
         // Race completed - show celebration card for winners, hide for DNF
-        final myParticipant = mapController.myParticipant;
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        final myParticipant = mapController.participantsList
+            .firstWhereOrNull((p) => p.userId == currentUserId);
         final isCompleted = myParticipant?.isCompleted ?? false;
 
         if (isCompleted) {

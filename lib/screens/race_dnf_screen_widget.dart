@@ -229,7 +229,7 @@ class DNFWidget extends StatelessWidget {
                     // View Leaderboard Button
                     CustomButton(
                       btnTitle: "View Leaderboard",
-                      btnColor: AppColors.appColor,
+                      backgroundColor: AppColors.appColor,
                       onPress: () {
                         // Navigate to leaderboard
                         Get.to(() => RaceWinnersScreen(
@@ -244,8 +244,8 @@ class DNFWidget extends StatelessWidget {
                     // Back to Home Button
                     CustomButton(
                       btnTitle: "Back to Home",
-                      btnColor: Colors.grey[300],
-                      txtColor: Colors.black87,
+                      backgroundColor: Colors.grey[300],
+                      textColor: Colors.black87,
                       onPress: () {
                         // Clean up map controller
                         if (Get.isRegistered<MapController>()) {

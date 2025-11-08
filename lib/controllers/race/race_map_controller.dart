@@ -356,14 +356,20 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
         // ✅ Auto-navigate DNF users to DNF screen when race completes
         Future.delayed(Duration(milliseconds: 800), () {
-          final isCompleted = myParticipant?.isCompleted ?? false;
-          if (!isCompleted && myParticipant != null && Get.context != null) {
-            print('❌ User did not complete race - auto-navigating to DNF screen');
-            Get.off(() => DNFWidget(
-              size: MediaQuery.of(Get.context!).size,
-              raceModel: raceModel,
-              mapController: this,
-            ));
+          final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+          if (currentUserId != null) {
+            final myParticipant = participantsList
+                .firstWhereOrNull((p) => p.userId == currentUserId);
+            final isCompleted = myParticipant?.isCompleted ?? false;
+
+            if (!isCompleted && myParticipant != null && Get.context != null && raceModel.value != null) {
+              print('❌ User did not complete race - auto-navigating to DNF screen');
+              Get.off(() => DNFWidget(
+                size: MediaQuery.of(Get.context!).size,
+                raceModel: raceModel.value,
+                mapController: this,
+              ));
+            }
           }
         });
       }
