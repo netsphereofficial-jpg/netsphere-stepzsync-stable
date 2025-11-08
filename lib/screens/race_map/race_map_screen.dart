@@ -49,18 +49,14 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
   void initState() {
     super.initState();
 
-    // Show manual sync button overlay
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && context.mounted) {
-        ManualSyncButtonOverlayManager.show(context);
-      }
-    });
+    // Manual sync button overlay is managed by main navigation screen
+    // and persists across all screens, so we don't need to show it here
   }
 
   @override
   void dispose() {
-    // Hide manual sync button when leaving race map
-    ManualSyncButtonOverlayManager.hide();
+    // Keep manual sync button visible when leaving race map
+    // ManualSyncButtonOverlayManager.hide(); // Removed to keep button persistent
     super.dispose();
   }
 

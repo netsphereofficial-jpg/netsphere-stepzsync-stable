@@ -26,16 +26,12 @@ class RaceShareService {
     try {
       final message = _getExternalShareMessage(race);
 
-      final result = await Share.shareWithResult(
+      await Share.share(
         message,
         subject: 'Join my race on StepzSync!',
       );
 
-      if (result.status == ShareResultStatus.success) {
-        debugPrint('✅ Race shared successfully');
-      } else if (result.status == ShareResultStatus.dismissed) {
-        debugPrint('ℹ️ Share dialog dismissed');
-      }
+      debugPrint('✅ Race share dialog opened');
     } catch (e) {
       debugPrint('❌ Error sharing race: $e');
       Get.snackbar(
