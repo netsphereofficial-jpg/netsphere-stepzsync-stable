@@ -25,6 +25,7 @@ import '../race_winner_screens_widgets.dart';
 import '../race_dnf_screen_widget.dart';
 import 'widgets/race_start_countdown.dart';
 import '../../utils/manual_sync_button_overlay_manager.dart';
+import '../../widgets/race/race_completion_card.dart';
 
 enum UserRole { participant, organizer }
 
@@ -1085,16 +1086,26 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
         );
 
       case 4:
-        return CustomButton(
-          btnTitle: "Race completed. Check winner list.",
-          onPress: () async {
-            // Navigate to winner screen with race data and participants
-            Get.to(() => RaceWinnersScreen(
-              raceData: widget.raceModel,
-              participants: mapController.participantsList.toList(),
-            ));
-          },
-        );
+        // Race completed - show celebration card for winners, hide for DNF
+        final myParticipant = mapController.myParticipant;
+        final isCompleted = myParticipant?.isCompleted ?? false;
+
+        if (isCompleted) {
+          // User completed - show beautiful celebration card
+          return RaceCompletionCard(
+            userRank: myParticipant?.rank,
+            userName: myParticipant?.userName,
+            onViewLeaderboard: () {
+              Get.to(() => RaceWinnersScreen(
+                raceData: widget.raceModel,
+                participants: mapController.participantsList.toList(),
+              ));
+            },
+          );
+        } else {
+          // User DNF - return empty (will trigger auto-navigation)
+          return const SizedBox.shrink();
+        }
 
       case 5:
         return const CircularProgressIndicator();

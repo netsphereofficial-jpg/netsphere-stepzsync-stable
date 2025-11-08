@@ -24,6 +24,7 @@ import '../../services/local_notification_service.dart';
 import '../../services/step_tracking_service.dart';
 import '../../services/race_bot_service.dart';
 import '../../services/race_step_sync_service.dart';
+import '../../screens/race_dnf_screen_widget.dart';
 
 class MapController extends GetxController with WidgetsBindingObserver {
   var joinedParticipants = 0.obs;
@@ -350,6 +351,19 @@ class MapController extends GetxController with WidgetsBindingObserver {
           if (mapSnapshot.value == null && !snapshotTimeout.value) {
             snapshotTimeout.value = true;
             print('⏱️ Snapshot timeout exceeded - showing completion screen without map');
+          }
+        });
+
+        // ✅ Auto-navigate DNF users to DNF screen when race completes
+        Future.delayed(Duration(milliseconds: 800), () {
+          final isCompleted = myParticipant?.isCompleted ?? false;
+          if (!isCompleted && myParticipant != null && Get.context != null) {
+            print('❌ User did not complete race - auto-navigating to DNF screen');
+            Get.off(() => DNFWidget(
+              size: MediaQuery.of(Get.context!).size,
+              raceModel: raceModel,
+              mapController: this,
+            ));
           }
         });
       }

@@ -10,6 +10,7 @@ import '../core/models/race_data_model.dart';
 import '../widgets/common/custom_app_bar.dart';
 import '../widgets/common/custom_widgets.dart';
 import '../widgets/common/vertical_dash_divider.dart';
+import 'race_winner_screens_widgets.dart';
 
 class DNFWidget extends StatelessWidget {
   const DNFWidget({
@@ -225,9 +226,26 @@ class DNFWidget extends StatelessWidget {
 
                     SizedBox(height: 24),
 
+                    // View Leaderboard Button
+                    CustomButton(
+                      btnTitle: "View Leaderboard",
+                      btnColor: AppColors.appColor,
+                      onPress: () {
+                        // Navigate to leaderboard
+                        Get.to(() => RaceWinnersScreen(
+                          raceData: raceModel!,
+                          participants: mapController.participantsList.toList(),
+                        ));
+                      },
+                    ),
+
+                    SizedBox(height: 12),
+
                     // Back to Home Button
                     CustomButton(
                       btnTitle: "Back to Home",
+                      btnColor: Colors.grey[300],
+                      txtColor: Colors.black87,
                       onPress: () {
                         // Clean up map controller
                         if (Get.isRegistered<MapController>()) {
