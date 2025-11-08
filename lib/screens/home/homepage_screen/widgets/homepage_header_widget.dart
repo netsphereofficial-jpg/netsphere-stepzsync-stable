@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../../core/constants/text_styles.dart';
 import '../../../../routes/app_routes.dart';
 import '../../../../widgets/common/profile_image_widget.dart';
+import '../../../../controllers/home/home_controller.dart';
 
 class HomepageHeaderWidget extends StatelessWidget {
   final RxString userName;
@@ -21,13 +22,20 @@ class HomepageHeaderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Profile Picture - Dynamic with user image
-        Obx(() => ProfileImageWidget(
-          imageUrl: profileImageUrl.value.isNotEmpty ? profileImageUrl.value : null,
-          size: 64,
-          borderColor: const Color(0xFFCDFF49),
-          borderWidth: 2,
-        )),
+        // Profile Picture - Dynamic with user image - Clickable to navigate to profile
+        GestureDetector(
+          onTap: () {
+            // Navigate to profile tab (index 4)
+            final homeController = Get.find<HomeController>();
+            homeController.changeIndex(4);
+          },
+          child: Obx(() => ProfileImageWidget(
+            imageUrl: profileImageUrl.value.isNotEmpty ? profileImageUrl.value : null,
+            size: 64,
+            borderColor: const Color(0xFFCDFF49),
+            borderWidth: 2,
+          )),
+        ),
         const SizedBox(width: 12),
 
         // Welcome Text
