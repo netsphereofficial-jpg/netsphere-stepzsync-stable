@@ -22,6 +22,7 @@ import '../../widgets/guest_upgrade_dialog.dart';
 import '../../widgets/dialogs/premium_purchase_dialog.dart';
 import '../../services/preferences_service.dart';
 import '../../controllers/subscription_controller.dart';
+import '../../utils/manual_sync_button_overlay_manager.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -85,6 +86,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
       }
 
       print('✅ [MAIN_NAV] Lifecycle manager initialized');
+
+      // Show manual sync button overlay after initialization
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && context.mounted) {
+          ManualSyncButtonOverlayManager.show(context);
+        }
+      });
     } catch (e) {
       print('❌ [MAIN_NAV] Error initializing lifecycle manager: $e');
     }
@@ -177,6 +185,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Hide manual sync button when leaving main navigation
+    ManualSyncButtonOverlayManager.hide();
     super.dispose();
   }
 

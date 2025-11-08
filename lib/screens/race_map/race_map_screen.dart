@@ -24,21 +24,47 @@ import '../../screens/subscription/subscription_screen.dart';
 import '../race_winner_screens_widgets.dart';
 import '../race_dnf_screen_widget.dart';
 import 'widgets/race_start_countdown.dart';
+import '../../utils/manual_sync_button_overlay_manager.dart';
 
 enum UserRole { participant, organizer }
 
-class RaceMapScreen extends StatelessWidget {
+class RaceMapScreen extends StatefulWidget {
   final RaceData? raceModel;
   final UserRole role;
+
+  const RaceMapScreen({super.key, this.raceModel, required this.role});
+
+  @override
+  State<RaceMapScreen> createState() => _RaceMapScreenState();
+}
+
+class _RaceMapScreenState extends State<RaceMapScreen> {
   final mapController = Get.put(MapController());
   final chatController = Get.put(ChatController());
   final GlobalKey _mapKey = GlobalKey();
 
-  RaceMapScreen({super.key, this.raceModel, required this.role});
+  @override
+  void initState() {
+    super.initState();
+
+    // Show manual sync button overlay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && context.mounted) {
+        ManualSyncButtonOverlayManager.show(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Hide manual sync button when leaving race map
+    ManualSyncButtonOverlayManager.hide();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    mapController.setRaceData(raceModel!);
+    mapController.setRaceData(widget.raceModel!);
 
     var size = MediaQuery.of(context).size;
     return PopScope(
@@ -57,7 +83,7 @@ class RaceMapScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: shouldShowAppBar ? CustomAppBar(
-            title: raceModel?.title ?? "",
+            title: widget.raceModel?.title ?? "",
             isBack: true,
             circularBackButton: true,
             backButtonCircleColor: AppColors.neonYellow,
@@ -79,7 +105,7 @@ class RaceMapScreen extends StatelessWidget {
             actions: [
               // Race type and status badges
               Obx(() {
-                final raceTypeId = raceModel?.raceTypeId ?? 3;
+                final raceTypeId = widget.raceModel?.raceTypeId ?? 3;
                 String typeText = '';
                 Color badgeColor = AppColors.appColor;
 
@@ -89,7 +115,7 @@ class RaceMapScreen extends StatelessWidget {
                 } else if (raceTypeId == 4) {
                   typeText = 'Marathon';
                   badgeColor = Color(0xFFDC2626);
-                } else if (raceModel?.isPrivate == true) {
+                } else if (widget.raceModel?.isPrivate == true) {
                   typeText = 'Private';
                   badgeColor = Color(0xFFEA580C);
                 } else {
@@ -147,7 +173,7 @@ class RaceMapScreen extends StatelessWidget {
               }),
 
               // Race chat icon with unread badge - hide for solo races
-              if (raceModel?.raceTypeId != 1) ...[
+              if (widget.raceModel?.raceTypeId != 1) ...[
                 Stack(
                   children: [
                     IconButton(
@@ -165,7 +191,7 @@ class RaceMapScreen extends StatelessWidget {
                       top: 6,
                       child: Obx(() {
                         final unreadCount = chatController
-                            .getUnreadRaceMessageCount(raceModel?.id ?? '');
+                            .getUnreadRaceMessageCount(widget.raceModel?.id ?? '');
                         if (unreadCount == 0) return SizedBox.shrink();
 
                         return Container(
@@ -199,7 +225,7 @@ class RaceMapScreen extends StatelessWidget {
                   onPressed: () {
                     if (mapController.participantsList.isEmpty) {
                       mapController.participantsList.value =
-                          raceModel?.participants ?? [];
+                          widget.raceModel?.participants ?? [];
                     }
                     showRankingBottomSheet(context, mapController.participantsList);
                   },
@@ -222,13 +248,13 @@ class RaceMapScreen extends StatelessWidget {
             if (completionState.showDNFScreen) {
               return DNFWidget(
                 size: size,
-                raceModel: raceModel,
+                raceModel: widget.raceModel,
                 mapController: mapController,
               );
             } else if (completionState.showWinnerScreen) {
               return WinnerWidget(
                 size: size,
-                raceModel: raceModel,
+                raceModel: widget.raceModel,
                 mapController: mapController,
               ); // or your fallback UI
             } else {
@@ -394,10 +420,10 @@ class RaceMapScreen extends StatelessWidget {
                   // Race Start Countdown (below top stats) - for status 0 or 1
                   Obx(() {
                     if ((mapController.raceStatus.value == 0 || mapController.raceStatus.value == 1) &&
-                        raceModel?.raceScheduleTime != null) {
+                        widget.raceModel?.raceScheduleTime != null) {
                       try {
                         DateTime scheduleTime;
-                        final scheduleStr = raceModel!.raceScheduleTime!;
+                        final scheduleStr = widget.raceModel!.raceScheduleTime!;
 
                         // Try to parse the schedule time
                         // First try ISO8601 format
@@ -419,7 +445,7 @@ class RaceMapScreen extends StatelessWidget {
                             right: 0,
                             child: RaceStartCountdown(
                               scheduleTime: scheduleTime,
-                              isOrganizer: role == UserRole.organizer,
+                              isOrganizer: widget.role == UserRole.organizer,
                             ),
                           );
                         }
@@ -438,7 +464,7 @@ class RaceMapScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 10.0),
                       child: getWidgetForType(
                         mapController.raceStatus.value,
-                        role == UserRole.organizer,
+                        widget.role == UserRole.organizer,
                       ),
                     ),
                   ),
@@ -458,7 +484,7 @@ class RaceMapScreen extends StatelessWidget {
   }
 
   void _openRaceChat(BuildContext context) {
-    if (raceModel == null) return;
+    if (widget.raceModel == null) return;
 
     // Check if guest user trying to access chat
     if (GuestUtils.isGuest()) {
@@ -489,7 +515,7 @@ class RaceMapScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       useSafeArea: true,
       enableDrag: true,
-      builder: (context) => RaceChatBottomSheet(raceModel: raceModel!),
+      builder: (context) => RaceChatBottomSheet(raceModel: widget.raceModel!),
     );
   }
 
@@ -592,16 +618,16 @@ class RaceMapScreen extends StatelessWidget {
 
   Widget countDownTimer(int status, String time) {
     // Don't show countdown for marathon races (no time limit)
-    if (raceModel?.raceTypeId == 4 && status == 6) {
+    if (widget.raceModel?.raceTypeId == 4 && status == 6) {
       return SizedBox.shrink();
     }
 
     switch (status) {
       case 6:
         // Show race ending countdown banner with duration info
-        final isSolo = raceModel?.raceTypeId == 1;
-        final durationMins = raceModel?.durationMins ??
-                            ((raceModel?.durationHrs ?? 1) * 60);
+        final isSolo = widget.raceModel?.raceTypeId == 1;
+        final durationMins = widget.raceModel?.durationMins ??
+                            ((widget.raceModel?.durationHrs ?? 1) * 60);
         final durationText = durationMins < 60
             ? '$durationMins mins'
             : durationMins == 60
@@ -724,7 +750,7 @@ class RaceMapScreen extends StatelessWidget {
                   builder: (BuildContext context) {
                     return InkWell(
                       onTap: () async {
-                        final minPart = mapController.raceModel.value?.minParticipants ?? 3;
+                        final minPart = widget.raceModel?.minParticipants ?? 3;
                         final currentPart = mapController.joinedParticipants.value;
 
                         if (currentPart < minPart) {
@@ -858,7 +884,7 @@ class RaceMapScreen extends StatelessWidget {
 
                     // Start the race after countdown
                     var response = await RaceRepository().startRaceApiCall(
-                      raceModel?.id,
+                      widget.raceModel?.id,
                     );
 
                     // Check if race start was successful
@@ -980,8 +1006,8 @@ class RaceMapScreen extends StatelessWidget {
       case 6:
         // Race ending - show stats with motivational message (Gap and ETA moved to floating widgets)
         // Marathon: Show motivational message without deadline pressure
-        final isMarathon = raceModel?.raceTypeId == 4;
-        final isSolo = raceModel?.raceTypeId == 1;
+        final isMarathon = widget.raceModel?.raceTypeId == 4;
+        final isSolo = widget.raceModel?.raceTypeId == 1;
 
         // Get the first finisher's name and position
         String motivationalMessage;
@@ -1064,7 +1090,7 @@ class RaceMapScreen extends StatelessWidget {
           onPress: () async {
             // Navigate to winner screen with race data and participants
             Get.to(() => RaceWinnersScreen(
-              raceData: raceModel,
+              raceData: widget.raceModel,
               participants: mapController.participantsList.toList(),
             ));
           },
@@ -1086,7 +1112,7 @@ class RaceMapScreen extends StatelessWidget {
           return SizedBox.shrink();
         }
 
-        final raceTypeId = raceModel?.raceTypeId ?? 3;
+        final raceTypeId = widget.raceModel?.raceTypeId ?? 3;
         final badge = _getRaceTypeBadge();
 
         List<Widget> stats = [];
@@ -1149,7 +1175,7 @@ class RaceMapScreen extends StatelessWidget {
   Widget _buildStatsBelow(MapController controller) {
     return Obx(
       () {
-        final raceTypeId = raceModel?.raceTypeId ?? 3;
+        final raceTypeId = widget.raceModel?.raceTypeId ?? 3;
         final isSolo = raceTypeId == 1;
 
         List<Widget> stats = [
@@ -1313,27 +1339,27 @@ class RaceMapScreen extends StatelessWidget {
 
   /// Check if leaderboard should be shown (hide for solo races)
   bool _shouldShowLeaderboard() {
-    return raceModel?.raceTypeId != 1; // Hide for solo
+    return widget.raceModel?.raceTypeId != 1; // Hide for solo
   }
 
   /// Check if countdown timer should be shown (hide for marathon)
   bool _shouldShowCountdown() {
-    return raceModel?.raceTypeId != 4; // Hide for marathon
+    return widget.raceModel?.raceTypeId != 4; // Hide for marathon
   }
 
   /// Check if gap analysis should be shown (hide for solo)
   bool _shouldShowGapAnalysis() {
-    return raceModel?.raceTypeId != 1; // Hide for solo
+    return widget.raceModel?.raceTypeId != 1; // Hide for solo
   }
 
   /// Get race type badge
   Widget? _getRaceTypeBadge() {
-    final raceTypeId = raceModel?.raceTypeId;
+    final raceTypeId = widget.raceModel?.raceTypeId;
 
     if (raceTypeId == 1) return _buildBadge('Solo', Color(0xFF0EA5E9));
     if (raceTypeId == 4) return _buildBadge('Marathon', Color(0xFFDC2626));
-    if (raceModel?.isPrivate == true) return _buildBadge('🔒 Private', Color(0xFFEA580C));
-    if (raceModel?.isPrivate == false) return _buildBadge('🌐 Public', Color(0xFF059669));
+    if (widget.raceModel?.isPrivate == true) return _buildBadge('🔒 Private', Color(0xFFEA580C));
+    if (widget.raceModel?.isPrivate == false) return _buildBadge('🌐 Public', Color(0xFF059669));
     return null;
   }
 
@@ -1439,7 +1465,7 @@ class RaceMapScreen extends StatelessWidget {
 
     final remainingDistance = _getCurrentUserRemainingDistance(controller);
     final distance = _getCurrentUserDistance(controller);
-    final totalDistance = raceModel?.totalDistance ?? 0;
+    final totalDistance = widget.raceModel?.totalDistance ?? 0;
     final rank = _getCurrentUserRank(controller);
 
     if (distance <= 0) return SizedBox.shrink();
@@ -1457,7 +1483,7 @@ class RaceMapScreen extends StatelessWidget {
       message = "🎯 Halfway there! Keep up the pace!";
       icon = Icons.stars;
       bgColor = Colors.blue;
-    } else if (rank == 1 && raceModel?.raceTypeId != 1) {
+    } else if (rank == 1 && widget.raceModel?.raceTypeId != 1) {
       message = "🔥 You're leading! Don't slow down!";
       icon = Icons.emoji_events;
       bgColor = Colors.amber.shade700;
@@ -1761,7 +1787,7 @@ class RaceMapScreen extends StatelessWidget {
       return SizedBox.shrink();
     }
 
-    if (raceModel?.raceTypeId != 4) return SizedBox.shrink(); // Marathon only
+    if (widget.raceModel?.raceTypeId != 4) return SizedBox.shrink(); // Marathon only
     if (controller.raceStatus.value != 3 && controller.raceStatus.value != 6) {
       return SizedBox.shrink();
     }

@@ -16,7 +16,7 @@ import '../../services/auth/firebase_auth_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/xp_service.dart';
 import '../../utils/notification_helpers.dart';
-import '../../widgets/race/race_summary_dialog.dart';
+import '../../screens/races/create_race/race_summary_screen.dart';
 
 class CreateRaceController extends GetxController {
   // Text controllers
@@ -583,9 +583,14 @@ class CreateRaceController extends GetxController {
   void showRaceSummaryDialog() {
     if (!_validateRaceDetails()) return;
 
-    Get.dialog(
-      RaceSummaryDialog(controller: this, onConfirm: _createRaceConfirmed),
-      barrierDismissible: false,
+    // Navigate to race summary screen instead of showing dialog
+    Get.to(
+      () => RaceSummaryScreen(
+        controller: this,
+        onConfirm: _createRaceConfirmed,
+      ),
+      transition: Transition.rightToLeft,
+      duration: const Duration(milliseconds: 300),
     );
   }
 
@@ -896,14 +901,13 @@ class CreateRaceController extends GetxController {
     // Notify homepage to update active race count immediately
     _notifyHomepageOfRaceCreation();
 
-    // Small delay to let the snackbar show
+    // Close RaceSummaryScreen first (if it's open)
+    // Then navigate to ActiveRacesScreen
+    Get.back(); // Close summary screen
+
+    // Small delay to let the snackbar show and screen transition complete
     Future.delayed(Duration(milliseconds: 500), () {
-      if (race.isPrivate == true) {
-        Get.to(() => ActiveRacesScreen());
-      } else {
-        // For public and solo races, go directly to active races
-        Get.to(() => ActiveRacesScreen());
-      }
+      Get.to(() => ActiveRacesScreen());
     });
   }
 
