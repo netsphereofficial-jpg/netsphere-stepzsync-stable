@@ -26,6 +26,7 @@ import '../race_dnf_screen_widget.dart';
 import 'widgets/race_start_countdown.dart';
 import '../../utils/manual_sync_button_overlay_manager.dart';
 import '../../widgets/race/race_completion_card.dart';
+import '../../services/race_share_service.dart';
 
 enum UserRole { participant, organizer }
 
@@ -238,6 +239,23 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
                     ),
                   ),
                 ),
+
+              // Share icon
+              if (widget.raceModel != null && RaceShareService.canShareRace(widget.raceModel!)) ...[
+                SizedBox(width: 4),
+                IconButton(
+                  onPressed: () {
+                    RaceShareService.showShareDialog(context, widget.raceModel!);
+                  },
+                  icon: Icon(Icons.share, color: AppColors.appColor, size: 22),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.neonYellow.withValues(alpha: 0.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ) : null,
 

@@ -12,6 +12,7 @@ import '../../core/models/race_data_model.dart';
 import '../vertical_dash_divider.dart';
 import '../../utils/guest_utils.dart';
 import '../../widgets/guest_upgrade_dialog.dart';
+import '../../services/race_share_service.dart';
 
 class RaceCardWidget extends StatefulWidget {
   final RaceData race;
@@ -183,6 +184,30 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
               ],
             ),
           ),
+
+          // Share button
+          if (RaceShareService.canShareRace(widget.race))
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: () {
+                  RaceShareService.showShareDialog(context, widget.race);
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.share,
+                    size: 18,
+                    color: AppColors.appColor,
+                  ),
+                ),
+              ),
+            ),
 
           // Race type and distance badges
           Column(

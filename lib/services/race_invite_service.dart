@@ -506,13 +506,15 @@ class RaceInviteService {
         if (raceDoc.exists) {
           final raceData = raceDoc.data() as Map<String, dynamic>;
           debugPrint('🔍 Race data found: ${raceData.keys.toList()}');
-          final currentParticipants = _safeStringListExtract(
-            raceData['participants'],
-            'participants',
-          );
+
+          // ✅ Check participants subcollection instead of array (Phase 0 optimization)
+          final participantDoc = await raceRef
+              .collection('participants')
+              .doc(userToAdd)
+              .get();
 
           // Only add if not already a participant
-          if (!currentParticipants.contains(userToAdd)) {
+          if (!participantDoc.exists) {
             // Get user profile data for participant and user_race documents
             final userDoc = await _firestore
                 .collection('user_profiles')
@@ -536,7 +538,7 @@ class RaceInviteService {
             if (result.isSuccess) {
               debugPrint('✅ Successfully joined race via RaceService.joinRaceAsUser');
             } else {
-              debugPrint('❌ Failed to join race via RaceService.joinRaceAsUser: ${result.message}');
+              debugPrint('❌ Failed to join race via RaceService.joinRaceAsUser: ${result.error}');
               return false;
             }
 
