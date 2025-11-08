@@ -178,11 +178,10 @@ class RaceSummaryScreen extends StatelessWidget {
         border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
-        children:
-            children
-                .expand((widget) => [widget, const SizedBox(height: 10)])
-                .toList()
-              ..removeLast(), // Remove last SizedBox
+        children: children
+            .expand((widget) => [widget, const SizedBox(height: 10)])
+            .toList()
+          ..removeLast(), // Remove last SizedBox
       ),
     );
   }
