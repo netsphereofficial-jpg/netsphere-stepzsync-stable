@@ -418,14 +418,13 @@ class CreateRaceScreen extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Row(
-            children: ['Marathon', 'Solo'].map((type) {
+            children: ['Solo'].map((type) {
               final isSelected = controller.raceType.value == type;
 
               return Expanded(
                 child: GestureDetector(
                   onTap: () => controller.raceType.value = type,
                   child: Container(
-                    margin: EdgeInsets.only(right: type != 'Solo' ? 8 : 0),
                     padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.appColor : Colors.grey[100],
