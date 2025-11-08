@@ -220,9 +220,10 @@ class WinnerWidget extends StatelessWidget {
 
                     SizedBox(height: 24),
 
-                    // Check if there's only one participant (solo race)
-                    // If solo, skip "View Race Map" and go straight to leaderboard
-                    if (mapController.participantsList.length == 1)
+                    // Check if there's only one participant (solo race) OR all participants have finished
+                    // If so, skip "View Race Map" and go straight to leaderboard
+                    if (mapController.participantsList.length == 1 ||
+                        mapController.participantsList.every((p) => p.isCompleted))
                       CustomButton(
                         btnTitle: "View Leaderboard",
                         onPress: () {
@@ -234,7 +235,7 @@ class WinnerWidget extends StatelessWidget {
                         },
                       )
                     else
-                      // View Results Button - Show for multi-participant races
+                      // View Results Button - Show only when there are still active racers
                       CustomButton(
                         btnTitle: "View Race Map",
                         onPress: () async {
