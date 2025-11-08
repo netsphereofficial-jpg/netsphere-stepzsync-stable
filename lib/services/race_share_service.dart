@@ -22,13 +22,14 @@ class RaceShareService {
 
   /// Share race externally via system share sheet
   /// Opens native share dialog (WhatsApp, SMS, Email, etc.)
-  static Future<void> shareExternally(RaceData race) async {
+  static Future<void> shareExternally(RaceData race, {Rect? sharePositionOrigin}) async {
     try {
       final message = _getExternalShareMessage(race);
 
       await Share.share(
         message,
         subject: 'Join my race on StepzSync!',
+        sharePositionOrigin: sharePositionOrigin,
       );
 
       debugPrint('✅ Race share dialog opened');

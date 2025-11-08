@@ -94,7 +94,17 @@ class ShareOptionsDialog extends StatelessWidget {
             color: const Color(0xFF35B555),
             onTap: () async {
               Get.back(); // Close options dialog
-              await RaceShareService.shareExternally(race);
+
+              // Calculate share position for iOS popover
+              final box = context.findRenderObject() as RenderBox?;
+              final sharePositionOrigin = box != null
+                  ? box.localToGlobal(Offset.zero) & box.size
+                  : null;
+
+              await RaceShareService.shareExternally(
+                race,
+                sharePositionOrigin: sharePositionOrigin,
+              );
             },
           ),
 
