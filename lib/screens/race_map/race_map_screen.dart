@@ -364,7 +364,7 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
                             ),
                             SizedBox(width: 8),
                             Text(
-                              "You've finished! Watching others race...",
+                              "Your race is done, but others are still on the track — keep watching.",
                               style: GoogleFonts.poppins(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
