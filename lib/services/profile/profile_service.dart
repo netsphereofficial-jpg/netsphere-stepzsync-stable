@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import '../../models/profile_models.dart';
@@ -361,6 +362,39 @@ class ProfileService {
     } catch (e) {
       print('❌ ProfileService: Error getting FCM token: $e');
       return null;
+    }
+  }
+
+  /// Delete user account and all associated data
+  /// This calls the Firebase Cloud Function to permanently delete the account
+  static Future<AuthResult> deleteUserAccount() async {
+    try {
+      print('🗑️ ProfileService: Starting account deletion...');
+      await _firebaseService.ensureInitialized();
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('🚫 ProfileService: User not authenticated');
+        return AuthResult.failure(error: 'User not authenticated');
+      }
+
+      print('👤 ProfileService: Deleting account for user: ${user.uid}');
+
+      // Call the Cloud Function to delete all user data
+      final callable = FirebaseFunctions.instance.httpsCallable('deleteUserAccount');
+      final result = await callable.call();
+
+      print('✅ ProfileService: Cloud Function completed successfully');
+      print('📊 Items deleted: ${result.data['itemsDeleted']}');
+
+      return AuthResult.success(
+        message: result.data['message'] ?? 'Account deleted successfully',
+        data: result.data,
+      );
+    } catch (e) {
+      print('❌ ProfileService: Failed to delete account: $e');
+      return AuthResult.failure(
+        error: 'Failed to delete account: ${e.toString()}',
+      );
     }
   }
 }

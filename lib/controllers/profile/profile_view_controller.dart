@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -9,6 +11,7 @@ import '../../models/profile_models.dart';
 import '../../services/profile/profile_service.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../screens/login_screen.dart';
+import '../../config/app_colors.dart';
 
 class ProfileViewController extends GetxController {
   // Observable variables
@@ -204,5 +207,195 @@ class ProfileViewController extends GetxController {
   /// Refresh profile data
   Future<void> refreshProfile() async {
     await setUserDetails();
+  }
+
+  /// Show delete account confirmation dialog
+  void showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              color: Colors.red,
+              size: 28,
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Delete Account?',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This action cannot be undone. Your account and all associated data will be permanently deleted:',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.buttonBlack,
+              ),
+            ),
+            SizedBox(height: 16),
+            _buildDeleteItem('Profile information'),
+            _buildDeleteItem('Race history and statistics'),
+            _buildDeleteItem('Friends and connections'),
+            _buildDeleteItem('Messages and notifications'),
+            _buildDeleteItem('All personal data'),
+            SizedBox(height: 16),
+            Text(
+              'Are you sure you want to continue?',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.greyColor2,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteAccount();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Delete Account',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeleteItem(String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(
+            Icons.close,
+            color: Colors.red,
+            size: 16,
+          ),
+          SizedBox(width: 8),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: AppColors.buttonBlack,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Delete user account
+  Future<void> _deleteAccount() async {
+    try {
+      isLoading.value = true;
+
+      // Show loading dialog
+      Get.dialog(
+        PopScope(
+          canPop: false,
+          child: Center(
+            child: Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.appColor),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Deleting account...',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      // Call the delete account service
+      final result = await ProfileService.deleteUserAccount();
+
+      // Close loading dialog
+      Get.back();
+
+      if (result.success) {
+        // Show success message
+        SnackbarUtils.showSuccess(
+          'Account Deleted',
+          'Your account has been permanently deleted',
+        );
+
+        // Navigate to login screen
+        Get.offAll(() => LoginScreen());
+      } else {
+        // Show error message
+        SnackbarUtils.showError(
+          'Deletion Failed',
+          result.error ?? 'Failed to delete account. Please try again.',
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+
+      SnackbarUtils.showError(
+        'Error',
+        'An unexpected error occurred: ${e.toString()}',
+      );
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

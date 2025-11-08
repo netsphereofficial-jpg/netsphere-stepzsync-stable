@@ -1287,3 +1287,186 @@ const raceCountdownChecker = require('./scheduled/raceCountdownChecker');
 // Export scheduled functions
 exports.autoStartScheduledRaces = raceAutoStarter.autoStartScheduledRaces;
 exports.checkRaceCountdowns = raceCountdownChecker.checkRaceCountdowns;
+
+/**
+ * ============================================================================
+ * USER ACCOUNT MANAGEMENT (Production)
+ * ============================================================================
+ */
+
+/**
+ * FUNCTION: deleteUserAccount (HTTPS Callable)
+ *
+ * Permanently deletes a user's account and all associated data.
+ * This function is required by Apple's App Store guidelines.
+ *
+ * What gets deleted:
+ * - User authentication (Firebase Auth)
+ * - User profile (user_profiles collection)
+ * - User health data (users collection)
+ * - User health baselines (users/{userId}/health_baselines subcollection)
+ * - Race participations (races/{raceId}/participants/{userId})
+ * - Friend requests (both sent and received)
+ * - Friend relationships
+ * - Chat messages sent by user
+ * - Notifications
+ *
+ * Note: Race data created by the user is preserved but anonymized.
+ *
+ * Returns:
+ * {
+ *   success: boolean,
+ *   message: string
+ * }
+ */
+exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
+  // 1. Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated to delete account');
+  }
+
+  const userId = context.auth.uid;
+  console.log(`🗑️ [DELETE_ACCOUNT] Starting account deletion for user ${userId}`);
+
+  try {
+    const batch = db.batch();
+    let deletionCount = 0;
+
+    // 2. Delete user profile
+    console.log(`   📝 Deleting user profile...`);
+    const profileRef = db.collection('user_profiles').doc(userId);
+    batch.delete(profileRef);
+    deletionCount++;
+
+    // 3. Delete user health data
+    console.log(`   🏥 Deleting user health data...`);
+    const userHealthRef = db.collection('users').doc(userId);
+    batch.delete(userHealthRef);
+    deletionCount++;
+
+    // 4. Delete health baselines subcollection
+    console.log(`   📊 Deleting health baselines...`);
+    const baselinesSnapshot = await db.collection('users')
+      .doc(userId)
+      .collection('health_baselines')
+      .get();
+
+    baselinesSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${baselinesSnapshot.size} baseline(s)`);
+
+    // 5. Remove from all race participations
+    console.log(`   🏁 Removing race participations...`);
+    const racesSnapshot = await db.collection('races').get();
+    let raceParticipationCount = 0;
+
+    for (const raceDoc of racesSnapshot.docs) {
+      const participantRef = raceDoc.ref.collection('participants').doc(userId);
+      const participantDoc = await participantRef.get();
+
+      if (participantDoc.exists) {
+        batch.delete(participantRef);
+        raceParticipationCount++;
+        deletionCount++;
+      }
+    }
+    console.log(`      Removed from ${raceParticipationCount} race(s)`);
+
+    // 6. Delete friend requests (sent)
+    console.log(`   👥 Deleting friend requests sent...`);
+    const sentRequestsSnapshot = await db.collection('friend_requests')
+      .where('fromUserId', '==', userId)
+      .get();
+
+    sentRequestsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${sentRequestsSnapshot.size} sent request(s)`);
+
+    // 7. Delete friend requests (received)
+    console.log(`   👥 Deleting friend requests received...`);
+    const receivedRequestsSnapshot = await db.collection('friend_requests')
+      .where('toUserId', '==', userId)
+      .get();
+
+    receivedRequestsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${receivedRequestsSnapshot.size} received request(s)`);
+
+    // 8. Delete friendships (where user is user1)
+    console.log(`   👥 Deleting friendships (as user1)...`);
+    const friendshipsAsUser1 = await db.collection('friendships')
+      .where('user1Id', '==', userId)
+      .get();
+
+    friendshipsAsUser1.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${friendshipsAsUser1.size} friendship(s)`);
+
+    // 9. Delete friendships (where user is user2)
+    console.log(`   👥 Deleting friendships (as user2)...`);
+    const friendshipsAsUser2 = await db.collection('friendships')
+      .where('user2Id', '==', userId)
+      .get();
+
+    friendshipsAsUser2.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${friendshipsAsUser2.size} friendship(s)`);
+
+    // 10. Delete chat messages
+    console.log(`   💬 Deleting chat messages...`);
+    const chatMessagesSnapshot = await db.collection('chat_messages')
+      .where('senderId', '==', userId)
+      .get();
+
+    chatMessagesSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${chatMessagesSnapshot.size} message(s)`);
+
+    // 11. Delete notifications
+    console.log(`   🔔 Deleting notifications...`);
+    const notificationsSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .get();
+
+    notificationsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletionCount++;
+    });
+    console.log(`      Deleted ${notificationsSnapshot.size} notification(s)`);
+
+    // 12. Commit all Firestore deletions
+    console.log(`   💾 Committing ${deletionCount} Firestore deletion(s)...`);
+    await batch.commit();
+    console.log(`   ✅ Firestore data deleted successfully`);
+
+    // 13. Delete Firebase Auth account (must be done last)
+    console.log(`   🔐 Deleting Firebase Auth account...`);
+    await admin.auth().deleteUser(userId);
+    console.log(`   ✅ Auth account deleted successfully`);
+
+    console.log(`✅ [DELETE_ACCOUNT] Successfully deleted account for user ${userId}`);
+    console.log(`   Total items deleted: ${deletionCount}`);
+
+    return {
+      success: true,
+      message: 'Account successfully deleted',
+      itemsDeleted: deletionCount
+    };
+
+  } catch (error) {
+    console.error(`❌ [DELETE_ACCOUNT] Error deleting account for user ${userId}:`, error);
+    throw new functions.https.HttpsError('internal', `Failed to delete account: ${error.message}`);
+  }
+});

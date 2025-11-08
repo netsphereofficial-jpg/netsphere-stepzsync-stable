@@ -715,6 +715,41 @@ class ProfileViewScreen extends StatelessWidget {
                     );
                   },
                 ),
+                // Delete Account Option
+                ListTile(
+                  leading: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.delete_forever_rounded,
+                      color: Colors.red,
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    'Delete Account',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Permanently delete your account and data',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.greyColor2,
+                    ),
+                  ),
+                  trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.red),
+                  onTap: () {
+                    Navigator.pop(context);
+                    controller.showDeleteAccountDialog(context);
+                  },
+                ),
                 SizedBox(height: 20),
                 // App Version Info
                 Container(
