@@ -200,15 +200,21 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
       controller.startAddress.value = result.formattedAddress!;
       controller.startLat?.value = result.latLng!.latitude;
       controller.startLng?.value = result.latLng!.longitude;
+
+      // Auto-generate random end location 1-5 km away
+      controller.generateRandomEndLocation(
+        result.latLng!.latitude,
+        result.latLng!.longitude,
+      );
     } else {
       // Update end location
       controller.endAddress.value = result.formattedAddress!;
       controller.endLat?.value = result.latLng!.latitude;
       controller.endLng?.value = result.latLng!.longitude;
-    }
 
-    // Calculate distance if both locations are set
-    _calculateDistance();
+      // Calculate distance if both locations are set
+      _calculateDistance();
+    }
   }
 
   void _calculateDistance() {

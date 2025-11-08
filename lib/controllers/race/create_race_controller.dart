@@ -155,6 +155,197 @@ class CreateRaceController extends GetxController {
     }
   }
 
+  /// Generate random end location 1-5 km from start point
+  Future<void> generateRandomEndLocation(double startLat, double startLng) async {
+    try {
+      // Generate random distance between 1.0 and 5.0 km
+      final random = dart_math.Random();
+      final randomDistance = 1.0 + random.nextDouble() * 4.0; // 1.0 - 5.0 km
+
+      // Generate random bearing (0-360 degrees)
+      final randomBearing = random.nextDouble() * 360.0;
+
+      // Calculate destination coordinates
+      final destination = _calculateDestination(
+        startLat,
+        startLng,
+        randomDistance,
+        randomBearing,
+      );
+
+      // Update end coordinates
+      endLat!.value = destination['lat']!;
+      endLng!.value = destination['lng']!;
+
+      // Reverse geocode to get address
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          destination['lat']!,
+          destination['lng']!,
+        );
+
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final address = [
+            place.street,
+            place.subLocality,
+            place.locality,
+            place.administrativeArea,
+          ].where((s) => s != null && s.isNotEmpty).join(', ');
+
+          endAddress.value = address.isNotEmpty ? address : 'Random Location';
+          endController.text = endAddress.value;
+        }
+      } catch (e) {
+        endAddress.value = 'Random Location (${randomDistance.toStringAsFixed(2)} km away)';
+        endController.text = endAddress.value;
+        log('Error reverse geocoding random location: $e');
+      }
+
+      // Calculate and update distance
+      final distance = _calculateDistance(startLat, startLng, endLat!.value, endLng!.value);
+      routeDistance.value = distance.toStringAsFixed(2);
+
+      log('Generated random end location: ${randomDistance.toStringAsFixed(2)} km away at bearing $randomBearing°');
+    } catch (e) {
+      log('Error generating random end location: $e');
+      SnackbarUtils.showError(
+        'Location Error',
+        'Failed to generate random end location',
+      );
+    }
+  }
+
+  /// Calculate destination point given start point, distance and bearing
+  Map<String, double> _calculateDestination(
+    double lat1,
+    double lon1,
+    double distance,
+    double bearing,
+  ) {
+    const double earthRadius = 6371.0; // km
+
+    // Convert to radians
+    final lat1Rad = lat1 * dart_math.pi / 180.0;
+    final lon1Rad = lon1 * dart_math.pi / 180.0;
+    final bearingRad = bearing * dart_math.pi / 180.0;
+
+    // Calculate destination latitude
+    final lat2Rad = dart_math.asin(
+      dart_math.sin(lat1Rad) * dart_math.cos(distance / earthRadius) +
+      dart_math.cos(lat1Rad) * dart_math.sin(distance / earthRadius) * dart_math.cos(bearingRad)
+    );
+
+    // Calculate destination longitude
+    final lon2Rad = lon1Rad + dart_math.atan2(
+      dart_math.sin(bearingRad) * dart_math.sin(distance / earthRadius) * dart_math.cos(lat1Rad),
+      dart_math.cos(distance / earthRadius) - dart_math.sin(lat1Rad) * dart_math.sin(lat2Rad)
+    );
+
+    // Convert back to degrees
+    final lat2 = lat2Rad * 180.0 / dart_math.pi;
+    final lon2 = lon2Rad * 180.0 / dart_math.pi;
+
+    return {'lat': lat2, 'lng': lon2};
+  }
+
+  /// Set end location to current GPS location
+  Future<void> setEndLocationToCurrent() async {
+    try {
+      isLoading.value = true;
+
+      // Check location services
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        SnackbarUtils.showWarning(
+          'Location Services Disabled',
+          'Please enable location services to use current location',
+        );
+        return;
+      }
+
+      // Check permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          SnackbarUtils.showWarning(
+            'Permission Denied',
+            'Location permission is required to use current location',
+          );
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        SnackbarUtils.showWarning(
+          'Permission Denied',
+          'Please enable location permission in settings',
+        );
+        return;
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
+      );
+
+      // Update end coordinates
+      endLat!.value = position.latitude;
+      endLng!.value = position.longitude;
+
+      // Reverse geocode to get address
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final address = [
+            place.street,
+            place.subLocality,
+            place.locality,
+            place.administrativeArea,
+          ].where((s) => s != null && s.isNotEmpty).join(', ');
+
+          endAddress.value = address.isNotEmpty ? address : 'Current Location';
+          endController.text = endAddress.value;
+        }
+      } catch (e) {
+        endAddress.value = 'Current Location';
+        endController.text = endAddress.value;
+        log('Error reverse geocoding current location: $e');
+      }
+
+      // Calculate distance if start location is set
+      if (startLat!.value != 0 && startLng!.value != 0) {
+        final distance = _calculateDistance(
+          startLat!.value,
+          startLng!.value,
+          endLat!.value,
+          endLng!.value,
+        );
+        routeDistance.value = distance.toStringAsFixed(2);
+      }
+
+      SnackbarUtils.showSuccess(
+        'Location Updated',
+        'End location set to your current location',
+      );
+    } catch (e) {
+      log('Error getting current location for end point: $e');
+      SnackbarUtils.showError(
+        'Location Error',
+        'Failed to get current location',
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   void incrementParticipants() {
     if (totalParticipants.value < 20) {
       totalParticipants.value++;

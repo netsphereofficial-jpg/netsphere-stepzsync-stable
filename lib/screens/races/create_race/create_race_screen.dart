@@ -155,13 +155,47 @@ class CreateRaceScreen extends StatelessWidget {
                 hintText: 'Add ending point',
                 isReadOnly: true,
                 onClick: () => _showLocationPicker(false),
-                suffixIcon: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Icon(
-                    Icons.location_on,
-                    color: AppColors.appColor,
-                    size: 20,
-                  ),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // GPS button to use current location
+                    Obx(() => controller.isLoading.value
+                        ? Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.appColor,
+                                ),
+                              ),
+                            ),
+                          )
+                        : IconButton(
+                            icon: Icon(
+                              Icons.my_location,
+                              color: AppColors.neonYellow,
+                              size: 20,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                            onPressed: () {
+                              controller.setEndLocationToCurrent();
+                            },
+                            tooltip: 'Use current location',
+                          ),
+                    ),
+                    SizedBox(width: 8),
+                    // Location icon
+                    Icon(
+                      Icons.location_on,
+                      color: AppColors.appColor,
+                      size: 20,
+                    ),
+                    SizedBox(width: 16),
+                  ],
                 ),
               ),
 
