@@ -188,8 +188,9 @@ class WinnerWidget extends StatelessWidget {
 
                     SizedBox(height: 32),
 
-                    // Info Text - conditional based on participant count
-                    if (mapController.participantsList.length > 1)
+                    // Info Text - only show if there are still active racers
+                    if (mapController.participantsList.length > 1 &&
+                        !mapController.participantsList.every((p) => p.isCompleted))
                       Container(
                         padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -493,7 +494,7 @@ class RaceWinnersScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: CustomAppBar(
-        title: "Race Winners",
+        title: "Race Results",
         isBack: true,
         circularBackButton: true,
         backButtonCircleColor: AppColors.neonYellow,
@@ -507,9 +508,12 @@ class RaceWinnersScreen extends StatelessWidget {
           color: AppColors.appColor,
         ),
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Padding(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
@@ -1056,13 +1060,44 @@ class RaceWinnersScreen extends StatelessWidget {
                     ),
                   );
                 }),
-                const SizedBox(height: 80), // Bottom padding for better scroll experience
+                const SizedBox(height: 20), // Reduced padding since bottom button provides space
               ],
             ],
           ),
         ),
       ),
-    );
+    ),
+    // Sticky Bottom Button for Home Navigation
+    Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: CustomButton(
+          btnTitle: "Back to Home",
+          backgroundColor: AppColors.appColor,
+          onPress: () {
+            // Clean up map controller
+            if (Get.isRegistered<MapController>()) {
+              Get.delete<MapController>();
+            }
+            // Navigate back to home - going back twice to exit race flow
+            Get.back();
+            Get.back();
+          },
+        ),
+      ),
+    ),
+  ],
+));
   }
 
   /// Helper method to build compact stat displays
