@@ -126,13 +126,8 @@ class UnifiedNotificationTest {
       mutualFriends: 2,
     );
 
-    // Test daily goal
-    await NotificationHelpers.sendDailyGoalCompleted(
-      goalType: 'steps',
-      goalValue: 10000,
-      actualValue: 12000,
-      xpEarned: 25,
-    );
+    // ❌ REMOVED: Daily goal notifications no longer sent
+    // await NotificationHelpers.sendDailyGoalCompleted(...)
 
     print('✅ Notification helpers test completed');
   }
@@ -292,36 +287,10 @@ class UnifiedNotificationTest {
   static Future<void> testAchievementScenario() async {
     print('🧪 Testing achievement scenario...');
 
-    // Daily goal
-    await NotificationHelpers.sendDailyGoalCompleted(
-      goalType: 'steps',
-      goalValue: 10000,
-      actualValue: 15000,
-      xpEarned: 50,
-    );
+    // ❌ REMOVED: Achievement notifications (daily goal, milestones, hall of fame) are no longer sent
+    print('⏭️ Skipping achievement tests - notifications removed per requirements');
 
-    await Future.delayed(Duration(milliseconds: 1000));
-
-    // Milestone achievement
-    await NotificationHelpers.sendMilestoneAchievement(
-      achievementName: 'Step Master',
-      achievementDescription: 'Reached 100,000 total steps!',
-      xpEarned: 200,
-      achievementIcon: '👑',
-    );
-
-    await Future.delayed(Duration(milliseconds: 1000));
-
-    // Hall of fame
-    await NotificationHelpers.sendHallOfFameEntry(
-      category: 'weekly',
-      rank: 1,
-      metric: 'steps',
-      value: '75,000',
-      xpEarned: 100,
-    );
-
-    print('✅ Achievement scenario test completed');
+    print('✅ Achievement scenario test completed (skipped)');
   }
 
   /// Debug and utility methods

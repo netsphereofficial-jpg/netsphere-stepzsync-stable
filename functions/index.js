@@ -207,22 +207,24 @@ exports.onParticipantUpdated = functions.firestore
         }
       }
 
-      // ✅ NEW: Detect rank changes (overtaking)
+      // ✅ UPDATED: Detect rank changes (overtaking) - only for PRIVATE races
       const oldRank = beforeData.rank || 999;
       const newRank = afterData.rank || 999;
       const rankChanged = oldRank !== newRank;
       const rankImproved = newRank < oldRank; // Lower rank number = better position
 
-      if (rankChanged && rankImproved && newRank > 0) {
+      // ✅ RANK 0 CHECK: Skip overtaking notifications when participants are at rank 0
+      if (rankChanged && rankImproved && newRank > 0 && oldRank > 0) {
         console.log(`🎯 Rank improved: ${userId} moved from #${oldRank} to #${newRank} in race ${raceId}`);
 
-        // Send overtaking notifications
+        // Send overtaking notifications (only for PRIVATE races)
         try {
           const { sendOvertakingNotifications } = require('./notifications/senders/raceNotifications');
 
           const raceDoc = await raceRef.get();
           if (raceDoc.exists) {
             const raceData = raceDoc.data();
+            const raceTypeId = raceData.raceTypeId || 3; // Default to public
 
             // Get all participants to find who was overtaken
             const participantsSnapshot = await db
@@ -238,7 +240,8 @@ exports.onParticipantUpdated = functions.firestore
               afterData.userName || afterData.displayName || 'Someone',
               newRank,
               oldRank,
-              participantsSnapshot.docs
+              participantsSnapshot.docs,
+              raceTypeId // ✅ Pass raceTypeId for filtering
             );
 
             console.log(`🔔 Overtaking notifications sent for race ${raceId}`);
@@ -246,6 +249,8 @@ exports.onParticipantUpdated = functions.firestore
         } catch (notifError) {
           console.error(`⚠️ Failed to send overtaking notifications: ${notifError}`);
         }
+      } else if (rankChanged && newRank === 0 && oldRank === 0) {
+        console.log(`⏭️ Skipping overtaking notification - participants at rank 0 (race just started)`);
       }
 
       // Update top participant if this participant is now rank #1
@@ -260,13 +265,14 @@ exports.onParticipantUpdated = functions.firestore
         };
         console.log(`🏆 New leader in race ${raceId}: ${updateData.topParticipant.userName} (${updateData.topParticipant.steps} steps)`);
 
-        // ✅ NEW: Send leader change notification to all participants
+        // ✅ UPDATED: Send leader change notification to all participants (only for PUBLIC races)
         try {
           const { sendLeaderChangeNotification } = require('./notifications/senders/raceNotifications');
 
           const raceDoc = await raceRef.get();
           if (raceDoc.exists) {
             const raceData = raceDoc.data();
+            const raceTypeId = raceData.raceTypeId || 3; // Default to public
 
             // Get all participants
             const participantsSnapshot = await db
@@ -280,7 +286,8 @@ exports.onParticipantUpdated = functions.firestore
               raceData.title || 'Race',
               userId,
               updateData.topParticipant.userName,
-              participantsSnapshot.docs
+              participantsSnapshot.docs,
+              raceTypeId // ✅ Pass raceTypeId for filtering
             );
 
             console.log(`🔔 Leader change notification sent for race ${raceId}`);
@@ -290,63 +297,8 @@ exports.onParticipantUpdated = functions.firestore
         }
       }
 
-      // ✅ NEW: Detect milestone completion (25%, 50%, 75%)
-      const oldDistance = beforeData.distance || 0;
-      const newDistance = afterData.distance || 0;
-
-      if (newDistance > oldDistance) {
-        try {
-          const raceDoc = await raceRef.get();
-          if (raceDoc.exists) {
-            const raceData = raceDoc.data();
-            const totalDistance = raceData.totalDistance || 0;
-
-            if (totalDistance > 0) {
-              const oldProgress = (oldDistance / totalDistance) * 100;
-              const newProgress = (newDistance / totalDistance) * 100;
-
-              // Get previously reached milestones from participant document
-              const reachedMilestones = afterData.reachedMilestones || [];
-              const milestones = [25, 50, 75];
-
-              for (const milestone of milestones) {
-                // Check if milestone was just crossed (wasn't reached before, but is now)
-                if (oldProgress < milestone && newProgress >= milestone && !reachedMilestones.includes(milestone)) {
-                  console.log(`🎯 Milestone reached: ${userId} hit ${milestone}% in race ${raceId}`);
-
-                  // Update participant's reached milestones
-                  await change.after.ref.update({
-                    reachedMilestones: admin.firestore.FieldValue.arrayUnion(milestone),
-                  });
-
-                  // Send notifications
-                  const {
-                    sendMilestonePersonalNotification,
-                    sendMilestoneAlertNotification,
-                  } = require('./notifications/senders/raceNotifications');
-
-                  const raceInfo = {
-                    id: raceId,
-                    title: raceData.title || 'Race',
-                  };
-
-                  const userName = afterData.userName || afterData.displayName || 'Someone';
-
-                  // Send personal notification to achiever
-                  await sendMilestonePersonalNotification(userId, raceInfo, milestone);
-
-                  // Send alert to all other participants
-                  await sendMilestoneAlertNotification(raceId, raceInfo, userName, milestone, userId);
-
-                  console.log(`🔔 Milestone notifications sent for ${userId} - ${milestone}%`);
-                }
-              }
-            }
-          }
-        } catch (milestoneError) {
-          console.error(`⚠️ Failed to handle milestone detection: ${milestoneError}`);
-        }
-      }
+      // ❌ REMOVED: Milestone completion detection (25%, 50%, 75%)
+      // Milestone notifications are no longer sent per requirements
 
       // Only update if there are changes
       if (Object.keys(updateData).length > 0) {
@@ -1184,7 +1136,7 @@ exports.onRaceInviteCreated = raceTriggers.onRaceInviteCreated;
 exports.onRaceStatusChanged = raceTriggers.onRaceStatusChanged;
 exports.onRaceInviteAccepted = raceTriggers.onRaceInviteAccepted;
 exports.onRaceInviteDeclined = raceTriggers.onRaceInviteDeclined;
-exports.onRaceCreated = raceTriggers.onRaceCreated;
+// exports.onRaceCreated = raceTriggers.onRaceCreated; // ❌ DISABLED - race creation notifications removed
 
 /**
  * ============================================================================

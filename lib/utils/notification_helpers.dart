@@ -124,91 +124,13 @@ class NotificationHelpers {
     print('🏃‍♂️ Race completion notification sent: $raceName (Rank: $finalRank)');
   }
 
-  /// Send race creation confirmation notification
-  static Future<void> sendRaceCreationConfirmation({
-    required String raceName,
-    required String raceType,
-    required double distance,
-    required String scheduledTime,
-    required int participantCount,
-  }) async {
-    final title = 'Race Created Successfully! 🎉';
+  /// ❌ REMOVED: Send race creation confirmation notification
+  /// Race creation notifications are no longer sent per requirements
+  // static Future<void> sendRaceCreationConfirmation - REMOVED
 
-    String message;
-    if (raceType == 'Solo') {
-      message = 'Your solo race "$raceName" is ready! Distance: ${distance.toStringAsFixed(1)}km. Start whenever you\'re ready!';
-    } else {
-      message = 'Your $raceType race "$raceName" is live! Distance: ${distance.toStringAsFixed(1)}km. Scheduled for $scheduledTime.';
-    }
-
-    final metadata = <String, dynamic>{
-      'raceType': raceType,
-      'distance': distance,
-      'scheduledTime': scheduledTime,
-      'participantCount': participantCount,
-      'createdAt': DateTime.now().toIso8601String(),
-    };
-
-    await UnifiedNotificationService.createAndPushNotification(
-      title: title,
-      message: message,
-      notificationType: 'RaceCreated',
-      category: 'Race',
-      icon: '🎉',
-      raceName: raceName,
-      metadata: metadata,
-    );
-
-    print('🎉 Race creation confirmation sent: $raceName ($raceType)');
-  }
-
-  /// Send race reminder notification (for upcoming races)
-  static Future<void> sendRaceReminder({
-    required String raceName,
-    required String raceId,
-    required String startTime,
-    String reminderType = '15min', // 15min, 1hour, 1day
-  }) async {
-    String title;
-    String message;
-
-    switch (reminderType) {
-      case '15min':
-        title = 'Race Starting Soon! ⏰';
-        message = '"$raceName" starts in 15 minutes. Get ready!';
-        break;
-      case '1hour':
-        title = 'Race Reminder 🕐';
-        message = '"$raceName" starts in 1 hour. Don\'t forget!';
-        break;
-      case '1day':
-        title = 'Race Tomorrow 📅';
-        message = '"$raceName" is scheduled for tomorrow at $startTime.';
-        break;
-      default:
-        title = 'Race Reminder ⏰';
-        message = '"$raceName" is coming up!';
-    }
-
-    final metadata = <String, dynamic>{
-      'reminderType': reminderType,
-      'startTime': startTime,
-      'reminderSentAt': DateTime.now().toIso8601String(),
-    };
-
-    await UnifiedNotificationService.createAndPushNotification(
-      title: title,
-      message: message,
-      notificationType: 'RaceReminder',
-      category: 'Race',
-      icon: '⏰',
-      raceId: raceId,
-      raceName: raceName,
-      metadata: metadata,
-    );
-
-    print('⏰ Race reminder sent: $raceName ($reminderType)');
-  }
+  /// ❌ REMOVED: Send race reminder notification (for upcoming races)
+  /// Race reminder notifications are no longer sent per requirements
+  // static Future<void> sendRaceReminder - REMOVED
 
   // MARK: - Social notifications
 
@@ -268,250 +190,14 @@ class NotificationHelpers {
     print('🎉 Friend acceptance notification sent: $friendName');
   }
 
-  // MARK: - Achievement notifications
+  // ❌ REMOVED: Achievement notifications section
+  // Milestone, daily goal, and hall of fame notifications are no longer sent
 
-  /// Send milestone achievement notification
-  static Future<void> sendMilestoneAchievement({
-    required String achievementName,
-    required String achievementDescription,
-    required int xpEarned,
-    String? achievementIcon,
-    String? achievementImage,
-    Map<String, dynamic>? milestoneData,
-  }) async {
-    final title = 'Achievement Unlocked! ${achievementIcon ?? '🏆'}';
-    final message = 'You earned "$achievementName"! $achievementDescription';
+  // ❌ REMOVED: Marathon notifications section
+  // Marathon event notifications are no longer sent
 
-    final metadata = <String, dynamic>{
-      'achievementName': achievementName,
-      'achievementDescription': achievementDescription,
-      'unlockedAt': DateTime.now().toIso8601String(),
-      ...?milestoneData,
-    };
-
-    await UnifiedNotificationService.sendAchievementNotification(
-      title: title,
-      message: message,
-      type: 'Milestone',
-      xpEarned: xpEarned,
-      additionalMetadata: metadata,
-    );
-
-    print('🏆 Milestone achievement notification sent: $achievementName');
-  }
-
-  /// Send daily goal achievement notification
-  static Future<void> sendDailyGoalCompleted({
-    required String goalType, // steps, distance, calories
-    required int goalValue,
-    required int actualValue,
-    int? xpEarned,
-  }) async {
-    String title;
-    String message;
-    String icon;
-
-    switch (goalType.toLowerCase()) {
-      case 'steps':
-        title = 'Daily Steps Goal! 👟';
-        message = 'You reached your daily goal of $goalValue steps!';
-        icon = '👟';
-        break;
-      case 'distance':
-        title = 'Distance Goal! 🏃‍♀️';
-        message = 'You covered your daily goal of $goalValue km!';
-        icon = '🏃‍♀️';
-        break;
-      case 'calories':
-        title = 'Calorie Goal! 🔥';
-        message = 'You burned your daily goal of $goalValue calories!';
-        icon = '🔥';
-        break;
-      default:
-        title = 'Daily Goal Completed! ⭐';
-        message = 'You achieved your daily $goalType goal!';
-        icon = '⭐';
-    }
-
-    final metadata = <String, dynamic>{
-      'goalType': goalType,
-      'goalValue': goalValue,
-      'actualValue': actualValue,
-      'completedAt': DateTime.now().toIso8601String(),
-    };
-
-    await UnifiedNotificationService.createAndPushNotification(
-      title: title,
-      message: message,
-      notificationType: 'DailyGoal',
-      category: 'Achievement',
-      icon: icon,
-      metadata: {
-        'xpEarned': xpEarned,
-        ...metadata,
-      },
-    );
-
-    print('⭐ Daily goal notification sent: $goalType ($goalValue)');
-  }
-
-  /// Send hall of fame notification
-  static Future<void> sendHallOfFameEntry({
-    required String category, // weekly, monthly, all-time
-    required int rank,
-    required String metric, // steps, distance, races_won
-    required String value,
-    int? xpEarned,
-  }) async {
-    final title = 'Hall of Fame! 🌟';
-    final message = 'You\'re #$rank in $category $metric with $value!';
-
-    final metadata = <String, dynamic>{
-      'category': category,
-      'rank': rank,
-      'metric': metric,
-      'value': value,
-      'enteredAt': DateTime.now().toIso8601String(),
-    };
-
-    await UnifiedNotificationService.sendAchievementNotification(
-      title: title,
-      message: message,
-      type: 'HallOfFame',
-      xpEarned: xpEarned,
-      additionalMetadata: metadata,
-    );
-
-    print('🌟 Hall of Fame notification sent: #$rank in $category $metric');
-  }
-
-  // MARK: - Marathon notifications
-
-  /// Send marathon event notification
-  static Future<void> sendMarathonEvent({
-    required String marathonName,
-    required String eventType, // started, milestone, completed
-    String? description,
-    int? participantCount,
-    String? timeRemaining,
-    Map<String, dynamic>? marathonData,
-  }) async {
-    String title;
-    String message;
-    String icon;
-
-    switch (eventType.toLowerCase()) {
-      case 'started':
-        title = 'Marathon Started! 🏃‍♀️';
-        message = '$marathonName has begun! Join now!';
-        icon = '🏃‍♀️';
-        break;
-      case 'milestone':
-        title = 'Marathon Milestone! 🎯';
-        message = description ?? 'Milestone reached in $marathonName!';
-        icon = '🎯';
-        break;
-      case 'completed':
-        title = 'Marathon Completed! 🏁';
-        message = '$marathonName has ended. Check your results!';
-        icon = '🏁';
-        break;
-      default:
-        title = 'Marathon Update 🏃‍♀️';
-        message = description ?? 'Update for $marathonName';
-        icon = '🏃‍♀️';
-    }
-
-    final metadata = <String, dynamic>{
-      'marathonName': marathonName,
-      'eventType': eventType,
-      if (participantCount != null) 'participantCount': participantCount,
-      if (timeRemaining != null) 'timeRemaining': timeRemaining,
-      'eventTime': DateTime.now().toIso8601String(),
-      ...?marathonData,
-    };
-
-    await UnifiedNotificationService.createAndPushNotification(
-      title: title,
-      message: message,
-      notificationType: eventType.toLowerCase() == 'completed' ? 'Marathon' : 'ActiveMarathon',
-      category: 'Marathon',
-      icon: icon,
-      metadata: metadata,
-    );
-
-    print('🏃‍♀️ Marathon notification sent: $marathonName ($eventType)');
-  }
-
-  // MARK: - System notifications
-
-  /// Send app update notification
-  static Future<void> sendAppUpdate({
-    required String version,
-    required String updateDescription,
-    bool isRequired = false,
-  }) async {
-    final title = isRequired ? 'App Update Required! ⚠️' : 'App Update Available! 🔄';
-    final message = 'Version $version is now available. $updateDescription';
-
-    await UnifiedNotificationService.sendGeneralNotification(
-      title: title,
-      message: message,
-      icon: isRequired ? '⚠️' : '🔄',
-      metadata: {
-        'version': version,
-        'description': updateDescription,
-        'required': isRequired,
-        'notifiedAt': DateTime.now().toIso8601String(),
-      },
-    );
-
-    print('🔄 App update notification sent: $version (Required: $isRequired)');
-  }
-
-  /// Send maintenance notification
-  static Future<void> sendMaintenanceNotification({
-    required String maintenanceType, // scheduled, emergency, completed
-    required DateTime scheduledTime,
-    String? duration,
-    String? description,
-  }) async {
-    String title;
-    String message;
-
-    switch (maintenanceType.toLowerCase()) {
-      case 'scheduled':
-        title = 'Scheduled Maintenance 🔧';
-        message = 'App maintenance scheduled for ${_formatDateTime(scheduledTime)}';
-        break;
-      case 'emergency':
-        title = 'Emergency Maintenance ⚠️';
-        message = 'Emergency maintenance in progress. Service may be interrupted.';
-        break;
-      case 'completed':
-        title = 'Maintenance Complete ✅';
-        message = 'Maintenance has been completed. All services are restored.';
-        break;
-      default:
-        title = 'Maintenance Notice 🔧';
-        message = description ?? 'System maintenance notification';
-    }
-
-    await UnifiedNotificationService.sendGeneralNotification(
-      title: title,
-      message: message,
-      icon: maintenanceType.toLowerCase() == 'emergency' ? '⚠️' : '🔧',
-      metadata: {
-        'maintenanceType': maintenanceType,
-        'scheduledTime': scheduledTime.toIso8601String(),
-        if (duration != null) 'duration': duration,
-        if (description != null) 'description': description,
-        'notifiedAt': DateTime.now().toIso8601String(),
-      },
-    );
-
-    print('🔧 Maintenance notification sent: $maintenanceType');
-  }
+  // ❌ REMOVED: System notifications section
+  // App update and maintenance notifications are no longer sent
 
   // MARK: - Utility methods
 
@@ -541,21 +227,19 @@ class NotificationHelpers {
 
     await Future.delayed(Duration(milliseconds: 500));
 
-    // Test achievement
-    await sendMilestoneAchievement(
-      achievementName: 'First 5K',
-      achievementDescription: 'Completed your first 5K run!',
-      xpEarned: 100,
-      achievementIcon: '🏃‍♂️',
-    );
-
-    await Future.delayed(Duration(milliseconds: 500));
-
     // Test friend request
     await sendFriendRequest(
       fromUserName: 'Sarah Johnson',
       fromUserId: 'user-456',
       mutualFriends: 3,
+    );
+
+    await Future.delayed(Duration(milliseconds: 500));
+
+    // Test friend accepted
+    await sendFriendAccepted(
+      friendName: 'Mike Wilson',
+      friendUserId: 'user-789',
     );
 
     print('✅ Test notifications created successfully!');

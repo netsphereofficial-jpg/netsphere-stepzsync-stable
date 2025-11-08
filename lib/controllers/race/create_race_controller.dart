@@ -15,7 +15,7 @@ import '../../screens/home/homepage_screen/controllers/homepage_data_service.dar
 import '../../services/auth/firebase_auth_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/xp_service.dart';
-import '../../utils/notification_helpers.dart';
+// ❌ REMOVED: import '../../utils/notification_helpers.dart'; - no longer needed
 import '../../screens/races/create_race/race_summary_screen.dart';
 
 class CreateRaceController extends GetxController {
@@ -986,14 +986,8 @@ class CreateRaceController extends GetxController {
       // Alternatively, if you have a dedicated createRace method:
       // final raceId = await _firebaseService.createRaceWithModel(race, creatorParticipant, currentUser.uid);
 
-      // Send race creation notification
-      await NotificationHelpers.sendRaceCreationConfirmation(
-        raceName: race.title ?? 'New Race',
-        raceType: raceType.value,
-        distance: distance,
-        scheduledTime: formattedScheduleTimeDisplay,
-        participantCount: finalTotalParticipants,
-      );
+      // ❌ REMOVED: Race creation notifications are no longer sent per requirements
+      // await NotificationHelpers.sendRaceCreationConfirmation(...)
 
       log('Race created with ID: $raceId');
       log(

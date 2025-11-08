@@ -20,12 +20,8 @@ const {
   sendRaceStarted,
   sendRaceStartedToAllParticipants,
   sendRaceCompletedToAllParticipants,
-  sendRaceCreationConfirmation,
-  sendJoinRequestAccepted,
   sendInviteAccepted,
-  sendJoinRequestDeclined,
   sendInviteDeclined,
-  sendNewJoinRequest,
   sendFirstFinisherNotification,
   sendDeadlineAlertNotification,
   sendRaceCancelledNotification,
@@ -96,9 +92,8 @@ exports.onRaceInviteCreated = functions.firestore
       // Determine notification type based on isJoinRequest flag
       if (isJoinRequest) {
         // This is a join request (user wants to join race)
-        // Send notification to race organizer (toUserId)
-        console.log(`📩 Join request: ${fromUserInfo.name} wants to join "${raceData.title}"`);
-        await sendNewJoinRequest(toUserId, raceData, fromUserInfo);
+        // ❌ REMOVED: Join request notifications are no longer sent
+        console.log(`⏭️ Skipping join request notification for ${fromUserInfo.name} to join "${raceData.title}" (notifications disabled)`);
       } else {
         // This is a race invitation (organizer invites user)
         // Send notification to invited user (toUserId)
@@ -190,11 +185,14 @@ exports.onRaceStatusChanged = functions.firestore
           firstFinisherUserId: firstFinisherUserId,
         };
 
+        // Get race type for filtering
+        const raceTypeId = afterData.raceTypeId || 3; // Default to public
+
         // Send first finisher notification
         await sendFirstFinisherNotification(firstFinisherUserId, raceData);
 
-        // Send deadline alert to all other active participants
-        await sendDeadlineAlertNotification(raceId, raceData, firstFinisherName, deadlineMinutes);
+        // Send deadline alert to all other active participants (only for PUBLIC races)
+        await sendDeadlineAlertNotification(raceId, raceData, firstFinisherName, deadlineMinutes, raceTypeId);
 
         return null;
       }
@@ -283,9 +281,9 @@ exports.onRaceInviteAccepted = functions.firestore
 
       // Determine notification type
       if (isJoinRequest) {
-        // Join request was accepted - notify requester
-        console.log(`✅ Join request accepted for "${raceData.title}"`);
-        await sendJoinRequestAccepted(toUserId, raceData, { id: fromUserId, name: afterData.fromUserName || 'Organizer' });
+        // Join request was accepted
+        // ❌ REMOVED: Join request accepted notifications are no longer sent
+        console.log(`⏭️ Skipping join request accepted notification for "${raceData.title}" (notifications disabled)`);
       } else {
         // Race invitation was accepted - notify inviter
         console.log(`✅ Race invitation accepted for "${raceData.title}"`);
@@ -365,9 +363,9 @@ exports.onRaceInviteDeclined = functions.firestore
 
       // Determine notification type
       if (isJoinRequest) {
-        // Join request was declined - notify requester
-        console.log(`❌ Join request declined for "${raceData.title}"`);
-        await sendJoinRequestDeclined(toUserId, raceData, { id: fromUserId, name: afterData.fromUserName || 'Organizer' });
+        // Join request was declined
+        // ❌ REMOVED: Join request declined notifications are no longer sent
+        console.log(`⏭️ Skipping join request declined notification for "${raceData.title}" (notifications disabled)`);
       } else {
         // Race invitation was declined - notify inviter
         console.log(`❌ Race invitation declined for "${raceData.title}"`);
@@ -384,60 +382,13 @@ exports.onRaceInviteDeclined = functions.firestore
 /**
  * TRIGGER 5: Race Created
  *
- * Triggers when: New race document is created
- * Sends:
- *   - Race creation confirmation to creator
- *   - Public race announcement to ALL users (if raceTypeId == 3)
+ * ❌ DISABLED: Race creation notifications have been removed per requirements
+ * - No race creation confirmation to creator
+ * - No public race announcements
  *
- * Race Type IDs:
- *   1 = Solo
- *   2 = Private
- *   3 = Public  ← Broadcasts to all users
- *   4 = Marathon
- *   5 = Quick Race
+ * Previous functionality:
+ * - Race Type IDs: 1=Solo, 2=Private, 3=Public, 4=Marathon, 5=Quick Race
+ * - Used to send creation confirmation to creator
+ * - Used to broadcast public races to all users
  */
-exports.onRaceCreated = functions.firestore
-  .document('races/{raceId}')
-  .onCreate(async (snap, context) => {
-    try {
-      const raceId = context.params.raceId;
-      const raceData = snap.data();
-
-      console.log(`🎯 Trigger: Race created ${raceId}`);
-
-      const creatorUserId = raceData.createdBy;
-      const raceTypeId = raceData.raceTypeId || 3; // Default to Public if not specified
-      const isPublicRace = raceTypeId === 3;
-
-      // Prepare race data for notification
-      const raceInfo = {
-        id: raceId,
-        title: raceData.title || 'Untitled Race',
-        raceType: raceData.raceType,
-        raceTypeId: raceTypeId,
-        distance: raceData.totalDistance,
-        scheduledTime: raceData.scheduleTime,
-        participantCount: raceData.totalParticipants || 0,
-        startAddress: raceData.startAddress,
-        organizerName: raceData.orgName || 'Unknown',
-      };
-
-      // 1. Send confirmation to creator
-      if (creatorUserId) {
-        console.log(`🎉 Sending race creation confirmation to ${creatorUserId}`);
-        await sendRaceCreationConfirmation(creatorUserId, raceInfo);
-      }
-
-      // 2. If public race, broadcast to ALL users
-      if (isPublicRace) {
-        console.log(`📢 Broadcasting public race announcement to all users...`);
-        const { sendPublicRaceAnnouncement } = require('../senders/raceNotifications');
-        await sendPublicRaceAnnouncement(raceInfo, creatorUserId);
-      }
-
-      return null;
-    } catch (error) {
-      console.error(`❌ Error in onRaceCreated: ${error}`);
-      return null;
-    }
-  });
+// exports.onRaceCreated - DISABLED

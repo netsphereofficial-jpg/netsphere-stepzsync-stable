@@ -168,143 +168,21 @@ async function sendRaceCompleted(userId, raceData, participantData) {
 
 /**
  * 4. Send race creation confirmation
- * Triggered when: User creates a new race
+ * ❌ REMOVED: Race creation notifications are no longer sent
  */
-async function sendRaceCreationConfirmation(userId, raceData) {
-  try {
-    console.log(`📤 Sending race creation confirmation to user: ${userId}`);
-
-    const notification = {
-      title: 'Race Created Successfully! 🎉',
-      body: `Your ${raceData.raceType || 'race'} "${raceData.title}" is ready! Distance: ${raceData.distance}km.`,
-    };
-
-    const data = {
-      type: 'RaceCreated',
-      category: 'Race',
-      icon: '🎉',
-      raceId: raceData.id,
-      raceName: raceData.title,
-      raceType: raceData.raceType || 'race',
-      distance: String(raceData.distance),
-      ...(raceData.scheduledTime && { scheduledTime: raceData.scheduledTime }),
-      ...(raceData.participantCount && { participantCount: String(raceData.participantCount) }),
-      createdAt: new Date().toISOString(),
-    };
-
-    const result = await sendNotificationToUser(userId, notification, data);
-
-    if (result.success) {
-      console.log(`✅ Race creation confirmation sent to ${userId}`);
-    } else {
-      console.error(`❌ Failed to send race creation confirmation: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Error sending race creation confirmation: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendRaceCreationConfirmation - REMOVED
 
 /**
  * 5. Send race reminder notification
- * Triggered when: Scheduled function checks upcoming races
+ * ❌ REMOVED: Race reminder notifications are no longer sent
  */
-async function sendRaceReminder(userId, raceData, reminderType = '15min') {
-  try {
-    console.log(`📤 Sending race reminder to user: ${userId} (${reminderType})`);
-
-    let title;
-    let message;
-
-    switch (reminderType) {
-      case '15min':
-        title = 'Race Starting Soon! ⏰';
-        message = `"${raceData.title}" starts in 15 minutes. Get ready!`;
-        break;
-      case '1hour':
-        title = 'Race Reminder 🕐';
-        message = `"${raceData.title}" starts in 1 hour. Don't forget!`;
-        break;
-      case '1day':
-        title = 'Race Tomorrow 📅';
-        message = `"${raceData.title}" is scheduled for tomorrow.`;
-        break;
-      default:
-        title = 'Race Reminder ⏰';
-        message = `"${raceData.title}" is coming up!`;
-    }
-
-    const notification = {
-      title: title,
-      body: message,
-    };
-
-    const data = {
-      type: 'RaceReminder',
-      category: 'Race',
-      icon: '⏰',
-      raceId: raceData.id,
-      raceName: raceData.title,
-      reminderType: reminderType,
-      ...(raceData.startTime && { startTime: raceData.startTime }),
-      reminderSentAt: new Date().toISOString(),
-    };
-
-    const result = await sendNotificationToUser(userId, notification, data);
-
-    if (result.success) {
-      console.log(`✅ Race reminder sent to ${userId} (${reminderType})`);
-    } else {
-      console.error(`❌ Failed to send race reminder: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Error sending race reminder: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendRaceReminder - REMOVED
 
 /**
  * 6. Send join request accepted notification
- * Triggered when: Organizer accepts a join request
+ * ❌ REMOVED: Join request notifications are no longer sent
  */
-async function sendJoinRequestAccepted(userId, raceData, organizerData) {
-  try {
-    console.log(`📤 Sending join request accepted notification to user: ${userId}`);
-
-    const notification = {
-      title: 'Join Request Accepted ✅',
-      body: `${organizerData.name} accepted your request to join "${raceData.title}"`,
-    };
-
-    const data = {
-      type: 'JoinRequestAccepted',
-      category: 'Race',
-      icon: '✅',
-      raceId: raceData.id,
-      raceName: raceData.title,
-      organizerUserId: organizerData.id,
-      organizerName: organizerData.name,
-      acceptedAt: new Date().toISOString(),
-    };
-
-    const result = await sendNotificationToUser(userId, notification, data);
-
-    if (result.success) {
-      console.log(`✅ Join request accepted notification sent to ${userId}`);
-    } else {
-      console.error(`❌ Failed to send join request accepted notification: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Error sending join request accepted notification: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendJoinRequestAccepted - REMOVED
 
 /**
  * 7. Send invite accepted notification
@@ -347,42 +225,9 @@ async function sendInviteAccepted(userId, raceData, accepterData) {
 
 /**
  * 8. Send join request declined notification
- * Triggered when: Organizer declines a join request
+ * ❌ REMOVED: Join request notifications are no longer sent
  */
-async function sendJoinRequestDeclined(userId, raceData, organizerData) {
-  try {
-    console.log(`📤 Sending join request declined notification to user: ${userId}`);
-
-    const notification = {
-      title: 'Join Request Declined',
-      body: `${organizerData.name} declined your request to join "${raceData.title}"`,
-    };
-
-    const data = {
-      type: 'JoinRequestDeclined',
-      category: 'Race',
-      icon: '❌',
-      raceId: raceData.id,
-      raceName: raceData.title,
-      organizerUserId: organizerData.id,
-      organizerName: organizerData.name,
-      declinedAt: new Date().toISOString(),
-    };
-
-    const result = await sendNotificationToUser(userId, notification, data);
-
-    if (result.success) {
-      console.log(`✅ Join request declined notification sent to ${userId}`);
-    } else {
-      console.error(`❌ Failed to send join request declined notification: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Error sending join request declined notification: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendJoinRequestDeclined - REMOVED
 
 /**
  * 9. Send invite declined notification
@@ -425,42 +270,9 @@ async function sendInviteDeclined(userId, raceData, declinerData) {
 
 /**
  * 10. Send new join request notification
- * Triggered when: User requests to join a race
+ * ❌ REMOVED: Join request notifications are no longer sent
  */
-async function sendNewJoinRequest(userId, raceData, requesterData) {
-  try {
-    console.log(`📤 Sending new join request notification to user: ${userId}`);
-
-    const notification = {
-      title: 'New Join Request 🙋‍♂️',
-      body: `${requesterData.name} wants to join "${raceData.title}"`,
-    };
-
-    const data = {
-      type: 'NewJoinRequest',
-      category: 'Race',
-      icon: '🙋‍♂️',
-      raceId: raceData.id,
-      raceName: raceData.title,
-      requesterUserId: requesterData.id,
-      requesterName: requesterData.name,
-      requestedAt: new Date().toISOString(),
-    };
-
-    const result = await sendNotificationToUser(userId, notification, data);
-
-    if (result.success) {
-      console.log(`✅ New join request notification sent to ${userId}`);
-    } else {
-      console.error(`❌ Failed to send new join request notification: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Error sending new join request notification: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendNewJoinRequest - REMOVED
 
 /**
  * 11. Send race won notification (special case for winners)
@@ -506,6 +318,8 @@ async function sendRaceWon(userId, raceData, winnerData) {
 /**
  * Batch send race started notifications to all participants
  * Used by race start trigger
+ * ✅ UPDATED: Only sends for PUBLIC races (raceTypeId === 3)
+ * ✅ UPDATED: Skips notifications when all participants have rank 0 (race just started)
  */
 async function sendRaceStartedToAllParticipants(raceId) {
   try {
@@ -519,6 +333,13 @@ async function sendRaceStartedToAllParticipants(raceId) {
     }
 
     const raceData = { id: raceId, ...raceDoc.data() };
+    const raceTypeId = raceData.raceTypeId || 3; // Default to public
+
+    // ✅ FILTER: Only send race started notifications for PUBLIC races
+    if (raceTypeId !== 3) {
+      console.log(`⏭️ Skipping race started notifications for race ${raceId} - not a public race (raceTypeId: ${raceTypeId})`);
+      return { success: true, message: 'Race started notifications only for public races' };
+    }
 
     // Get all participants
     const participantsSnapshot = await db.collection('races').doc(raceId).collection('participants').get();
@@ -526,6 +347,17 @@ async function sendRaceStartedToAllParticipants(raceId) {
     if (participantsSnapshot.empty) {
       console.log(`ℹ️ No participants found for race ${raceId}`);
       return { success: true, message: 'No participants to notify' };
+    }
+
+    // ✅ RANK 0 CHECK: If all participants have rank 0, skip notifications
+    const allParticipantsRankZero = participantsSnapshot.docs.every(doc => {
+      const participantData = doc.data();
+      return (participantData.rank === 0 || participantData.rank === undefined || participantData.rank === null);
+    });
+
+    if (allParticipantsRankZero) {
+      console.log(`⏭️ Skipping race started notifications - all participants at rank 0 (race just started, no movement yet)`);
+      return { success: true, message: 'Skipped - all participants at rank 0' };
     }
 
     // Send to all participants
@@ -551,6 +383,7 @@ async function sendRaceStartedToAllParticipants(raceId) {
 /**
  * Batch send race completed notifications to all participants
  * Used by race complete trigger
+ * ✅ UPDATED: Only sends notifications for top 3 finishers (1st, 2nd, 3rd)
  */
 async function sendRaceCompletedToAllParticipants(raceId) {
   try {
@@ -573,19 +406,32 @@ async function sendRaceCompletedToAllParticipants(raceId) {
       return { success: true, message: 'No participants to notify' };
     }
 
-    // Send to all participants with their individual rank data
+    // ✅ FILTER: Only send to top 3 finishers (1st, 2nd, 3rd)
     const promises = [];
     participantsSnapshot.forEach(doc => {
       const participantUserId = doc.id;
       const participantData = doc.data();
-      promises.push(sendRaceCompleted(participantUserId, raceData, participantData));
+      const rank = participantData.rank || 999;
+
+      // Only notify participants who finished in top 3
+      if (rank <= 3 && rank >= 1) {
+        console.log(`🏆 Sending podium notification to ${participantUserId} (Rank ${rank})`);
+        promises.push(sendRaceCompleted(participantUserId, raceData, participantData));
+      } else {
+        console.log(`⏭️ Skipping notification for ${participantUserId} (Rank ${rank}) - not in top 3`);
+      }
     });
+
+    if (promises.length === 0) {
+      console.log(`ℹ️ No top 3 finishers to notify for race ${raceId}`);
+      return { success: true, message: 'No top 3 finishers to notify' };
+    }
 
     const results = await Promise.all(promises);
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
 
-    console.log(`✅ Race completed notifications sent: ${successCount} succeeded, ${failureCount} failed`);
+    console.log(`✅ Race completed notifications sent to top 3: ${successCount} succeeded, ${failureCount} failed`);
 
     return { success: true, successCount, failureCount };
   } catch (error) {
@@ -596,143 +442,9 @@ async function sendRaceCompletedToAllParticipants(raceId) {
 
 /**
  * 12. Send public race announcement to ALL users
- * Triggered when: Public race is created (raceTypeId == 3)
- * Broadcast notification to entire user base
+ * ❌ REMOVED: Public race announcements are no longer sent
  */
-async function sendPublicRaceAnnouncement(raceData, creatorUserId) {
-  try {
-    console.log(`📢 Broadcasting public race announcement: "${raceData.title}"`);
-
-    // Get all user profiles (with FCM tokens)
-    const usersSnapshot = await db.collection('user_profiles').get();
-
-    if (usersSnapshot.empty) {
-      console.log(`ℹ️ No users found to notify`);
-      return { success: true, message: 'No users to notify' };
-    }
-
-    // Prepare notification message
-    const notification = {
-      title: 'New Public Race Available! 🏁',
-      body: `${raceData.organizerName} created "${raceData.title}" - ${raceData.distance}km. Join now!`,
-    };
-
-    const data = {
-      type: 'PublicRaceAnnouncement',
-      category: 'Race',
-      icon: '🏁',
-      raceId: raceData.id,
-      raceName: raceData.title,
-      raceTypeId: String(raceData.raceTypeId),
-      distance: String(raceData.distance),
-      organizerName: raceData.organizerName,
-      ...(raceData.startAddress && { location: raceData.startAddress }),
-      ...(raceData.scheduledTime && { scheduledTime: raceData.scheduledTime }),
-      ...(raceData.participantCount && { participantLimit: String(raceData.participantCount) }),
-      createdAt: new Date().toISOString(),
-    };
-
-    // Get all FCM tokens (exclude creator to avoid duplicate notification)
-    const tokens = [];
-    const userIds = [];
-
-    usersSnapshot.forEach(doc => {
-      const userId = doc.id;
-      const userData = doc.data();
-      const fcmToken = userData.fcmToken;
-
-      // Skip creator (they already got confirmation notification)
-      if (userId === creatorUserId) {
-        return;
-      }
-
-      // Only include users with valid FCM tokens
-      if (fcmToken && typeof fcmToken === 'string' && fcmToken.trim() !== '') {
-        tokens.push(fcmToken);
-        userIds.push(userId);
-      }
-    });
-
-    if (tokens.length === 0) {
-      console.log(`ℹ️ No users with FCM tokens found (excluding creator)`);
-      return { success: true, message: 'No users with tokens to notify' };
-    }
-
-    console.log(`📤 Sending to ${tokens.length} users (excluding creator)`);
-
-    // Send in batches (FCM limit is 500 tokens per request)
-    const batchSize = 500;
-    const batches = [];
-
-    for (let i = 0; i < tokens.length; i += batchSize) {
-      const batchTokens = tokens.slice(i, i + batchSize);
-      batches.push(batchTokens);
-    }
-
-    let totalSuccess = 0;
-    let totalFailure = 0;
-
-    for (let i = 0; i < batches.length; i++) {
-      const batchTokens = batches[i];
-
-      try {
-        const message = {
-          notification: notification,
-          data: data,
-          tokens: batchTokens,
-          android: {
-            priority: 'high',
-            notification: {
-              channelId: 'race_notifications',
-              priority: 'high',
-              sound: 'default',
-            },
-          },
-          apns: {
-            payload: {
-              aps: {
-                sound: 'default',
-                badge: 1,
-                contentAvailable: true,
-              },
-            },
-          },
-        };
-
-        const response = await admin.messaging().sendEachForMulticast(message);
-
-        totalSuccess += response.successCount;
-        totalFailure += response.failureCount;
-
-        console.log(`✅ Batch ${i + 1}/${batches.length}: ${response.successCount} sent, ${response.failureCount} failed`);
-
-        // Log failed tokens for debugging
-        if (response.failureCount > 0) {
-          response.responses.forEach((resp, idx) => {
-            if (!resp.success) {
-              console.error(`❌ Failed to send to token ${idx}: ${resp.error?.message}`);
-            }
-          });
-        }
-      } catch (error) {
-        console.error(`❌ Error sending batch ${i + 1}: ${error}`);
-        totalFailure += batchTokens.length;
-      }
-    }
-
-    console.log(`✅ Public race announcement broadcast complete: ${totalSuccess} succeeded, ${totalFailure} failed`);
-
-    return {
-      success: true,
-      totalUsers: tokens.length,
-      successCount: totalSuccess,
-      failureCount: totalFailure,
-    };
-  } catch (error) {
-    console.error(`❌ Error broadcasting public race announcement: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendPublicRaceAnnouncement - REMOVED
 
 // Helper function to convert number to ordinal (1st, 2nd, 3rd, etc.)
 function getOrdinal(number) {
@@ -794,10 +506,17 @@ async function sendParticipantJoinedNotification(organizerUserId, raceData, part
 /**
  * 14. Send overtaking notifications (to overtaker, overtaken, and others)
  * Triggered when: User improves rank by overtaking another participant
+ * ✅ UPDATED: Only sends for PRIVATE races (raceTypeId === 2)
  */
-async function sendOvertakingNotifications(raceId, raceTitle, overtakerUserId, overtakerName, newRank, oldRank, allParticipantsDocs) {
+async function sendOvertakingNotifications(raceId, raceTitle, overtakerUserId, overtakerName, newRank, oldRank, allParticipantsDocs, raceTypeId) {
   try {
-    console.log(`📤 Sending overtaking notifications for race: ${raceId}`);
+    // ✅ FILTER: Only send overtaking notifications for PRIVATE races
+    if (raceTypeId !== 2) {
+      console.log(`⏭️ Skipping overtaking notifications for race ${raceId} - not a private race (raceTypeId: ${raceTypeId})`);
+      return { success: true, message: 'Overtaking notifications only for private races' };
+    }
+
+    console.log(`📤 Sending overtaking notifications for PRIVATE race: ${raceId}`);
 
     // Find who was overtaken (person now at oldRank)
     let overtakenUserId = null;
@@ -905,10 +624,17 @@ async function sendOvertakingNotifications(raceId, raceTitle, overtakerUserId, o
 /**
  * 15. Send leader change notification to all participants
  * Triggered when: Someone takes 1st place
+ * ✅ UPDATED: Only sends for PUBLIC races (raceTypeId === 3)
  */
-async function sendLeaderChangeNotification(raceId, raceTitle, newLeaderUserId, newLeaderName, allParticipantsDocs) {
+async function sendLeaderChangeNotification(raceId, raceTitle, newLeaderUserId, newLeaderName, allParticipantsDocs, raceTypeId) {
   try {
-    console.log(`📤 Sending leader change notification for race: ${raceId}`);
+    // ✅ FILTER: Only send leader change notifications for PUBLIC races
+    if (raceTypeId !== 3) {
+      console.log(`⏭️ Skipping leader change notifications for race ${raceId} - not a public race (raceTypeId: ${raceTypeId})`);
+      return { success: true, message: 'Leader change notifications only for public races' };
+    }
+
+    console.log(`📤 Sending leader change notification for PUBLIC race: ${raceId}`);
 
     const notification = {
       title: 'New Leader! 👑',
@@ -998,10 +724,17 @@ async function sendFirstFinisherNotification(userId, raceData) {
 /**
  * 17. Send deadline alert notification to all active participants
  * Triggered when: First participant finishes and deadline is set (statusId → 6)
+ * ✅ UPDATED: Only sends for PUBLIC races (raceTypeId === 3)
  */
-async function sendDeadlineAlertNotification(raceId, raceData, firstFinisherName, deadlineMinutes) {
+async function sendDeadlineAlertNotification(raceId, raceData, firstFinisherName, deadlineMinutes, raceTypeId) {
   try {
-    console.log(`📤 Sending deadline alert notifications for race: ${raceId}`);
+    // ✅ FILTER: Only send deadline alerts for PUBLIC races
+    if (raceTypeId !== 3) {
+      console.log(`⏭️ Skipping deadline alert for race ${raceId} - not a public race (raceTypeId: ${raceTypeId})`);
+      return { success: true, message: 'Deadline alerts only for public races' };
+    }
+
+    console.log(`📤 Sending deadline alert notifications for PUBLIC race: ${raceId}`);
 
     // Get all participants
     const participantsSnapshot = await db.collection('races').doc(raceId).collection('participants').get();
@@ -1116,114 +849,15 @@ async function sendRaceCancelledNotification(raceId, raceTitle, cancellationReas
 
 /**
  * 19. Send personal milestone notification to participant who reached milestone
- * Triggered when: Participant reaches 25%, 50%, or 75% of race distance
+ * ❌ REMOVED: Milestone notifications are no longer sent
  */
-async function sendMilestonePersonalNotification(userId, raceData, milestonePercent) {
-  try {
-    console.log(`📤 Sending personal milestone notification to user: ${userId} (${milestonePercent}%)`);
-
-    const milestoneEmojis = { 25: '🎯', 50: '⚡', 75: '🔥' };
-    const milestoneIcon = milestoneEmojis[milestonePercent] || '📍';
-
-    const notification = {
-      title: `Milestone Reached! ${milestoneIcon}`,
-      body: `Great job! You've completed ${milestonePercent}% of "${raceData.title}"!`,
-    };
-
-    const data = {
-      type: 'RaceMilestonePersonal',
-      category: 'Achievement',
-      icon: milestoneIcon,
-      raceId: raceData.id,
-      raceName: raceData.title,
-      milestone: String(milestonePercent),
-      achievedAt: new Date().toISOString(),
-    };
-
-    const result = await sendNotificationToUser(userId, notification, data);
-
-    if (result.success) {
-      console.log(`✅ Personal milestone notification sent to ${userId} (${milestonePercent}%)`);
-    } else {
-      console.error(`❌ Failed to send personal milestone notification: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Error sending personal milestone notification: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendMilestonePersonalNotification - REMOVED
 
 /**
  * 20. Send milestone alert notification to all other participants
- * Triggered when: Someone reaches a race milestone (25%, 50%, 75%)
+ * ❌ REMOVED: Milestone notifications are no longer sent
  */
-async function sendMilestoneAlertNotification(raceId, raceData, userName, milestonePercent, achieverUserId) {
-  try {
-    console.log(`📤 Sending milestone alert notifications for race: ${raceId} (${userName} - ${milestonePercent}%)`);
-
-    // Get all participants
-    const participantsSnapshot = await db.collection('races').doc(raceId).collection('participants').get();
-
-    if (participantsSnapshot.empty) {
-      console.log(`ℹ️ No participants found for race ${raceId}`);
-      return { success: true, message: 'No participants to notify' };
-    }
-
-    const milestoneEmojis = { 25: '🎯', 50: '⚡', 75: '🔥' };
-    const milestoneIcon = milestoneEmojis[milestonePercent] || '📍';
-
-    const notification = {
-      title: `${userName} Hit ${milestonePercent}%! ${milestoneIcon}`,
-      body: `${userName} reached ${milestonePercent}% of "${raceData.title}". Keep pushing!`,
-    };
-
-    const data = {
-      type: 'RaceMilestoneAlert',
-      category: 'Race',
-      icon: milestoneIcon,
-      raceId: raceId,
-      raceName: raceData.title,
-      achieverName: userName,
-      achieverUserId: achieverUserId,
-      milestone: String(milestonePercent),
-      timestamp: new Date().toISOString(),
-    };
-
-    const promises = [];
-
-    // Send to all participants except the achiever
-    participantsSnapshot.forEach(doc => {
-      const participantUserId = doc.id;
-      const participantData = doc.data();
-
-      // Skip the participant who reached the milestone
-      if (participantUserId === achieverUserId) {
-        return;
-      }
-
-      // Skip users who have already won (rank 1 and completed)
-      if (participantData.rank === 1 && participantData.isCompleted === true) {
-        console.log(`⏭️ Skipping winner ${participantUserId} - already won the race`);
-        return;
-      }
-
-      promises.push(sendNotificationToUser(participantUserId, notification, data));
-    });
-
-    const results = await Promise.all(promises);
-    const successCount = results.filter(r => r.success).length;
-    const failureCount = results.filter(r => !r.success).length;
-
-    console.log(`✅ Milestone alert notifications sent: ${successCount} succeeded, ${failureCount} failed`);
-
-    return { success: true, successCount, failureCount };
-  } catch (error) {
-    console.error(`❌ Error sending milestone alert notifications: ${error}`);
-    return { success: false, error: error.message };
-  }
-}
+// async function sendMilestoneAlertNotification - REMOVED
 
 /**
  * 21. Send proximity alert notification when opponent gets within 20m
@@ -1336,25 +970,25 @@ module.exports = {
   sendRaceInvitation,
   sendRaceStarted,
   sendRaceCompleted,
-  sendRaceCreationConfirmation,
-  sendRaceReminder,
-  sendJoinRequestAccepted,
+  // sendRaceCreationConfirmation, - REMOVED
+  // sendRaceReminder, - REMOVED
+  // sendJoinRequestAccepted, - REMOVED
   sendInviteAccepted,
-  sendJoinRequestDeclined,
+  // sendJoinRequestDeclined, - REMOVED
   sendInviteDeclined,
-  sendNewJoinRequest,
+  // sendNewJoinRequest, - REMOVED
   sendRaceWon,
   sendRaceStartedToAllParticipants,
   sendRaceCompletedToAllParticipants,
-  sendPublicRaceAnnouncement,
+  // sendPublicRaceAnnouncement, - REMOVED
   sendParticipantJoinedNotification,
   sendOvertakingNotifications,
   sendLeaderChangeNotification,
   sendFirstFinisherNotification,
   sendDeadlineAlertNotification,
   sendRaceCancelledNotification,
-  sendMilestonePersonalNotification,
-  sendMilestoneAlertNotification,
+  // sendMilestonePersonalNotification, - REMOVED
+  // sendMilestoneAlertNotification, - REMOVED
   sendProximityAlertNotification,
   sendCountdownTimerNotification,
 };
