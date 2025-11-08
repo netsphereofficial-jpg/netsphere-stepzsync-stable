@@ -440,7 +440,7 @@ class _PremiumPurchaseDialogContentState
                               ),
                               SizedBox(width: 8),
                               Text(
-                                'Claim Christmas Offer',
+                                'Claim Offer',
                                 style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,

@@ -146,6 +146,9 @@ class CreateRaceController extends GetxController {
         startAddress.value = address.trim();
 
         log('Current location set as start point: $address');
+
+        // Auto-generate random end location after setting start
+        await generateRandomEndLocation(position.latitude, position.longitude);
       }
     } catch (e) {
       log('Error getting current location: $e');
