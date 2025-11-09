@@ -280,6 +280,30 @@ async function sendNotificationToUser(userId, notification, data = {}, options =
       });
     }
 
+    // ✅ CRITICAL FIX: Store notification in Firestore for in-app notification list
+    // This allows users to see notifications even if they dismissed the push notification
+    if (result.success) {
+      try {
+        const notificationDoc = {
+          userId: userId,
+          type: data.type || 'Unknown',
+          category: data.category || 'General',
+          icon: data.icon || '🔔',
+          title: notification.title,
+          message: notification.body,
+          data: data, // Store all data for routing/actions
+          isRead: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        await admin.firestore().collection('user_notifications').add(notificationDoc);
+        console.log(`📝 Stored notification in Firestore for user ${userId}`);
+      } catch (storeError) {
+        console.error(`⚠️ Failed to store notification in Firestore: ${storeError}`);
+        // Don't fail the whole operation if storage fails
+      }
+    }
+
     return result;
 
   } catch (error) {
