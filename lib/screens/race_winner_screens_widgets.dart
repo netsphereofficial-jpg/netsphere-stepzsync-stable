@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
@@ -402,67 +403,273 @@ void showRankingBottomSheet(
     BuildContext context,
     RxList<Participant> dataList,
     ) {
+  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
   showModalBottomSheet(
     context: context,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) {
-      return SafeArea(
-        bottom: true,
-        child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.9,
-          builder: (_, controller) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    '🏆 Participant Rankings',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          bottom: true,
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.6,
+            minChildSize: 0.4,
+            maxChildSize: 0.9,
+            builder: (_, controller) {
+              return Column(
+                children: [
+                  // Drag handle
+                  Container(
+                    margin: EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: Obx(() {
-                    final sortedList = [...dataList];
-                    sortedList.sort((a, b) => a.rank.compareTo(b.rank));
 
-                    return ListView.builder(
-                      controller: controller,
-                      itemCount: sortedList.length,
-                      itemBuilder: (_, index) {
-                        final item = sortedList[index];
-                        // Ensure participant name is never blank - use fallback if empty
-                        final displayName = (item.userName == null || item.userName!.isEmpty)
-                            ? 'User ${item.userId.substring(0, 6)}'
-                            : item.userName!;
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.appColor,
+                                AppColors.appColor.withValues(alpha: 0.7),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.leaderboard,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Rankings',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                '${dataList.length} participants',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                        return ListTile(
-                          leading: Text('${item.rank}'),
-                          title: Text(
-                            displayName,
-                            style: GoogleFonts.poppins(),
-                          ),
-                          subtitle: Text(
-                            'Distance covered: ${item.distance.toStringAsFixed(2)} km',
-                            style: GoogleFonts.poppins(),
-                          ),
-                        );
-                      },
-                    );
-                  }),
-                ),
-              ],
-            );
-          },
+                  Divider(height: 1, color: Colors.grey.shade200),
+
+                  // Participant list
+                  Expanded(
+                    child: Obx(() {
+                      final sortedList = [...dataList];
+                      sortedList.sort((a, b) => a.rank.compareTo(b.rank));
+
+                      return ListView.builder(
+                        controller: controller,
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: sortedList.length,
+                        itemBuilder: (_, index) {
+                          final item = sortedList[index];
+                          final isCurrentUser = item.userId == currentUserId;
+
+                          // Ensure participant name is never blank - use fallback if empty
+                          final displayName = (item.userName == null || item.userName!.isEmpty)
+                              ? 'User ${item.userId.substring(0, 6)}'
+                              : item.userName!;
+
+                          // Get rank colors
+                          Color? rankColor;
+                          Color? rankBgColor;
+                          IconData? rankIcon;
+
+                          if (item.rank == 1) {
+                            rankColor = Color(0xFFF59E0B); // Vibrant Gold
+                            rankBgColor = Color(0xFFFEF3C7); // Light gold background
+                            rankIcon = Icons.emoji_events;
+                          } else if (item.rank == 2) {
+                            rankColor = Color(0xFF94A3B8); // Vibrant Silver
+                            rankBgColor = Color(0xFFF1F5F9); // Light silver background
+                            rankIcon = Icons.emoji_events;
+                          } else if (item.rank == 3) {
+                            rankColor = Color(0xFFEA580C); // Vibrant Bronze
+                            rankBgColor = Color(0xFFFFEDD5); // Light bronze background
+                            rankIcon = Icons.emoji_events;
+                          }
+
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: isCurrentUser
+                                ? AppColors.appColor.withValues(alpha: 0.08)
+                                : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isCurrentUser
+                                  ? AppColors.appColor.withValues(alpha: 0.3)
+                                  : Colors.grey.shade200,
+                                width: isCurrentUser ? 2 : 1,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Row(
+                                children: [
+                                  // Rank badge
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: rankBgColor ?? Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: rankColor != null
+                                        ? Border.all(color: rankColor, width: 2)
+                                        : null,
+                                    ),
+                                    child: Center(
+                                      child: rankIcon != null
+                                        ? Icon(rankIcon, color: rankColor, size: 24)
+                                        : Text(
+                                            '#${item.rank}',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                    ),
+                                  ),
+
+                                  SizedBox(width: 12),
+
+                                  // Participant info
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                displayName,
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.black87,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (isCurrentUser) ...[
+                                              SizedBox(width: 6),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.appColor,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  'You',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.straighten, size: 14, color: Colors.grey.shade600),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              '${item.distance.toStringAsFixed(2)} km',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.grey.shade700,
+                                              ),
+                                            ),
+                                            if (item.avgSpeed > 0) ...[
+                                              SizedBox(width: 12),
+                                              Icon(Icons.speed, size: 14, color: Colors.grey.shade600),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                '${item.avgSpeed.toStringAsFixed(1)} km/h',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Completion status
+                                  if (item.isCompleted)
+                                    Container(
+                                      padding: EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green.shade600,
+                                        size: 20,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       );
     },
