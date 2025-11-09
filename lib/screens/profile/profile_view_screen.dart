@@ -371,7 +371,7 @@ class ProfileViewScreen extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          controller.name.value.capitalizeFirst??"",
+                          _toTitleCase(controller.name.value),
                           style: GoogleFonts.poppins(
                             fontSize: 24,
                             color: AppColors.primary,
@@ -852,5 +852,15 @@ class ProfileViewScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Convert string to title case (capitalize first letter of each word)
+  /// Example: "nikhil sahu" -> "Nikhil Sahu"
+  String _toTitleCase(String text) {
+    if (text.isEmpty) return text;
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
   }
 }
