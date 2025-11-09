@@ -163,9 +163,55 @@ class RaceBotService extends GetxService {
     }
   }
 
+  /// ✅ NEW: Recreate bot profiles from existing Firebase participant data
+  /// This is needed when app restarts or when restarting bot simulation
+  Future<void> recreateBotProfiles(String raceId, List<Participant> participants) async {
+    try {
+      log('🔄 Recreating bot profiles for race $raceId from ${participants.length} participants');
+
+      final List<BotMovementProfile> botProfiles = [];
+
+      // Filter bots (userId starts with 'u_')
+      final bots = participants.where((p) => p.userId.startsWith('u_')).toList();
+
+      for (final bot in bots) {
+        // Create movement profile with similar characteristics to original
+        final profile = _createRandomBotProfile(bot.userId, bot.userName);
+
+        // ✅ CRITICAL: Restore current state from Firebase
+        profile.currentDistance = (bot.distance ?? 0.0) * 1000; // Convert KM to meters
+        profile.lastUpdate = DateTime.now();
+
+        // If bot has already covered some distance, consider them warmed up
+        if (profile.currentDistance > 100) {
+          profile.isWarmedUp = true;
+          profile.currentMomentum = 1.0;
+        }
+
+        botProfiles.add(profile);
+        log('✅ Recreated profile for bot ${bot.userName}: ${profile.currentDistance.toStringAsFixed(1)}m');
+      }
+
+      // Store bot profiles in memory
+      _activeBots[raceId] = botProfiles;
+
+      log('✅ Successfully recreated ${botProfiles.length} bot profiles for race $raceId');
+    } catch (e) {
+      log('❌ Error recreating bot profiles: $e');
+      rethrow;
+    }
+  }
+
   /// ✅ IMPROVED: Start bot simulation with health monitoring and auto-restart
   Future<void> startBotSimulation(String raceId) async {
     try {
+      // ✅ CRITICAL CHECK: Ensure bot profiles exist before starting
+      if (!_activeBots.containsKey(raceId) || _activeBots[raceId]!.isEmpty) {
+        log('⚠️ Cannot start bot simulation - no bot profiles found for race $raceId');
+        log('⚠️ Make sure to call recreateBotProfiles() or addBotsToRace() first');
+        return;
+      }
+
       // Cancel any existing timer (but keep bot profiles)
       _raceTimers[raceId]?.cancel();
       _raceTimers.remove(raceId);
@@ -174,7 +220,7 @@ class RaceBotService extends GetxService {
       _botFailureCount[raceId] = 0;
       _lastSuccessfulUpdate[raceId] = DateTime.now();
 
-      log('🏁 Starting realistic bot simulation with health monitoring for race $raceId');
+      log('🏁 Starting realistic bot simulation with health monitoring for race $raceId (${_activeBots[raceId]!.length} bots)');
 
       // Start irregular update timer (2-5 second intervals)
       _startIrregularUpdates(raceId);

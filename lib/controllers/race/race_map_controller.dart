@@ -2560,22 +2560,22 @@ class MapController extends GetxController with WidgetsBindingObserver {
           .map((doc) => Participant.fromFirestore(doc))
           .toList();
 
-      // Check for bots - they can have userId starting with 'bot_' OR be in the common bot names list
-      final botNames = ['Hannah', 'Justin', 'Julia', 'Marcus', 'Emily', 'David'];
-      final hasBots = participants.any((p) =>
-        p.userId.startsWith('bot_') ||
-        (p.userName != null && botNames.contains(p.userName))
-      );
+      // ✅ FIXED: Check for bots using correct userId pattern
+      // Bots are created with userId starting with 'u_' (not 'bot_') in race_bot_service.dart line 555
+      final hasBots = participants.any((p) => p.userId.startsWith('u_'));
 
       if (hasBots) {
-        final botCount = participants.where((p) =>
-          p.userId.startsWith('bot_') ||
-          (p.userName != null && botNames.contains(p.userName))
-        ).length;
-        print('🤖 Restarting bot simulation for race ${race.id} (found $botCount bots)');
+        final botCount = participants.where((p) => p.userId.startsWith('u_')).length;
+        print('🤖 Restarting bot simulation for race ${race.id} (found $botCount bots with u_ prefix)');
+
         final botService = RaceBotService.instance;
+
+        // ✅ CRITICAL FIX: Recreate bot profiles before starting simulation
+        // The bot profiles are stored in memory only and are lost when app restarts
+        await botService.recreateBotProfiles(race.id!, participants);
+
         await botService.startBotSimulation(race.id!);
-        print('✅ Bot simulation restarted successfully');
+        print('✅ Bot simulation restarted successfully with recreated profiles');
       } else {
         print('ℹ️ No bots found in race (${participants.length} total participants), skipping bot simulation');
       }
