@@ -2560,24 +2560,38 @@ class MapController extends GetxController with WidgetsBindingObserver {
           .map((doc) => Participant.fromFirestore(doc))
           .toList();
 
+      // ✅ DEBUG: Log all participant userIds to verify bot detection
+      print('🔍 DEBUG: Race ${race.id} has ${participants.length} total participants');
+      for (final p in participants) {
+        final isBot = p.userId.startsWith('u_');
+        print('   ${isBot ? "🤖 BOT" : "👤 USER"}: userId=${p.userId}, name=${p.userName}, distance=${p.distance}km');
+      }
+
       // ✅ FIXED: Check for bots using correct userId pattern
       // Bots are created with userId starting with 'u_' (not 'bot_') in race_bot_service.dart line 555
       final hasBots = participants.any((p) => p.userId.startsWith('u_'));
 
       if (hasBots) {
-        final botCount = participants.where((p) => p.userId.startsWith('u_')).length;
-        print('🤖 Restarting bot simulation for race ${race.id} (found $botCount bots with u_ prefix)');
+        final botParticipants = participants.where((p) => p.userId.startsWith('u_')).toList();
+        final botCount = botParticipants.length;
+        print('🤖 DEBUG: Found $botCount bots in race ${race.id}');
+        print('🤖 DEBUG: Bot userIds: ${botParticipants.map((b) => b.userId).join(", ")}');
+        print('🤖 DEBUG: Bot names: ${botParticipants.map((b) => b.userName).join(", ")}');
 
         final botService = RaceBotService.instance;
 
+        print('🔄 DEBUG: Calling recreateBotProfiles for race ${race.id}...');
         // ✅ CRITICAL FIX: Recreate bot profiles before starting simulation
         // The bot profiles are stored in memory only and are lost when app restarts
         await botService.recreateBotProfiles(race.id!, participants);
+        print('✅ DEBUG: recreateBotProfiles completed');
 
+        print('🏁 DEBUG: Calling startBotSimulation for race ${race.id}...');
         await botService.startBotSimulation(race.id!);
         print('✅ Bot simulation restarted successfully with recreated profiles');
       } else {
-        print('ℹ️ No bots found in race (${participants.length} total participants), skipping bot simulation');
+        print('ℹ️ No bots found in race ${race.id} (${participants.length} total participants)');
+        print('🔍 DEBUG: Participant userIds: ${participants.map((p) => p.userId).take(5).join(", ")}${participants.length > 5 ? "..." : ""}');
       }
     } catch (e) {
       print('❌ Error restarting bot simulation: $e');

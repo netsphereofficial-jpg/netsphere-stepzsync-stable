@@ -167,37 +167,61 @@ class RaceBotService extends GetxService {
   /// This is needed when app restarts or when restarting bot simulation
   Future<void> recreateBotProfiles(String raceId, List<Participant> participants) async {
     try {
-      log('🔄 Recreating bot profiles for race $raceId from ${participants.length} participants');
+      log('🔄 DEBUG: recreateBotProfiles called for race $raceId');
+      log('📊 DEBUG: Total participants received: ${participants.length}');
 
       final List<BotMovementProfile> botProfiles = [];
 
       // Filter bots (userId starts with 'u_')
       final bots = participants.where((p) => p.userId.startsWith('u_')).toList();
+      log('🤖 DEBUG: Filtered ${bots.length} bot participants from ${participants.length} total');
+
+      if (bots.isEmpty) {
+        log('⚠️ DEBUG: No bots found to recreate profiles for race $raceId');
+        // Store empty list to prevent null errors
+        _activeBots[raceId] = botProfiles;
+        return;
+      }
+
+      log('🤖 DEBUG: Bot userIds: ${bots.map((b) => b.userId).join(", ")}');
+      log('🤖 DEBUG: Bot names: ${bots.map((b) => b.userName).join(", ")}');
 
       for (final bot in bots) {
+        log('🔨 DEBUG: Creating profile for bot ${bot.userName} (${bot.userId})');
+
         // Create movement profile with similar characteristics to original
         final profile = _createRandomBotProfile(bot.userId, bot.userName);
+        log('   📝 DEBUG: Profile created - Type: ${profile.botType}, Speed: ${(profile.baseSpeed * 3.6).toStringAsFixed(1)} km/h');
 
         // ✅ CRITICAL: Restore current state from Firebase
-        profile.currentDistance = (bot.distance ?? 0.0) * 1000; // Convert KM to meters
+        final distanceKm = bot.distance ?? 0.0;
+        profile.currentDistance = distanceKm * 1000; // Convert KM to meters
         profile.lastUpdate = DateTime.now();
+        log('   📍 DEBUG: Restored distance: ${distanceKm}km (${profile.currentDistance.toStringAsFixed(1)}m)');
 
         // If bot has already covered some distance, consider them warmed up
         if (profile.currentDistance > 100) {
           profile.isWarmedUp = true;
           profile.currentMomentum = 1.0;
+          log('   🔥 DEBUG: Bot is warmed up (distance > 100m)');
+        } else {
+          log('   ❄️ DEBUG: Bot needs warm-up (distance <= 100m)');
         }
 
         botProfiles.add(profile);
-        log('✅ Recreated profile for bot ${bot.userName}: ${profile.currentDistance.toStringAsFixed(1)}m');
+        log('✅ DEBUG: Successfully recreated profile for bot ${bot.userName}');
       }
 
       // Store bot profiles in memory
       _activeBots[raceId] = botProfiles;
+      log('💾 DEBUG: Stored ${botProfiles.length} bot profiles in memory for race $raceId');
+      log('🗂️ DEBUG: Total races with active bots: ${_activeBots.length}');
+      log('📋 DEBUG: Active race IDs: ${_activeBots.keys.join(", ")}');
 
       log('✅ Successfully recreated ${botProfiles.length} bot profiles for race $raceId');
-    } catch (e) {
+    } catch (e, stackTrace) {
       log('❌ Error recreating bot profiles: $e');
+      log('Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -205,30 +229,61 @@ class RaceBotService extends GetxService {
   /// ✅ IMPROVED: Start bot simulation with health monitoring and auto-restart
   Future<void> startBotSimulation(String raceId) async {
     try {
+      log('🏁 DEBUG: startBotSimulation called for race $raceId');
+
       // ✅ CRITICAL CHECK: Ensure bot profiles exist before starting
-      if (!_activeBots.containsKey(raceId) || _activeBots[raceId]!.isEmpty) {
+      log('🔍 DEBUG: Checking if race $raceId has bot profiles...');
+      log('🔍 DEBUG: _activeBots contains race? ${_activeBots.containsKey(raceId)}');
+
+      if (!_activeBots.containsKey(raceId)) {
+        log('⚠️ DEBUG: Race $raceId NOT found in _activeBots map');
+        log('⚠️ DEBUG: Available race IDs in _activeBots: ${_activeBots.keys.join(", ")}');
         log('⚠️ Cannot start bot simulation - no bot profiles found for race $raceId');
         log('⚠️ Make sure to call recreateBotProfiles() or addBotsToRace() first');
         return;
       }
 
+      final botProfiles = _activeBots[raceId]!;
+      log('✅ DEBUG: Found ${botProfiles.length} bot profiles for race $raceId');
+
+      if (botProfiles.isEmpty) {
+        log('⚠️ DEBUG: Bot profiles list is EMPTY for race $raceId');
+        log('⚠️ Cannot start bot simulation - no bot profiles found for race $raceId');
+        log('⚠️ Make sure to call recreateBotProfiles() or addBotsToRace() first');
+        return;
+      }
+
+      // Log bot details
+      for (final profile in botProfiles) {
+        log('   🤖 Bot: ${profile.botName} (${profile.botId}) - ${profile.botType} - ${(profile.baseSpeed * 3.6).toStringAsFixed(1)} km/h - Current: ${profile.currentDistance.toStringAsFixed(1)}m');
+      }
+
       // Cancel any existing timer (but keep bot profiles)
-      _raceTimers[raceId]?.cancel();
-      _raceTimers.remove(raceId);
+      if (_raceTimers.containsKey(raceId)) {
+        log('🔄 DEBUG: Cancelling existing timer for race $raceId');
+        _raceTimers[raceId]?.cancel();
+        _raceTimers.remove(raceId);
+      }
 
       // ✅ NEW: Initialize health tracking
       _botFailureCount[raceId] = 0;
       _lastSuccessfulUpdate[raceId] = DateTime.now();
+      log('💊 DEBUG: Health tracking initialized for race $raceId');
 
-      log('🏁 Starting realistic bot simulation with health monitoring for race $raceId (${_activeBots[raceId]!.length} bots)');
+      log('🏁 Starting realistic bot simulation with health monitoring for race $raceId (${botProfiles.length} bots)');
 
       // Start irregular update timer (2-5 second intervals)
+      log('⏰ DEBUG: Starting irregular updates for race $raceId...');
       _startIrregularUpdates(raceId);
 
       // ✅ NEW: Start health check timer (runs every 60 seconds)
+      log('🏥 DEBUG: Starting health check for race $raceId...');
       _startHealthCheck(raceId);
-    } catch (e) {
+
+      log('✅ DEBUG: Bot simulation fully started for race $raceId');
+    } catch (e, stackTrace) {
       log('❌ Error starting bot simulation: $e');
+      log('Stack trace: $stackTrace');
     }
   }
 
@@ -254,19 +309,29 @@ class RaceBotService extends GetxService {
       milliseconds: 15000 + _random.nextInt(15000),
     );
 
-    log('⏱️ Scheduling next bot update for race $raceId in ${interval.inMilliseconds}ms');
+    log('⏱️ DEBUG: Scheduling next bot update for race $raceId in ${interval.inSeconds}s (${interval.inMilliseconds}ms)');
+    log('⏱️ DEBUG: Current time: ${DateTime.now().toIso8601String()}');
 
     _raceTimers[raceId] = Timer(interval, () async {
-      log('⏰ Timer fired for race $raceId');
+      log('⏰ DEBUG: ========== TIMER FIRED for race $raceId ==========');
+      log('⏰ DEBUG: Timer execution time: ${DateTime.now().toIso8601String()}');
+      log('⏰ DEBUG: Calling _updateAllBots...');
+
       await _updateAllBots(raceId);
+
+      log('⏰ DEBUG: _updateAllBots completed, scheduling next update...');
 
       // Schedule next update with new random interval
       if (_activeBots.containsKey(raceId)) {
+        log('✅ DEBUG: Race $raceId still has active bots, scheduling next update');
         _startIrregularUpdates(raceId);
       } else {
-        log('⚠️ Race $raceId not in active bots, stopping updates');
+        log('⚠️ DEBUG: Race $raceId not in active bots map, stopping updates');
+        log('⚠️ DEBUG: Available races: ${_activeBots.keys.join(", ")}');
       }
     });
+
+    log('✅ DEBUG: Timer created and registered for race $raceId');
   }
 
   /// Update all bots in a race with realistic movement
