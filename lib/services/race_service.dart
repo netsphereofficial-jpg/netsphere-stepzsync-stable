@@ -725,15 +725,17 @@ class RaceService {
       int currentStepsOnServer = 0;
       for (int i = 0; i < participantsList.length; i++) {
         if (participantsList[i]['userId'].toString() == userId) {
-          // ✅ FIX: Validate that new steps >= current steps on server before updating
+          // ✅ CRITICAL FIX: Validate that new steps >= current steps on server before updating
+          // This prevents race condition where stale data overwrites fresh data
           currentStepsOnServer = (participantsList[i]['steps'] as num?)?.toInt() ?? 0;
 
           if (steps < currentStepsOnServer) {
-            print('⚠️ [RACE_SERVICE] Skipping update for $userId in race $raceId - new steps ($steps) < current steps on server ($currentStepsOnServer)');
+            print('⚠️ [RACE_SERVICE] REJECTED: new steps ($steps) < current steps on server ($currentStepsOnServer)');
+            print('   This prevents data loss from race conditions on app restart');
             return; // Skip update to prevent going backwards
           }
 
-          print('   📊 [RACE_SERVICE] Validated: $steps steps >= $currentStepsOnServer steps on server');
+          print('   📊 [RACE_SERVICE] Validated: $steps steps >= $currentStepsOnServer steps on server ✅');
 
           participantsList[i].addAll({
             'distance': distance,
@@ -786,6 +788,20 @@ class RaceService {
       // Update current user's full data
       // NOTE: Only update progress fields, don't overwrite userName, userProfilePicture, userId, joinedAt
       final participantRef = raceRef.collection('participants').doc(userId);
+
+      // ✅ CRITICAL FIX: Double-check before batch commit to prevent race condition
+      // Re-read current server value to ensure we're not overwriting fresher data
+      final currentParticipantDoc = await participantRef.get();
+      if (currentParticipantDoc.exists) {
+        final finalServerSteps = (currentParticipantDoc.data()?['steps'] as num?)?.toInt() ?? 0;
+        if (steps < finalServerSteps) {
+          print('❌ [RACE_SERVICE] CRITICAL: Server updated between read and write!');
+          print('   Server now has $finalServerSteps steps, we were about to write $steps steps');
+          print('   Aborting batch to prevent data corruption');
+          return; // Abort the entire batch to prevent data loss
+        }
+      }
+
       batch.set(participantRef, {
         'userId': userId, // Ensure userId is set for document creation
         'distance': distance,

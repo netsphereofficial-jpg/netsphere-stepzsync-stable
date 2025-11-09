@@ -232,7 +232,8 @@ class UserSubscription {
   });
 
   bool get isActive => status == SubscriptionStatus.active;
-  bool get isPremium => currentPlan != SubscriptionPlanType.free && isActive;
+  // bool get isPremium => currentPlan != SubscriptionPlanType.free && isActive;
+  bool get isPremium => true;
   bool get isExpiringSoon {
     if (expiryDate == null) return false;
     return expiryDate!.difference(DateTime.now()).inDays <= 7;

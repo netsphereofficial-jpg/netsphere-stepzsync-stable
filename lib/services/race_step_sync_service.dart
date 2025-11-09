@@ -52,6 +52,10 @@ class RaceBaseline {
   bool isCompleted;                      // Whether participant finished this race
   DateTime? completedAt;                 // When participant finished
 
+  // Data integrity tracking (protection against race conditions)
+  int maxStepsEverSeen;                  // Highest step count ever recorded (monotonic increasing)
+  DateTime? lastServerSync;              // When we last fetched fresh data from server
+
   RaceBaseline({
     required this.raceId,
     required this.raceTitle,
@@ -66,7 +70,9 @@ class RaceBaseline {
     this.healthKitBaselineCalories = 0,
     this.isCompleted = false,
     this.completedAt,
-  });
+    int? maxStepsEverSeen,
+    this.lastServerSync,
+  }) : maxStepsEverSeen = maxStepsEverSeen ?? serverSteps;
 
   // JSON serialization for persistence
   Map<String, dynamic> toJson() {
@@ -84,6 +90,8 @@ class RaceBaseline {
       'healthKitBaselineCalories': healthKitBaselineCalories,
       'isCompleted': isCompleted,
       'completedAt': completedAt?.toIso8601String(),
+      'maxStepsEverSeen': maxStepsEverSeen,
+      'lastServerSync': lastServerSync?.toIso8601String(),
     };
   }
 
@@ -106,6 +114,9 @@ class RaceBaseline {
       healthKitBaselineCalories: json['healthKitBaselineCalories'] as int? ?? 0,
       isCompleted: json['isCompleted'] as bool? ?? false,
       completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'] as String) : null,
+      // Load data integrity tracking
+      maxStepsEverSeen: json['maxStepsEverSeen'] as int?,
+      lastServerSync: json['lastServerSync'] != null ? DateTime.tryParse(json['lastServerSync'] as String) : null,
     );
   }
 
@@ -563,56 +574,64 @@ class RaceStepSyncService extends GetxService {
 
   /// Refresh server state for all active race baselines
   /// Called on startup to sync with Firestore (source of truth)
+  /// ✅ CRITICAL FIX: Now protected by _baselineUpdateLock to prevent race conditions
   Future<void> _refreshServerStateForAllRaces() async {
-    try {
-      dev.log('🔄 [RACE_SYNC] Refreshing server state for ${_raceBaselines.length} race(s)...');
-
-      // ✅ CRITICAL: Get current HealthKit values to reset baseline (prevent double-counting on restart)
-      double currentHealthKitDistance = 0.0;
-      int currentHealthKitCalories = 0;
-
+    await _baselineUpdateLock.synchronized(() async {
       try {
-        if (Get.isRegistered<StepTrackingService>()) {
-          final stepTrackingService = Get.find<StepTrackingService>();
-          currentHealthKitDistance = stepTrackingService.todayDistance.value;
-          currentHealthKitCalories = stepTrackingService.todayCalories.value;
-          dev.log('📍 [RACE_SYNC] Current HealthKit: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
+        dev.log('🔄 [RACE_SYNC] Refreshing server state for ${_raceBaselines.length} race(s)... [LOCKED]');
+
+        // ✅ CRITICAL: Get current HealthKit values to reset baseline (prevent double-counting on restart)
+        double currentHealthKitDistance = 0.0;
+        int currentHealthKitCalories = 0;
+
+        try {
+          if (Get.isRegistered<StepTrackingService>()) {
+            final stepTrackingService = Get.find<StepTrackingService>();
+            currentHealthKitDistance = stepTrackingService.todayDistance.value;
+            currentHealthKitCalories = stepTrackingService.todayCalories.value;
+            dev.log('📍 [RACE_SYNC] Current HealthKit: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
+          }
+        } catch (e) {
+          dev.log('⚠️ [RACE_SYNC] Error fetching current HealthKit data: $e');
         }
+
+        for (final entry in _raceBaselines.entries) {
+          final raceId = entry.key;
+          final baseline = entry.value;
+
+          // Fetch fresh participant data including completion status
+          final participantData = await _fetchParticipantData(raceId);
+
+          // Update baseline with server state
+          baseline.serverSteps = participantData.steps;
+          baseline.serverDistance = participantData.distance;  // ✅ NEW: Sync distance
+          baseline.serverCalories = participantData.calories;  // ✅ NEW: Sync calories
+          baseline.isCompleted = participantData.isCompleted;  // ✅ Sync completion status
+          baseline.completedAt = participantData.completedAt;  // ✅ Sync completion time
+
+          // ✅ CRITICAL FIX: Update data integrity tracking
+          baseline.maxStepsEverSeen = participantData.steps;  // Server is source of truth
+          baseline.lastServerSync = DateTime.now();  // Track when we synced
+
+          // ✅ CRITICAL FIX: Reset HealthKit baseline to current value to prevent double-counting
+          // When app restarts, we've already written distance to server, so we need to reset
+          // the baseline to current HealthKit value so delta calculation starts fresh
+          baseline.healthKitBaselineDistance = currentHealthKitDistance;
+          baseline.healthKitBaselineCalories = currentHealthKitCalories;
+
+          dev.log('   ✅ "${baseline.raceTitle}": server=${participantData.steps} steps, ${participantData.distance.toStringAsFixed(2)} km, ${participantData.calories} cal, completed=${participantData.isCompleted}');
+          dev.log('      Reset HealthKit baseline to current: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
+          dev.log('      maxStepsEverSeen=${baseline.maxStepsEverSeen}, lastServerSync=${baseline.lastServerSync}');
+        }
+
+        // Save updated baselines
+        await _saveBaselines();
+
+        dev.log('✅ [RACE_SYNC] Server state refreshed for all races [UNLOCKED]');
       } catch (e) {
-        dev.log('⚠️ [RACE_SYNC] Error fetching current HealthKit data: $e');
+        dev.log('❌ [RACE_SYNC] Error refreshing server state: $e');
       }
-
-      for (final entry in _raceBaselines.entries) {
-        final raceId = entry.key;
-        final baseline = entry.value;
-
-        // Fetch fresh participant data including completion status
-        final participantData = await _fetchParticipantData(raceId);
-
-        // Update baseline with server state
-        baseline.serverSteps = participantData.steps;
-        baseline.serverDistance = participantData.distance;  // ✅ NEW: Sync distance
-        baseline.serverCalories = participantData.calories;  // ✅ NEW: Sync calories
-        baseline.isCompleted = participantData.isCompleted;  // ✅ Sync completion status
-        baseline.completedAt = participantData.completedAt;  // ✅ Sync completion time
-
-        // ✅ CRITICAL FIX: Reset HealthKit baseline to current value to prevent double-counting
-        // When app restarts, we've already written distance to server, so we need to reset
-        // the baseline to current HealthKit value so delta calculation starts fresh
-        baseline.healthKitBaselineDistance = currentHealthKitDistance;
-        baseline.healthKitBaselineCalories = currentHealthKitCalories;
-
-        dev.log('   ✅ "${baseline.raceTitle}": server=${participantData.steps} steps, ${participantData.distance.toStringAsFixed(2)} km, ${participantData.calories} cal, completed=${participantData.isCompleted}');
-        dev.log('      Reset HealthKit baseline to current: ${currentHealthKitDistance.toStringAsFixed(2)} km, $currentHealthKitCalories cal');
-      }
-
-      // Save updated baselines
-      await _saveBaselines();
-
-      dev.log('✅ [RACE_SYNC] Server state refreshed for all races');
-    } catch (e) {
-      dev.log('❌ [RACE_SYNC] Error refreshing server state: $e');
-    }
+    });
   }
 
   /// Save baselines to SharedPreferences (thread-safe)
@@ -906,6 +925,59 @@ class RaceStepSyncService extends GetxService {
           final remainingDistance = (totalDistance - cappedRaceDistance).clamp(0.0, totalDistance);
           final cappedCalories = (cappedTotalRaceSteps * STEPS_TO_CALORIES_FACTOR).round();
           final cappedAvgSpeed = raceMinutes > 0 ? (cappedRaceDistance / raceMinutes) * 60 : 0.0;
+
+          // ✅ CRITICAL FIX: Monotonic increasing validation
+          // REJECT writes that would decrease steps (prevents data corruption from race conditions)
+          if (cappedTotalRaceSteps < baseline.maxStepsEverSeen) {
+            dev.log('❌ [RACE_SYNC] REJECTED: Attempt to decrease steps from ${baseline.maxStepsEverSeen} to $cappedTotalRaceSteps');
+            dev.log('   This indicates a race condition - skipping this sync cycle to prevent data loss');
+            continue;  // Skip this race, do NOT write stale data
+          }
+
+          // ✅ CRITICAL FIX: Check if server has newer data (timestamp validation)
+          // If server was updated recently by another device, skip this sync to avoid overwriting fresh data
+          if (baseline.lastServerSync != null) {
+            final timeSinceServerSync = DateTime.now().difference(baseline.lastServerSync!);
+
+            // If we haven't synced from server in last 10 seconds, check if server has newer data
+            if (timeSinceServerSync.inSeconds > 10) {
+              dev.log('⚠️ [RACE_SYNC] Last server sync was ${timeSinceServerSync.inSeconds}s ago, checking for newer data...');
+
+              try {
+                final participantDoc = await _firestore
+                    .collection('races')
+                    .doc(raceId)
+                    .collection('participants')
+                    .doc(currentUser.uid)
+                    .get()
+                    .timeout(Duration(seconds: 5));
+
+                if (participantDoc.exists) {
+                  final serverSteps = participantDoc.data()?['steps'] as int? ?? 0;
+
+                  // If server has MORE steps than we're about to write, update our baseline
+                  if (serverSteps > cappedTotalRaceSteps) {
+                    dev.log('🔄 [RACE_SYNC] Server has newer data: $serverSteps steps > our $cappedTotalRaceSteps steps');
+                    dev.log('   Updating baseline to server value and skipping this sync cycle');
+
+                    baseline.serverSteps = serverSteps;
+                    baseline.sessionRaceSteps = 0;  // Reset session
+                    baseline.maxStepsEverSeen = serverSteps;
+                    baseline.lastServerSync = DateTime.now();
+                    await _saveBaselines();
+
+                    continue;  // Skip this sync cycle, server is ahead
+                  }
+                }
+              } catch (e) {
+                dev.log('⚠️ [RACE_SYNC] Error checking server data: $e (continuing with write)');
+                // Continue with write if check fails
+              }
+            }
+          }
+
+          // Update maxStepsEverSeen before writing
+          baseline.maxStepsEverSeen = cappedTotalRaceSteps;
 
           // Write to Firebase
           final participantRef = _firestore

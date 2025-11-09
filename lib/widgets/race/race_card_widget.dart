@@ -370,7 +370,7 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
 
     developer.log('   ✅ Current participant found: ${currentParticipant?.userId == currentUserId}');
     if (currentParticipant != null) {
-      developer.log('      Steps: ${currentParticipant.steps}, Distance: ${currentParticipant.distance}, Calories: ${currentParticipant.calories}, Rank: ${currentParticipant.rank}');
+      developer.log('      Steps: ${currentParticipant.steps}, Distance: ${currentParticipant.distance}, Calories: ${currentParticipant.calories}, Rank: ${currentParticipant.rank}, AvgSpeed: ${currentParticipant.avgSpeed}');
     }
 
     // Use participant data for user-specific metrics
