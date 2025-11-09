@@ -52,6 +52,11 @@ android {
                 keyPassword = keystoreProperties["keyPassword"] as String
                 storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
+                // Enable all signature schemes for maximum compatibility
+                enableV1Signing = true  // JAR Signature (required for Android < 7.0)
+                enableV2Signing = true  // Full APK Signature (Android 7.0+)
+                enableV3Signing = true  // APK Signature with key rotation support (Android 9.0+)
+                enableV4Signing = true  // Streaming installation signature (Android 11+)
             }
         }
     }
