@@ -59,6 +59,7 @@ class UserProfile {
     return {
       'fullName': fullName,
       'username': username,
+      'usernameLower': username?.toLowerCase(), // For case-insensitive search
       'phoneNumber': phoneNumber,
       'countryCode': countryCode,
       'gender': gender,

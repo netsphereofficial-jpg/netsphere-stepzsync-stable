@@ -257,36 +257,57 @@ class ProfileScreen extends StatelessWidget {
           style: AppTextStyles.fieldLabel,
         ),
         SizedBox(height: AppSpacing.labelFieldGap),
-        GestureDetector(
-          onTap: () => _showCustomDatePicker(controller),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppDesignColors.fieldBackground,
-              borderRadius: BorderRadius.circular(AppRadius.textField),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller.dobController,
-                    enabled: false,
-                    style: AppTextStyles.fieldInput,
-                    decoration: InputDecoration(
-                      hintText: 'DD/MM/YYYY',
-                      hintStyle: AppTextStyles.fieldHint,
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppDesignColors.fieldBackground,
+            borderRadius: BorderRadius.circular(AppRadius.textField),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller.dobController,
+                  style: AppTextStyles.fieldInput,
+                  keyboardType: TextInputType.datetime,
+                  decoration: InputDecoration(
+                    hintText: 'DD/MM/YYYY',
+                    hintStyle: AppTextStyles.fieldHint,
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
                   ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+                    _DateInputFormatter(),
+                  ],
+                  onChanged: (value) {
+                    // Parse manual date entry
+                    if (value.length == 10) {
+                      final parts = value.split('/');
+                      if (parts.length == 3) {
+                        try {
+                          final day = int.parse(parts[0]);
+                          final month = int.parse(parts[1]);
+                          final year = int.parse(parts[2]);
+                          final date = DateTime(year, month, day);
+                          controller.selectedDate.value = date;
+                        } catch (e) {
+                          // Invalid date, ignore
+                        }
+                      }
+                    }
+                  },
                 ),
-                Icon(
+              ),
+              GestureDetector(
+                onTap: () => _showCustomDatePicker(controller),
+                child: Icon(
                   Icons.calendar_today_rounded,
                   color: AppDesignColors.label,
                   size: 20,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1175,6 +1196,41 @@ class _CapitalizeWordsFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: newText,
       selection: newValue.selection,
+    );
+  }
+}
+
+/// Custom TextInputFormatter to format date input as DD/MM/YYYY
+/// Automatically adds slashes as user types
+class _DateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+
+    // Remove all slashes to work with raw digits
+    final digitsOnly = text.replaceAll('/', '');
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (digitsOnly.length > 8) {
+      return oldValue;
+    }
+
+    // Build formatted string
+    String formatted = '';
+    for (int i = 0; i < digitsOnly.length; i++) {
+      formatted += digitsOnly[i];
+      // Add slash after DD and MM
+      if (i == 1 || i == 3) {
+        formatted += '/';
+      }
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

@@ -26,11 +26,11 @@ class FriendsService {
           .limit(20)
           .get();
 
-      // Search by username
+      // Search by username (using lowercase field for case-insensitive search)
       final usernameQuery = await _firestore
           .collection('user_profiles')
-          .where('username', isGreaterThanOrEqualTo: query.toLowerCase())
-          .where('username', isLessThan: query.toLowerCase() + '\uf8ff')
+          .where('usernameLower', isGreaterThanOrEqualTo: query.toLowerCase())
+          .where('usernameLower', isLessThan: query.toLowerCase() + '\uf8ff')
           .limit(20)
           .get();
 
@@ -62,12 +62,12 @@ class FriendsService {
     }
   }
 
-  // Check username availability
+  // Check username availability (case-insensitive)
   static Future<bool> isUsernameAvailable(String username) async {
     try {
       final query = await _firestore
           .collection('user_profiles')
-          .where('username', isEqualTo: username.toLowerCase())
+          .where('usernameLower', isEqualTo: username.toLowerCase())
           .limit(1)
           .get();
 

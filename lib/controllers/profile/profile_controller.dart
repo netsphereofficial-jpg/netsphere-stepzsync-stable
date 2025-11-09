@@ -674,7 +674,7 @@ class ProfileController extends GetxController {
       fullName: nameCtr.text.trim().capitalizeWords(),
       username: usernameCtr.text.trim().isEmpty
           ? null
-          : usernameCtr.text.trim().toLowerCase(),
+          : usernameCtr.text.trim(), // Preserve exact case as typed by user
       phoneNumber: '',
       countryCode: '',
       gender: gender.value,
