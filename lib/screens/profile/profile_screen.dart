@@ -71,6 +71,7 @@ class ProfileScreen extends StatelessWidget {
                             maxLength: 30,
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                              _CapitalizeWordsFormatter(),
                             ],
                           ),
                           SizedBox(height: AppSpacing.fieldSpacing),
@@ -1143,6 +1144,37 @@ class ProfileScreen extends StatelessWidget {
           Navigator.pop(context);
         },
       ),
+    );
+  }
+}
+
+/// Custom TextInputFormatter to capitalize the first letter of each word
+/// Example: typing "nikhil sahu" will automatically format to "Nikhil Sahu"
+class _CapitalizeWordsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Get the new text
+    final text = newValue.text;
+
+    if (text.isEmpty) {
+      return newValue;
+    }
+
+    // Capitalize first letter of each word
+    final words = text.split(' ');
+    final capitalizedWords = words.map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).toList();
+
+    final newText = capitalizedWords.join(' ');
+
+    return TextEditingValue(
+      text: newText,
+      selection: newValue.selection,
     );
   }
 }
