@@ -304,9 +304,10 @@ class RaceBotService extends GetxService {
 
   /// Start irregular update pattern (realistic timing)
   void _startIrregularUpdates(String raceId) {
-    // Random interval: 15-30 seconds (very gradual movement)
+    // ✅ IMPROVED: Faster updates for more realistic racing action
+    // Random interval: 5-10 seconds (realistic race progress visibility)
     final interval = Duration(
-      milliseconds: 15000 + _random.nextInt(15000),
+      milliseconds: 5000 + _random.nextInt(5000),
     );
 
     log('⏱️ DEBUG: Scheduling next bot update for race $raceId in ${interval.inSeconds}s (${interval.inMilliseconds}ms)');
@@ -666,75 +667,75 @@ class RaceBotService extends GetxService {
     return 'u_${List.generate(8, (_) => chars[_random.nextInt(chars.length)]).join()}';
   }
 
-  /// Create random bot movement profile (realistic personality)
+  /// Create random bot movement profile (realistic racing speeds)
   BotMovementProfile _createRandomBotProfile(String botId, String botName) {
-    // Weighted random selection of bot type
+    // Weighted random selection of bot type - ADJUSTED FOR RACING
     final rand = _random.nextDouble();
 
-    if (rand < 0.30) {
-      // Profile 1: Very Slow Walker (30%) - Extremely leisurely
-      final speed = 0.5 + _random.nextDouble() * 0.3; // 0.5-0.8 m/s (1.8-2.9 km/h)
-      return BotMovementProfile(
-        botId: botId,
-        botName: botName,
-        botType: 'Very Slow Walker',
-        baseSpeed: speed,
-        consistency: 0.8 + _random.nextDouble() * 0.1, // 0.8-0.9
-        restFrequency: 18.0 + _random.nextDouble() * 7.0, // 18-25% chance
-        sprintTendency: 0.0, // Never sprint
-        fatigueRate: 0.12 + _random.nextDouble() * 0.10, // 0.12-0.22
-      )..logCreation(speed);
-    } else if (rand < 0.55) {
-      // Profile 2: Slow Walker (25%) - Slow stroll
-      final speed = 0.8 + _random.nextDouble() * 0.4; // 0.8-1.2 m/s (2.9-4.3 km/h)
-      return BotMovementProfile(
-        botId: botId,
-        botName: botName,
-        botType: 'Slow Walker',
-        baseSpeed: speed,
-        consistency: 0.7 + _random.nextDouble() * 0.2, // 0.7-0.9
-        restFrequency: 15.0 + _random.nextDouble() * 5.0, // 15-20% chance
-        sprintTendency: 3.0 + _random.nextDouble() * 2.0, // 3-5% chance
-        fatigueRate: 0.10 + _random.nextDouble() * 0.08, // 0.10-0.18
-      )..logCreation(speed);
-    } else if (rand < 0.75) {
-      // Profile 3: Normal Walker (20%) - Average walking pace
-      final speed = 1.2 + _random.nextDouble() * 0.4; // 1.2-1.6 m/s (4.3-5.8 km/h)
-      return BotMovementProfile(
-        botId: botId,
-        botName: botName,
-        botType: 'Normal Walker',
-        baseSpeed: speed,
-        consistency: 0.6 + _random.nextDouble() * 0.2, // 0.6-0.8
-        restFrequency: 12.0 + _random.nextDouble() * 5.0, // 12-17% chance
-        sprintTendency: 8.0 + _random.nextDouble() * 4.0, // 8-12% chance
-        fatigueRate: 0.08 + _random.nextDouble() * 0.10, // 0.08-0.18
-      )..logCreation(speed);
-    } else if (rand < 0.90) {
-      // Profile 4: Fast Walker (15%) - Brisk walking
-      final speed = 1.6 + _random.nextDouble() * 0.4; // 1.6-2.0 m/s (5.8-7.2 km/h)
-      return BotMovementProfile(
-        botId: botId,
-        botName: botName,
-        botType: 'Fast Walker',
-        baseSpeed: speed,
-        consistency: 0.5 + _random.nextDouble() * 0.2, // 0.5-0.7
-        restFrequency: 15.0 + _random.nextDouble() * 5.0, // 15-20% chance
-        sprintTendency: 12.0 + _random.nextDouble() * 5.0, // 12-17% chance
-        fatigueRate: 0.12 + _random.nextDouble() * 0.10, // 0.12-0.22
-      )..logCreation(speed);
-    } else {
-      // Profile 5: Light Jogger (10%) - Very light jog
+    if (rand < 0.20) {
+      // Profile 1: Casual Jogger (20%) - Slow jogging pace
       final speed = 2.0 + _random.nextDouble() * 0.5; // 2.0-2.5 m/s (7.2-9.0 km/h)
       return BotMovementProfile(
         botId: botId,
         botName: botName,
-        botType: 'Light Jogger',
+        botType: 'Casual Jogger',
+        baseSpeed: speed,
+        consistency: 0.7 + _random.nextDouble() * 0.15, // 0.7-0.85
+        restFrequency: 12.0 + _random.nextDouble() * 5.0, // 12-17% chance
+        sprintTendency: 8.0 + _random.nextDouble() * 4.0, // 8-12% chance
+        fatigueRate: 0.10 + _random.nextDouble() * 0.08, // 0.10-0.18
+      )..logCreation(speed);
+    } else if (rand < 0.45) {
+      // Profile 2: Moderate Runner (25%) - Average running pace
+      final speed = 2.5 + _random.nextDouble() * 0.7; // 2.5-3.2 m/s (9.0-11.5 km/h)
+      return BotMovementProfile(
+        botId: botId,
+        botName: botName,
+        botType: 'Moderate Runner',
+        baseSpeed: speed,
+        consistency: 0.65 + _random.nextDouble() * 0.2, // 0.65-0.85
+        restFrequency: 10.0 + _random.nextDouble() * 5.0, // 10-15% chance
+        sprintTendency: 10.0 + _random.nextDouble() * 5.0, // 10-15% chance
+        fatigueRate: 0.08 + _random.nextDouble() * 0.10, // 0.08-0.18
+      )..logCreation(speed);
+    } else if (rand < 0.70) {
+      // Profile 3: Good Runner (25%) - Strong running pace
+      final speed = 3.2 + _random.nextDouble() * 0.6; // 3.2-3.8 m/s (11.5-13.7 km/h)
+      return BotMovementProfile(
+        botId: botId,
+        botName: botName,
+        botType: 'Good Runner',
         baseSpeed: speed,
         consistency: 0.6 + _random.nextDouble() * 0.2, // 0.6-0.8
-        restFrequency: 18.0 + _random.nextDouble() * 5.0, // 18-23% chance
-        sprintTendency: 15.0 + _random.nextDouble() * 5.0, // 15-20% chance
-        fatigueRate: 0.15 + _random.nextDouble() * 0.10, // 0.15-0.25
+        restFrequency: 8.0 + _random.nextDouble() * 4.0, // 8-12% chance
+        sprintTendency: 12.0 + _random.nextDouble() * 6.0, // 12-18% chance
+        fatigueRate: 0.10 + _random.nextDouble() * 0.08, // 0.10-0.18
+      )..logCreation(speed);
+    } else if (rand < 0.90) {
+      // Profile 4: Fast Runner (20%) - Competitive runner
+      final speed = 3.8 + _random.nextDouble() * 0.6; // 3.8-4.4 m/s (13.7-15.8 km/h)
+      return BotMovementProfile(
+        botId: botId,
+        botName: botName,
+        botType: 'Fast Runner',
+        baseSpeed: speed,
+        consistency: 0.7 + _random.nextDouble() * 0.15, // 0.7-0.85
+        restFrequency: 6.0 + _random.nextDouble() * 4.0, // 6-10% chance
+        sprintTendency: 15.0 + _random.nextDouble() * 8.0, // 15-23% chance
+        fatigueRate: 0.12 + _random.nextDouble() * 0.08, // 0.12-0.20
+      )..logCreation(speed);
+    } else {
+      // Profile 5: Elite Runner (10%) - Very fast, athletic runner
+      final speed = 4.4 + _random.nextDouble() * 0.8; // 4.4-5.2 m/s (15.8-18.7 km/h)
+      return BotMovementProfile(
+        botId: botId,
+        botName: botName,
+        botType: 'Elite Runner',
+        baseSpeed: speed,
+        consistency: 0.75 + _random.nextDouble() * 0.15, // 0.75-0.90
+        restFrequency: 4.0 + _random.nextDouble() * 3.0, // 4-7% chance
+        sprintTendency: 18.0 + _random.nextDouble() * 10.0, // 18-28% chance
+        fatigueRate: 0.08 + _random.nextDouble() * 0.08, // 0.08-0.16 (more endurance)
       )..logCreation(speed);
     }
   }
