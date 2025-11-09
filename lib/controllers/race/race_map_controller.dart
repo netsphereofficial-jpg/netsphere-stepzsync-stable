@@ -404,6 +404,12 @@ class MapController extends GetxController with WidgetsBindingObserver {
     // steps to be lost when user is not on the race map screen.
     // The service automatically manages active races and only syncs to races the user has joined.
 
+    // ✅ IMPORTANT: Do NOT stop bot simulation here
+    // Bots should continue running even when user navigates away from race screen
+    // because the race is still active. When user returns, _restartBotSimulationIfNeeded()
+    // will check if bots are still running and recreate profiles if needed.
+    print('🔄 Race map controller closing - bots will continue running in background');
+
     super.onClose();
   }
 

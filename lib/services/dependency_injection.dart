@@ -31,9 +31,10 @@ class DependencyInjection {
     Get.lazyPut<FirebaseSubscriptionService>(() =>
         FirebaseSubscriptionService(), fenix: true);
 
-    // Register RaceBotService as lazy permanent singleton
-    // This ensures bot simulations persist across navigation
-    Get.lazyPut<RaceBotService>(() => RaceBotService(), fenix: true);
+    // ✅ CRITICAL: Register RaceBotService as IMMEDIATE permanent singleton
+    // This ensures bot simulations persist across navigation and survive controller disposal
+    // MUST use Get.put (not lazyPut) to prevent service disposal when RaceMapController is destroyed
+    Get.put<RaceBotService>(RaceBotService(), permanent: true);
 
     // Register PreferencesService as a lazy singleton
     // This will only initialize when first accessed
