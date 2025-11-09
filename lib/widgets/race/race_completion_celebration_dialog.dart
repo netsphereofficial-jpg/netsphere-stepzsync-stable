@@ -10,6 +10,7 @@ import '../../config/app_colors.dart';
 /// - Simple celebration for 4th+ finishers (3 seconds)
 /// - Finish position badge and congratulations message
 /// - Enhanced animations and participant statistics
+/// - Special handling for solo races (no rank display)
 class RaceCompletionCelebrationDialog extends StatefulWidget {
   final int finishPosition;
   final int finalRank;
@@ -18,6 +19,7 @@ class RaceCompletionCelebrationDialog extends StatefulWidget {
   final double? distance;
   final double? calories;
   final double? avgSpeed;
+  final bool isSoloRace;
 
   const RaceCompletionCelebrationDialog({
     Key? key,
@@ -28,6 +30,7 @@ class RaceCompletionCelebrationDialog extends StatefulWidget {
     this.distance,
     this.calories,
     this.avgSpeed,
+    this.isSoloRace = false,
   }) : super(key: key);
 
   @override
@@ -43,6 +46,7 @@ class RaceCompletionCelebrationDialog extends StatefulWidget {
     double? distance,
     double? calories,
     double? avgSpeed,
+    bool isSoloRace = false,
   }) {
     Get.dialog(
       RaceCompletionCelebrationDialog(
@@ -53,6 +57,7 @@ class RaceCompletionCelebrationDialog extends StatefulWidget {
         distance: distance,
         calories: calories,
         avgSpeed: avgSpeed,
+        isSoloRace: isSoloRace,
       ),
       barrierDismissible: false,
     );
@@ -556,7 +561,50 @@ class _RaceCompletionCelebrationDialogState
   }
 
   Widget _buildPositionText() {
-    // For 1st place, make it extra prominent with enhanced styling
+    // For solo races, show completion message instead of rank
+    if (widget.isSoloRace) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF1E88E5), // Vibrant blue
+              Color(0xFF1565C0), // Darker blue
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFF1E88E5).withOpacity(0.5),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: 24,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'RACE COMPLETED!',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // For 1st place in competitive races, make it extra prominent with enhanced styling
     if (widget.finishPosition == 1) {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -612,6 +660,12 @@ class _RaceCompletionCelebrationDialogState
   }
 
   String _getCongratulationsText() {
+    // For solo races, show achievement-focused message
+    if (widget.isSoloRace) {
+      return 'WELL DONE!';
+    }
+
+    // For competitive races, show position-based message
     switch (widget.finishPosition) {
       case 1:
         return 'WINNER!';

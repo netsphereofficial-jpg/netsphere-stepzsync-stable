@@ -1196,6 +1196,10 @@ class RaceService {
           // Reconstruct RaceData object for modal
           final raceDataForModal = RaceData.fromFirestoreMap(freshRaceData, raceId);
 
+          // Get race type to determine if this is a solo race
+          final raceTypeId = freshRaceData['raceTypeId'] ?? 0;
+          final isSoloRace = raceTypeId == 1;
+
           RaceCompletionCelebrationDialog.show(
             finishPosition: finishOrder,
             finalRank: currentRank,
@@ -1203,6 +1207,7 @@ class RaceService {
             distance: distance,
             calories: calories,
             avgSpeed: avgSpeed,
+            isSoloRace: isSoloRace,
             onComplete: () {
               print('✅ Celebration dialog dismissed for $userId');
 
@@ -1222,25 +1227,35 @@ class RaceService {
           print('⏭️ Skipping celebration dialog - current user ($currentUserId) is not the one who completed ($userId)');
         }
 
+        // Get race type to determine completion flow
+        final raceTypeId = freshRaceData['raceTypeId'] ?? 0;
+        final isSoloRace = raceTypeId == 1;
+
         // If this is the FIRST finisher AND race is still active
         if (completedCount == 0 && freshStatus == RaceStateMachine.STATUS_ACTIVE) {
-          print('🎉 FIRST FINISHER! Starting race ending countdown');
-
-          // Get race duration - prefer minutes, fallback to hours converted to minutes
-          final durationMins = freshRaceData['durationMins'] as int? ??
-                              ((freshRaceData['durationHrs'] as int? ?? 1) * 60);
-
-          // 🚀 Use State Machine to transition to ENDING
-          final transitioned = await RaceStateMachine.transitionToEnding(
-            raceId,
-            userId,
-            durationMins,
-          );
-
-          if (transitioned) {
-            print('✅ Race transitioned to ENDING via state machine');
+          if (isSoloRace) {
+            // ✅ Solo races skip the "ending" status and go directly to completed
+            print('🏁 Solo race completed! Transitioning directly to COMPLETED');
+            await RaceStateMachine.transitionToCompleted(raceId);
           } else {
-            print('⚠️ Failed to transition race to ENDING');
+            print('🎉 FIRST FINISHER! Starting race ending countdown');
+
+            // Get race duration - prefer minutes, fallback to hours converted to minutes
+            final durationMins = freshRaceData['durationMins'] as int? ??
+                                ((freshRaceData['durationHrs'] as int? ?? 1) * 60);
+
+            // 🚀 Use State Machine to transition to ENDING
+            final transitioned = await RaceStateMachine.transitionToEnding(
+              raceId,
+              userId,
+              durationMins,
+            );
+
+            if (transitioned) {
+              print('✅ Race transitioned to ENDING via state machine');
+            } else {
+              print('⚠️ Failed to transition race to ENDING');
+            }
           }
         } else if (freshStatus == RaceStateMachine.STATUS_ENDING) {
           // Race is in ending countdown - participant already updated
@@ -1250,11 +1265,13 @@ class RaceService {
           print('⚠️ Participant finished in unexpected status $freshStatus');
         }
 
-        // Check if ALL participants have finished
-        final allFinished = await RaceStateMachine.areAllParticipantsFinished(raceId);
-        if (allFinished) {
-          print('🏆 ALL participants finished! Transitioning to COMPLETED');
-          await RaceStateMachine.transitionToCompleted(raceId);
+        // Check if ALL participants have finished (for non-solo races)
+        if (!isSoloRace) {
+          final allFinished = await RaceStateMachine.areAllParticipantsFinished(raceId);
+          if (allFinished) {
+            print('🏆 ALL participants finished! Transitioning to COMPLETED');
+            await RaceStateMachine.transitionToCompleted(raceId);
+          }
         }
       }
     } catch (e) {

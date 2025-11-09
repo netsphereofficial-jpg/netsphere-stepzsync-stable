@@ -379,6 +379,9 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
     final currentRank = currentParticipant?.rank ?? 0;
     final calories = currentParticipant?.calories ?? 0;
 
+    // Check if this is a solo race
+    final isSoloRace = widget.race.raceTypeId == 1;
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -410,13 +413,16 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow(
-                  icon: Icons.emoji_events,
-                  label: 'My Rank',
-                  value: currentRank > 0 ? '#$currentRank' : 'N/A',
-                  isIcon: true,
-                ),
-                SizedBox(height: 8),
+                // Only show rank for competitive races (not solo)
+                if (!isSoloRace)
+                  _buildInfoRow(
+                    icon: Icons.emoji_events,
+                    label: 'My Rank',
+                    value: currentRank > 0 ? '#$currentRank' : 'N/A',
+                    isIcon: true,
+                  ),
+                if (!isSoloRace)
+                  SizedBox(height: 8),
                 _buildInfoRow(
                   icon: Icons.track_changes,
                   label: 'Remaining',
@@ -455,18 +461,24 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
     final calories = currentParticipant?.calories ?? 0;
     final finishOrder = currentParticipant?.finishOrder;
 
-    // Get rank emoji and badge text
+    // Check if this is a solo race
+    final isSoloRace = widget.race.raceTypeId == 1;
+
+    // Get rank emoji and badge text (hide for solo races)
     String rankBadge = '#$finalRank';
     String rankEmoji = '';
-    if (finishOrder == 1 || finalRank == 1) {
-      rankEmoji = '🥇';
-      rankBadge = '1st Place';
-    } else if (finishOrder == 2 || finalRank == 2) {
-      rankEmoji = '🥈';
-      rankBadge = '2nd Place';
-    } else if (finishOrder == 3 || finalRank == 3) {
-      rankEmoji = '🥉';
-      rankBadge = '3rd Place';
+    if (!isSoloRace) {
+      // Only show rank badges for competitive races
+      if (finishOrder == 1 || finalRank == 1) {
+        rankEmoji = '🥇';
+        rankBadge = '1st Place';
+      } else if (finishOrder == 2 || finalRank == 2) {
+        rankEmoji = '🥈';
+        rankBadge = '2nd Place';
+      } else if (finishOrder == 3 || finalRank == 3) {
+        rankEmoji = '🥉';
+        rankBadge = '3rd Place';
+      }
     }
 
     return Container(
