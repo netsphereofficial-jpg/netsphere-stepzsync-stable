@@ -806,6 +806,91 @@ class HealthSyncService extends GetxController {
     }
   }
 
+  /// Get race progress from exact race start time to now (time-based baseline)
+  ///
+  /// This method queries HealthKit/Health Connect for steps, distance, and calories
+  /// accumulated from the exact race start time to the current time.
+  ///
+  /// Used for time-based baseline tracking where we want to know EXACTLY how much
+  /// the user has progressed since joining a race, regardless of day boundaries.
+  ///
+  /// Returns null if health services are unavailable or query fails.
+  Future<Map<String, dynamic>?> getRaceProgressFromStart(DateTime raceStartTime) async {
+    if (!isHealthAvailable.value) {
+      print('${HealthConfig.logPrefix} ⚠️ Health services not available for race progress query');
+      return null;
+    }
+
+    try {
+      final now = DateTime.now();
+
+      print('${HealthConfig.logPrefix} 📊 Querying race progress from ${raceStartTime.toIso8601String()} to ${now.toIso8601String()}');
+
+      // Query steps for the exact time range
+      final steps = await _health.getTotalStepsInInterval(raceStartTime, now) ?? 0;
+
+      // Query distance and calories for the same time range
+      final otherDataTypes = <HealthDataType>[
+        Platform.isIOS
+            ? HealthDataType.DISTANCE_WALKING_RUNNING
+            : HealthDataType.DISTANCE_DELTA,
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+      ];
+
+      final List<HealthDataPoint> healthData = await _health.getHealthDataFromTypes(
+        types: otherDataTypes,
+        startTime: raceStartTime,
+        endTime: now,
+      ).timeout(HealthConfig.syncTimeout);
+
+      // Extract distance
+      double distanceKm = 0.0;
+      for (var point in healthData) {
+        if (point.type == HealthDataType.DISTANCE_WALKING_RUNNING ||
+            point.type == HealthDataType.DISTANCE_DELTA) {
+          final distanceMeters = (point.value as num).toDouble();
+          distanceKm += distanceMeters / 1000.0;
+        }
+      }
+
+      // Extract calories
+      int caloriesKcal = 0;
+      for (var point in healthData) {
+        if (point.type == HealthDataType.ACTIVE_ENERGY_BURNED) {
+          caloriesKcal += (point.value as num).toInt();
+        }
+      }
+
+      // Fallback: If no distance data, calculate from steps
+      double finalDistance = distanceKm;
+      if (finalDistance == 0.0 && steps > 0) {
+        const stepsToKm = 0.000762; // Average: ~1312 steps per km
+        finalDistance = steps * stepsToKm;
+        print('${HealthConfig.logPrefix} ℹ️ No distance data, calculated from steps: ${finalDistance.toStringAsFixed(2)} km');
+      }
+
+      // Fallback: If no calorie data, estimate from steps
+      int finalCalories = caloriesKcal;
+      if (finalCalories == 0 && steps > 0) {
+        const stepsToCalories = 0.04; // Average: ~0.04 calories per step
+        finalCalories = (steps * stepsToCalories).round();
+        print('${HealthConfig.logPrefix} ℹ️ No calorie data, estimated from steps: $finalCalories kcal');
+      }
+
+      print('${HealthConfig.logPrefix} ✅ Race progress: $steps steps, ${finalDistance.toStringAsFixed(2)} km, $finalCalories kcal');
+
+      return {
+        'steps': steps,
+        'distance': finalDistance,
+        'calories': finalCalories,
+      };
+    } catch (e, stackTrace) {
+      print('${HealthConfig.logPrefix} ❌ Error querying race progress: $e');
+      print('📍 Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
   @override
   void onClose() {
     _syncStatusController.close();

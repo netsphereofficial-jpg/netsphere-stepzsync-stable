@@ -8,6 +8,8 @@ import '../core/models/race_data_model.dart';
 import 'step_tracking_service.dart';
 import 'firebase_service.dart';
 import 'race_state_machine.dart';
+import 'health_sync_service.dart';
+import 'race_step_reconciliation_service.dart';
 import '../widgets/race/race_completion_celebration_dialog.dart';
 import '../controllers/race/completed_races_controller.dart';
 
@@ -572,6 +574,54 @@ class RaceService {
 
       print('✅ Participant added to race with 3-collection structure');
 
+      // Initialize time-based baseline for this race
+      try {
+        print('📊 Initializing time-based baseline for race $raceId');
+
+        // Get race start time (actualStartTime for active races, or current time for pending races)
+        final raceStartTime = raceData['actualStartTime'] != null
+            ? (raceData['actualStartTime'] as Timestamp).toDate()
+            : DateTime.now();
+
+        // Get current HealthKit data to establish baseline
+        final healthSyncService = Get.find<HealthSyncService>();
+        final currentHealthData = await healthSyncService.fetchTodaySteps();
+
+        if (currentHealthData != null) {
+          final healthKitStepsAtStart = currentHealthData['steps'] as int? ?? 0;
+          final healthKitDistanceAtStart = currentHealthData['distance'] as double? ?? 0.0;
+          final healthKitCaloriesAtStart = currentHealthData['calories'] as int? ?? 0;
+
+          print('📊 Baseline captured: $healthKitStepsAtStart steps, ${healthKitDistanceAtStart.toStringAsFixed(2)} km, $healthKitCaloriesAtStart kcal');
+
+          // Store baseline in server (Cloud Function will handle this)
+          // For now, the RaceStepSyncService will create the baseline when it detects the new race
+          // We'll pass this information via the reconciliation service
+          try {
+            final reconciliationService = Get.find<RaceStepReconciliationService>();
+            // Initialize baseline on server
+            await reconciliationService.initializeRaceBaseline(
+              raceId: raceId,
+              raceTitle: raceData['title'] ?? 'Unknown Race',
+              raceStartTime: raceStartTime,
+              healthKitStepsAtStart: healthKitStepsAtStart,
+              healthKitDistanceAtStart: healthKitDistanceAtStart,
+              healthKitCaloriesAtStart: healthKitCaloriesAtStart,
+            );
+            print('✅ Time-based baseline initialized on server');
+          } catch (e) {
+            print('⚠️ Could not initialize baseline on server (will be created on first sync): $e');
+            // Don't fail the join operation if baseline initialization fails
+            // The RaceStepSyncService will create it on first detection
+          }
+        } else {
+          print('⚠️ Could not fetch current health data for baseline (will use 0)');
+        }
+      } catch (e) {
+        print('❌ Error initializing time-based baseline: $e');
+        // Don't fail the join operation if baseline initialization fails
+      }
+
       // If race is active or scheduled, start step tracking
       // if (raceStatus == 'active' || raceStatus == 'scheduled') {
       //   try {
@@ -636,6 +686,65 @@ class RaceService {
       await batch.commit();
 
       print('✅ Updated all participants status to active in subcollection');
+
+      // 🆕 CRITICAL FIX: Initialize or update baseline for all participants when race starts
+      // This ensures baseline is set at actual race start time, not join time
+      try {
+        print('📊 Initializing baselines for all participants at race start...');
+
+        // Get race data to fetch actualStartTime
+        final raceDoc = await _racesCollection.doc(raceId).get();
+        final raceData = raceDoc.data() as Map<String, dynamic>?;
+
+        if (raceData != null) {
+          final actualStartTime = (raceData['actualStartTime'] as Timestamp?)?.toDate() ?? DateTime.now();
+          final raceTitle = raceData['title'] as String? ?? 'Unknown Race';
+
+          // Only initialize baseline for current user (each user initializes their own)
+          if (Get.isRegistered<HealthSyncService>() && Get.isRegistered<RaceStepReconciliationService>()) {
+            final healthSyncService = Get.find<HealthSyncService>();
+            final reconciliationService = Get.find<RaceStepReconciliationService>();
+
+            // Fetch current HealthKit data for current user
+            final currentHealthData = await healthSyncService.fetchTodaySteps();
+
+            if (currentHealthData != null) {
+              final healthKitStepsAtStart = currentHealthData['steps'] as int? ?? 0;
+              final healthKitDistanceAtStart = currentHealthData['distance'] as double? ?? 0.0;
+              final healthKitCaloriesAtStart = currentHealthData['calories'] as int? ?? 0;
+
+              print('📊 Current user baseline at race start:');
+              print('   Steps: $healthKitStepsAtStart');
+              print('   Distance: ${healthKitDistanceAtStart.toStringAsFixed(2)} km');
+              print('   Calories: $healthKitCaloriesAtStart');
+
+              // Initialize/update baseline via Cloud Function
+              final baselineInitSuccess = await reconciliationService.initializeRaceBaseline(
+                raceId: raceId,
+                raceTitle: raceTitle,
+                raceStartTime: actualStartTime,
+                healthKitStepsAtStart: healthKitStepsAtStart,
+                healthKitDistanceAtStart: healthKitDistanceAtStart,
+                healthKitCaloriesAtStart: healthKitCaloriesAtStart,
+              );
+
+              if (baselineInitSuccess) {
+                print('✅ Baseline initialized/updated for current user at race start');
+              } else {
+                print('⚠️ Could not initialize baseline for current user (will use existing or create on first sync)');
+              }
+            } else {
+              print('⚠️ Could not fetch health data for baseline initialization');
+            }
+          } else {
+            print('⚠️ Required services not available for baseline initialization');
+          }
+        }
+      } catch (e) {
+        print('⚠️ Error initializing baselines at race start: $e');
+        // Don't fail race start if baseline initialization fails
+        // The syncHealthDataToRaces will create it on first sync
+      }
 
       return {
         'status': 200,

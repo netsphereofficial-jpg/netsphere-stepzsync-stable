@@ -166,6 +166,70 @@ class RaceStepReconciliationService extends GetxService {
     }
   }
 
+  /// Initialize time-based baseline for a newly joined race
+  ///
+  /// This method creates a baseline document on the server with the user's current
+  /// health data at the time of joining. This baseline will be used to calculate
+  /// race-specific progress using time-based queries.
+  ///
+  /// Parameters:
+  /// - [raceId]: The ID of the race being joined
+  /// - [raceTitle]: The title of the race
+  /// - [raceStartTime]: The exact time when the race started (or will start)
+  /// - [healthKitStepsAtStart]: User's total steps when joining
+  /// - [healthKitDistanceAtStart]: User's total distance (km) when joining
+  /// - [healthKitCaloriesAtStart]: User's total calories when joining
+  Future<bool> initializeRaceBaseline({
+    required String raceId,
+    required String raceTitle,
+    required DateTime raceStartTime,
+    required int healthKitStepsAtStart,
+    required double healthKitDistanceAtStart,
+    required int healthKitCaloriesAtStart,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      dev.log('⚠️ [RACE_RECONCILIATION] No authenticated user, cannot initialize baseline');
+      return false;
+    }
+
+    try {
+      dev.log('📊 [RACE_RECONCILIATION] Initializing baseline for race: $raceTitle');
+      dev.log('   Race ID: $raceId');
+      dev.log('   Start Time: ${raceStartTime.toIso8601String()}');
+      dev.log('   Baseline: $healthKitStepsAtStart steps, ${healthKitDistanceAtStart.toStringAsFixed(2)} km, $healthKitCaloriesAtStart kcal');
+
+      // Call Cloud Function to initialize baseline
+      final callable = _functions.httpsCallable('initializeRaceBaseline');
+      final result = await callable.call({
+        'userId': currentUser.uid,
+        'raceId': raceId,
+        'raceTitle': raceTitle,
+        'raceStartTime': raceStartTime.toIso8601String(),
+        'healthKitStepsAtStart': healthKitStepsAtStart,
+        'healthKitDistanceAtStart': healthKitDistanceAtStart,
+        'healthKitCaloriesAtStart': healthKitCaloriesAtStart,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+
+      final data = result.data as Map<String, dynamic>;
+      final success = data['success'] as bool? ?? false;
+      final message = data['message'] as String? ?? 'Unknown error';
+
+      if (success) {
+        dev.log('✅ [RACE_RECONCILIATION] Baseline initialized successfully');
+        return true;
+      } else {
+        dev.log('❌ [RACE_RECONCILIATION] Failed to initialize baseline: $message');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      dev.log('❌ [RACE_RECONCILIATION] Error initializing baseline: $e');
+      dev.log('   Stack trace: $stackTrace');
+      return false;
+    }
+  }
+
   /// Get debug information about sync state
   Map<String, dynamic> getDebugInfo() {
     return {

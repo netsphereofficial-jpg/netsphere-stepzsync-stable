@@ -1262,6 +1262,7 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
           remainingDistance: 0.0,
           rank: 0,
           steps: 0,
+          avgSpeed: 0.0,
         ),
       );
 
@@ -1328,11 +1329,10 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
 
       final avgSpeed = currentUserParticipant.avgSpeed;
 
-      // Additional validation: For walking, avg speed should be reasonable (0-10 km/h)
-      // Return 0.0 if speed seems unrealistic or if distance is 0 (no movement yet)
-      if (avgSpeed < 0 ||
-          avgSpeed > 10 ||
-          currentUserParticipant.distance <= 0) {
+      // Validation: Return 0.0 if speed is negative or if distance is 0 (no movement yet)
+      // Note: avgSpeed is calculated as (distance / time_since_race_start) * 60
+      // This can result in high values early in the race when time is very small
+      if (avgSpeed < 0 || currentUserParticipant.distance <= 0) {
         return 0.0;
       }
 
@@ -2168,6 +2168,7 @@ class _RaceMapScreenState extends State<RaceMapScreen> {
           remainingDistance: mapController.raceModel.value?.totalDistance ?? 0,
           rank: 0,
           steps: 0,
+          avgSpeed: 0.0,
           isCompleted: false,
         ),
       );

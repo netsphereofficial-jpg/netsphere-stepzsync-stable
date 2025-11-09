@@ -688,6 +688,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
         console.log(`   📂 Checking for existing baseline at: users/${userId}/health_baselines/${raceId}`);
         const baselineDoc = await baselineRef.get();
         let baselineData;
+        let useTimeBasedBaseline = false;
 
         if (!baselineDoc.exists) {
           // Create new baseline (first time syncing to this race)
@@ -712,41 +713,66 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
         } else {
           console.log(`   📖 [BASELINE] Found existing baseline`);
           baselineData = baselineDoc.data();
-          console.log(`      Current baseline: ${baselineData.healthKitBaselineSteps} steps, ${baselineData.healthKitBaselineDistance.toFixed(2)} km, ${baselineData.healthKitBaselineCalories} cal`);
-          console.log(`      Last processed date: ${baselineData.lastProcessedDate}`);
-          console.log(`      Today's date: ${date}`);
 
-          // Check for day rollover
-          if (baselineData.lastProcessedDate && baselineData.lastProcessedDate !== date) {
-            console.log(`   🌅 [DAY_ROLLOVER] Day rollover detected!`);
-            console.log(`      Previous date: ${baselineData.lastProcessedDate}`);
-            console.log(`      Today: ${date}`);
-            console.log(`      Resetting baseline: ${baselineData.healthKitBaselineSteps} steps → ${totalSteps} steps`);
-            console.log(`      This prevents counting yesterday's steps in today's race`);
+          // Check if this is a time-based baseline (new architecture)
+          useTimeBasedBaseline = baselineData.useTimeBasedBaseline === true;
 
-            // Reset baseline to current totals
-            baselineData.healthKitBaselineSteps = totalSteps;
-            baselineData.healthKitBaselineDistance = totalDistance;
-            baselineData.healthKitBaselineCalories = totalCalories;
-            baselineData.lastProcessedDate = date;
-            baselineData.lastUpdatedAt = admin.firestore.Timestamp.now();
-
-            batch.update(baselineRef, baselineData);
-            console.log(`      ✅ Baseline reset queued in batch`);
+          if (useTimeBasedBaseline) {
+            console.log(`   ⏰ [TIME-BASED] Using time-based baseline (fixed anchor point)`);
+            console.log(`      Baseline at race start: ${baselineData.healthKitStepsAtStart} steps, ${baselineData.healthKitDistanceAtStart.toFixed(2)} km, ${baselineData.healthKitCaloriesAtStart} cal`);
+            console.log(`      Race start time: ${baselineData.raceStartTime ? new Date(baselineData.raceStartTime._seconds * 1000).toISOString() : 'N/A'}`);
           } else {
-            console.log(`   ✅ Same day - no rollover, will calculate delta normally`);
+            console.log(`   📅 [LEGACY] Using legacy day-based baseline`);
+            console.log(`      Current baseline: ${baselineData.healthKitBaselineSteps} steps, ${baselineData.healthKitBaselineDistance.toFixed(2)} km, ${baselineData.healthKitBaselineCalories} cal`);
+            console.log(`      Last processed date: ${baselineData.lastProcessedDate}`);
+            console.log(`      Today's date: ${date}`);
+
+            // Check for day rollover (only for legacy baselines)
+            if (baselineData.lastProcessedDate && baselineData.lastProcessedDate !== date) {
+              console.log(`   🌅 [DAY_ROLLOVER] Day rollover detected!`);
+              console.log(`      Previous date: ${baselineData.lastProcessedDate}`);
+              console.log(`      Today: ${date}`);
+              console.log(`      Resetting baseline: ${baselineData.healthKitBaselineSteps} steps → ${totalSteps} steps`);
+              console.log(`      This prevents counting yesterday's steps in today's race`);
+
+              // Reset baseline to current totals
+              baselineData.healthKitBaselineSteps = totalSteps;
+              baselineData.healthKitBaselineDistance = totalDistance;
+              baselineData.healthKitBaselineCalories = totalCalories;
+              baselineData.lastProcessedDate = date;
+              baselineData.lastUpdatedAt = admin.firestore.Timestamp.now();
+
+              batch.update(baselineRef, baselineData);
+              console.log(`      ✅ Baseline reset queued in batch`);
+            } else {
+              console.log(`   ✅ Same day - no rollover, will calculate delta normally`);
+            }
           }
         }
 
-        // 5. Calculate deltas
-        const stepsDelta = totalSteps - baselineData.healthKitBaselineSteps;
-        const distanceDelta = totalDistance - baselineData.healthKitBaselineDistance;
-        const caloriesDelta = totalCalories - baselineData.healthKitBaselineCalories;
+        // 5. Calculate deltas based on baseline type
+        let stepsDelta, distanceDelta, caloriesDelta;
+
+        if (useTimeBasedBaseline) {
+          // Time-based: Calculate from fixed anchor point at race start
+          stepsDelta = totalSteps - (baselineData.healthKitStepsAtStart || 0);
+          distanceDelta = totalDistance - (baselineData.healthKitDistanceAtStart || 0);
+          caloriesDelta = totalCalories - (baselineData.healthKitCaloriesAtStart || 0);
+        } else {
+          // Legacy: Calculate from daily baseline
+          stepsDelta = totalSteps - baselineData.healthKitBaselineSteps;
+          distanceDelta = totalDistance - baselineData.healthKitBaselineDistance;
+          caloriesDelta = totalCalories - baselineData.healthKitBaselineCalories;
+        }
 
         console.log(`   📊 Race: ${baselineData.raceTitle}`);
-        console.log(`      Baseline: ${baselineData.healthKitBaselineSteps} steps, ${baselineData.healthKitBaselineDistance.toFixed(2)} km, ${baselineData.healthKitBaselineCalories} cal`);
-        console.log(`      Current: ${totalSteps} steps, ${totalDistance.toFixed(2)} km, ${totalCalories} cal`);
-        console.log(`      Delta: +${stepsDelta} steps, +${distanceDelta.toFixed(2)} km, +${caloriesDelta} cal`);
+        if (useTimeBasedBaseline) {
+          console.log(`      Baseline (at race start): ${baselineData.healthKitStepsAtStart || 0} steps, ${(baselineData.healthKitDistanceAtStart || 0).toFixed(2)} km, ${baselineData.healthKitCaloriesAtStart || 0} cal`);
+        } else {
+          console.log(`      Baseline (daily): ${baselineData.healthKitBaselineSteps} steps, ${baselineData.healthKitBaselineDistance.toFixed(2)} km, ${baselineData.healthKitBaselineCalories} cal`);
+        }
+        console.log(`      Current (total today): ${totalSteps} steps, ${totalDistance.toFixed(2)} km, ${totalCalories} cal`);
+        console.log(`      Delta (race progress): +${stepsDelta} steps, +${distanceDelta.toFixed(2)} km, +${caloriesDelta} cal`);
 
         // 🔍 DETAILED DISTANCE DELTA LOGGING
         console.log(`   📏 [DISTANCE_DELTA_CHECK] Distance delta analysis:`);
@@ -770,8 +796,10 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
         let baselineNeedsReset = false;
 
         // Case 1: Negative delta (current < baseline) - Health Connect data inconsistency
-        if (stepsDelta < 0) {
-          console.log(`   ⚠️ [HEALTH_CONNECT_INCONSISTENCY] Current value (${totalSteps}) is LOWER than baseline (${baselineData.healthKitBaselineSteps})`);
+        // ONLY applies to legacy baselines (time-based baselines should never be reset)
+        if (stepsDelta < 0 && !useTimeBasedBaseline) {
+          const baselineSteps = baselineData.healthKitBaselineSteps;
+          console.log(`   ⚠️ [HEALTH_CONNECT_INCONSISTENCY] Current value (${totalSteps}) is LOWER than baseline (${baselineSteps})`);
           console.log(`      This indicates Health Connect recalculated daily totals`);
           console.log(`      Resetting baseline to current value and treating as new starting point`);
 
@@ -792,6 +820,13 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
 
           console.log(`      Baseline reset complete. Future syncs will calculate from ${totalSteps} steps`);
           continue; // Skip this sync, next sync will show proper progress
+        } else if (stepsDelta < 0 && useTimeBasedBaseline) {
+          console.log(`   ⚠️ [TIME-BASED] Negative delta detected (${stepsDelta})`);
+          console.log(`      This could indicate user deleted health data or device issue`);
+          console.log(`      Time-based baseline is NEVER reset - treating as 0 progress this sync`);
+          effectiveStepsDelta = 0;
+          effectiveDistanceDelta = 0;
+          effectiveCaloriesDelta = 0;
         }
 
         // Case 2: Positive steps but distance is 0 - Use calculated distance
@@ -1097,13 +1132,13 @@ async function updateRaceRanks(raceId) {
     // Distances are equal or very close - apply tie-breaking
     console.log(`   🔀 Tie-breaking between ${a.userId} and ${b.userId} (both at ${a.distance.toFixed(2)}km)`);
 
-    // ✅ FIX: If both completed, earlier completion time wins (INVERTED LOGIC FIXED)
+    // ✅ FIX: If both completed, earlier completion time wins
     if (a.isCompleted && b.isCompleted && a.completedAt && b.completedAt) {
       const completionDiff = a.completedAt.toMillis() - b.completedAt.toMillis();
       console.log(`      Both completed - comparing timestamps: ${a.userId}=${a.completedAt.toDate().toISOString()} vs ${b.userId}=${b.completedAt.toDate().toISOString()}`);
       console.log(`      completionDiff=${completionDiff} (negative means a finished first, should rank higher)`);
-      // ✅ CRITICAL FIX: Negate the diff so earlier completion = negative = ranks FIRST
-      return -completionDiff; // Earlier completion = better rank (negative = a wins)
+      // Earlier completion = negative = ranks FIRST (a.completedAt < b.completedAt → negative → a wins)
+      return completionDiff; // Earlier completion = better rank
     }
 
     // Both incomplete - more recent update wins (they're still racing)
@@ -1468,5 +1503,134 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
   } catch (error) {
     console.error(`❌ [DELETE_ACCOUNT] Error deleting account for user ${userId}:`, error);
     throw new functions.https.HttpsError('internal', `Failed to delete account: ${error.message}`);
+  }
+});
+
+/**
+ * FUNCTION: initializeRaceBaseline (HTTPS Callable)
+ *
+ * Creates a time-based baseline when a user joins a race. This baseline
+ * stores the user's current health data at join time, which will be used
+ * to calculate race-specific progress.
+ *
+ * Input:
+ * {
+ *   userId: string,
+ *   raceId: string,
+ *   raceTitle: string,
+ *   raceStartTime: string,          // ISO8601 timestamp of race start
+ *   healthKitStepsAtStart: number,  // User's total steps when joining
+ *   healthKitDistanceAtStart: number, // km
+ *   healthKitCaloriesAtStart: number,
+ *   timestamp: string               // ISO8601 timestamp of request
+ * }
+ *
+ * Returns:
+ * {
+ *   success: boolean,
+ *   message: string
+ * }
+ */
+exports.initializeRaceBaseline = functions.https.onCall(async (data, context) => {
+  // 1. Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated to initialize baseline');
+  }
+
+  const authUserId = context.auth.uid;
+  const {
+    userId,
+    raceId,
+    raceTitle,
+    raceStartTime,
+    healthKitStepsAtStart,
+    healthKitDistanceAtStart,
+    healthKitCaloriesAtStart,
+    timestamp
+  } = data;
+
+  // 2. Verify user is initializing their own baseline
+  if (userId !== authUserId) {
+    throw new functions.https.HttpsError('permission-denied', 'Can only initialize your own baseline');
+  }
+
+  // 3. Input validation
+  if (!raceId || typeof raceId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid raceId');
+  }
+  if (!raceTitle || typeof raceTitle !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid raceTitle');
+  }
+  if (!raceStartTime || typeof raceStartTime !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid raceStartTime');
+  }
+  if (typeof healthKitStepsAtStart !== 'number' || healthKitStepsAtStart < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid healthKitStepsAtStart');
+  }
+  if (typeof healthKitDistanceAtStart !== 'number' || healthKitDistanceAtStart < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid healthKitDistanceAtStart');
+  }
+  if (typeof healthKitCaloriesAtStart !== 'number' || healthKitCaloriesAtStart < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid healthKitCaloriesAtStart');
+  }
+
+  console.log(`📊 [INIT_BASELINE] Initializing baseline for user ${userId}, race ${raceId}`);
+  console.log(`   Race: ${raceTitle}`);
+  console.log(`   Start Time: ${raceStartTime}`);
+  console.log(`   Baseline: ${healthKitStepsAtStart} steps, ${healthKitDistanceAtStart.toFixed(2)} km, ${healthKitCaloriesAtStart} cal`);
+
+  try {
+    // Parse race start time
+    const raceStartTimestamp = admin.firestore.Timestamp.fromDate(new Date(raceStartTime));
+
+    // Create baseline document
+    const baselineRef = db.collection('users')
+      .doc(userId)
+      .collection('health_baselines')
+      .doc(raceId);
+
+    // Check if baseline already exists
+    const existingBaseline = await baselineRef.get();
+    if (existingBaseline.exists) {
+      console.log(`   ⚠️ Baseline already exists for this race, updating...`);
+    }
+
+    const baselineData = {
+      raceId: raceId,
+      raceTitle: raceTitle,
+      raceStartTime: raceStartTimestamp,
+
+      // Time-based baseline flag
+      useTimeBasedBaseline: true,
+
+      // Health data at race join time (baseline anchor)
+      healthKitStepsAtStart: healthKitStepsAtStart,
+      healthKitDistanceAtStart: healthKitDistanceAtStart,
+      healthKitCaloriesAtStart: healthKitCaloriesAtStart,
+
+      // Current race progress (starts at 0)
+      currentRaceSteps: 0,
+      currentRaceDistance: 0.0,
+      currentRaceCalories: 0,
+
+      // Metadata
+      createdAt: admin.firestore.Timestamp.now(),
+      lastUpdatedAt: admin.firestore.Timestamp.now(),
+    };
+
+    await baselineRef.set(baselineData, { merge: true });
+
+    console.log(`✅ [INIT_BASELINE] Baseline initialized successfully`);
+    console.log(`   Document path: users/${userId}/health_baselines/${raceId}`);
+    console.log(`   Time-based: true`);
+
+    return {
+      success: true,
+      message: 'Baseline initialized successfully',
+    };
+
+  } catch (error) {
+    console.error(`❌ [INIT_BASELINE] Error initializing baseline:`, error);
+    throw new functions.https.HttpsError('internal', `Failed to initialize baseline: ${error.message}`);
   }
 });
