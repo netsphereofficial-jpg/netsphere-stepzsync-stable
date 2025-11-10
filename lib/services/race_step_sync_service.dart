@@ -1037,11 +1037,14 @@ class RaceStepSyncService extends GetxService {
               raceDistance = deltaSteps * stepsToKm;
               raceCalories = (deltaSteps * 0.04).round(); // 1 step ≈ 0.04 cal
 
-              dev.log('   📱 [ANDROID] Distance estimated from delta steps');
+              dev.log('   📱 [ANDROID FALLBACK] Distance estimated from delta steps:');
+              dev.log('      Delta Steps: $deltaSteps → Distance: ${raceDistance.toStringAsFixed(2)} km');
             } else {
               totalRaceSteps = deltaSteps;
               raceDistance = deltaDistance;
               raceCalories = deltaCalories;
+
+              dev.log('   ✅ Using Health Connect distance data: ${deltaDistance.toStringAsFixed(2)} km');
             }
 
             dev.log('   ✅ Delta calculation:');
@@ -1086,6 +1089,16 @@ class RaceStepSyncService extends GetxService {
             // Total distance/calories formula
             raceDistance = baseline.serverDistance + baseline.sessionRaceDistance + healthKitDistanceDelta;
             raceCalories = baseline.serverCalories + baseline.sessionRaceCalories + healthKitCaloriesDelta;
+
+            // ✅ ANDROID FALLBACK: If distance is 0 but we have steps, estimate from steps
+            if (raceDistance == 0.0 && totalRaceSteps > 0) {
+              const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
+              raceDistance = totalRaceSteps * stepsToKm;
+              raceCalories = (totalRaceSteps * 0.04).round(); // 1 step ≈ 0.04 cal
+
+              dev.log('   📱 [ANDROID FALLBACK - LEGACY] Distance estimated from total steps:');
+              dev.log('      Total Steps: $totalRaceSteps → Distance: ${raceDistance.toStringAsFixed(2)} km');
+            }
 
             dev.log('   📊 Legacy calculation:');
             dev.log('      Server: ${baseline.serverSteps} steps, ${baseline.serverDistance.toStringAsFixed(2)} km, ${baseline.serverCalories} cal');
@@ -1170,6 +1183,13 @@ class RaceStepSyncService extends GetxService {
           if (raceSeconds > 0) {
             final raceHours = raceSeconds / 3600.0;
             cappedAvgSpeed = cappedRaceDistance / raceHours;
+
+            dev.log('   📊 AvgSpeed Calculation:');
+            dev.log('      Distance: ${cappedRaceDistance.toStringAsFixed(2)} km');
+            dev.log('      Time: ${raceSeconds}s (${raceHours.toStringAsFixed(2)} hours)');
+            dev.log('      Speed: ${cappedAvgSpeed.toStringAsFixed(2)} km/h');
+          } else {
+            dev.log('   ⚠️ AvgSpeed = 0: raceSeconds = $raceSeconds (cannot calculate)');
           }
 
           // ✅ CRITICAL FIX: Monotonic increasing validation
