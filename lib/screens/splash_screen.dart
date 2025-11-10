@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/onboarding_service.dart';
-import 'login_screen.dart';
+import '../services/auth_wrapper.dart';
 import 'onboarding/onboarding_screen.dart';
 
 /// Simplified Splash Screen - 2.5 seconds with onboarding check
-/// Based on research: TikTok/Instagram pattern
-/// No forced authentication - user chooses Login/Signup/Guest
+/// Flow: Splash → Onboarding (first-time) OR AuthWrapper (returning)
+/// AuthWrapper checks Firebase Auth state and routes accordingly
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -31,12 +31,14 @@ class _SplashScreenState extends State<SplashScreen> {
       final shouldShowOnboarding = await OnboardingService.shouldShowOnboarding();
 
       if (shouldShowOnboarding) {
-        // Navigate to onboarding screens
+        // First-time user: Navigate to onboarding screens
         Get.off(() => OnboardingScreen());
       } else {
-        // Navigate directly to LoginScreen
-        // User can choose: Login, Signup, or Continue as Guest
-        Get.off(() => LoginScreen());
+        // Returning user: Navigate to AuthWrapper
+        // AuthWrapper will check Firebase Auth state and route accordingly:
+        // - Logged in → HomeScreen
+        // - Not logged in → LoginScreen
+        Get.off(() => AuthWrapper());
       }
     }
   }

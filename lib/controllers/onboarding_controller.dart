@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../screens/login_screen.dart';
+import '../services/auth_wrapper.dart';
 import '../services/onboarding_service.dart';
 
 /// Controller for managing onboarding flow
@@ -79,13 +79,16 @@ class OnboardingController extends GetxController {
     await nextPage();
   }
 
-  /// Complete onboarding and navigate to login
+  /// Complete onboarding and navigate to AuthWrapper
   Future<void> completeOnboarding() async {
     // Mark onboarding as completed
     await OnboardingService.completeOnboarding();
 
-    // Navigate to login screen
-    Get.off(() => LoginScreen());
+    // Navigate to AuthWrapper to check auth state
+    // AuthWrapper will route to appropriate screen:
+    // - Logged in (guest mode) → HomeScreen
+    // - Not logged in → LoginScreen
+    Get.off(() => AuthWrapper());
   }
 
   /// Handle permission request result

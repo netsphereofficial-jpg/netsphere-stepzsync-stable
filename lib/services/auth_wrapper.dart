@@ -43,9 +43,21 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return StreamBuilder<User?>(
       stream: firebaseService.getAuthStateChanges(),
       builder: (context, authSnapshot) {
-        debugPrint('🔍 [AUTH_DEBUG] StreamBuilder - connectionState: ${authSnapshot.connectionState}, hasData: ${authSnapshot.hasData}, user: ${authSnapshot.data?.uid}');
+        debugPrint('🔍 [AUTH_DEBUG] ========== AUTH STATE CHECK ==========');
+        debugPrint('🔍 [AUTH_DEBUG] StreamBuilder triggered');
+        debugPrint('🔍 [AUTH_DEBUG] Connection state: ${authSnapshot.connectionState}');
+        debugPrint('🔍 [AUTH_DEBUG] Has data: ${authSnapshot.hasData}');
+        debugPrint('🔍 [AUTH_DEBUG] Has error: ${authSnapshot.hasError}');
+        if (authSnapshot.hasError) {
+          debugPrint('🔍 [AUTH_DEBUG] Error: ${authSnapshot.error}');
+        }
+        debugPrint('🔍 [AUTH_DEBUG] User UID: ${authSnapshot.data?.uid}');
+        debugPrint('🔍 [AUTH_DEBUG] User email: ${authSnapshot.data?.email}');
+        debugPrint('🔍 [AUTH_DEBUG] User is anonymous: ${authSnapshot.data?.isAnonymous}');
+        debugPrint('🔍 [AUTH_DEBUG] =====================================');
 
         if (authSnapshot.connectionState == ConnectionState.waiting) {
+          debugPrint('🔍 [AUTH_DEBUG] ⏳ Waiting for auth state...');
           return _buildLoadingScreen();
         }
 
