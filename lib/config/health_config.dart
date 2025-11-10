@@ -88,13 +88,16 @@ class HealthConfig {
     }
   }
 
-  /// Permissions for each data type (READ_WRITE for maximum access)
-  /// Requesting READ_WRITE for all data types to allow comprehensive health data management
+  /// Permissions for each data type (READ for iOS compatibility)
+  /// Using READ-ONLY permissions because:
+  /// 1. App only needs to read health data, not write it
+  /// 2. iOS doesn't allow WRITE on certain types (ELECTROCARDIOGRAM, HIGH_HEART_RATE_EVENT, etc.)
+  /// 3. Prevents "Invalid argument" error on iOS HealthKit authorization
   static List<HealthDataAccess> get permissions {
     return dataTypes.map((type) {
-      // Request READ_WRITE permission for all data types
-      // This allows both reading existing data and writing new data
-      return HealthDataAccess.READ_WRITE;
+      // Request READ permission for all data types
+      // This is sufficient since we only need to read health data
+      return HealthDataAccess.READ;
     }).toList();
   }
 
