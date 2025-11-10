@@ -187,13 +187,13 @@ class _HealthConnectPermissionScreenState extends State<HealthConnectPermissionS
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              color: AppColors.neonYellow.withValues(alpha: 0.1),
+              color: AppColors.appColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.favorite,
               size: 50,
-              color: AppColors.neonYellow,
+              color: AppColors.appColor,
             ),
           ),
           const SizedBox(height: 32),
@@ -339,10 +339,10 @@ class _HealthConnectPermissionScreenState extends State<HealthConnectPermissionS
           child: ElevatedButton(
             onPressed: _handleConnectHealthData,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.neonYellow,
-              foregroundColor: AppColors.buttonBlack,
-              elevation: 3,
-              shadowColor: AppColors.neonYellow.withValues(alpha: 0.3),
+              backgroundColor: AppColors.appColor,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              shadowColor: AppColors.appColor.withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -353,7 +353,7 @@ class _HealthConnectPermissionScreenState extends State<HealthConnectPermissionS
                 Icon(
                   Icons.favorite,
                   size: 20,
-                  color: AppColors.buttonBlack,
+                  color: Colors.white,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -361,7 +361,7 @@ class _HealthConnectPermissionScreenState extends State<HealthConnectPermissionS
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.buttonBlack,
+                    color: Colors.white,
                   ),
                 ),
               ],
