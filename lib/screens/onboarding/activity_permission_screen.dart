@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../config/app_colors.dart';
 import '../../controllers/onboarding_controller.dart';
 import '../../services/onboarding_service.dart';
+import '../../utils/health_permissions_helper.dart';
 
 /// Onboarding screen for physical activity permission
 /// Follows the design pattern of My Races/All Races screens
@@ -76,14 +77,46 @@ class _ActivityPermissionScreenState extends State<ActivityPermissionScreen>
         return;
       }
     } else if (Platform.isIOS) {
-      // Request Motion & Fitness permission on iOS
-      final status = await Permission.sensors.request();
-      granted = status.isGranted;
+      // Step 1: Request Motion & Fitness permission on iOS
+      final sensorsStatus = await Permission.sensors.request();
 
-      if (status.isPermanentlyDenied) {
+      if (sensorsStatus.isPermanentlyDenied) {
         // Show dialog to open settings
         _showPermanentlyDeniedDialog();
         return;
+      }
+
+      // Step 2: Request HealthKit permissions if Motion & Fitness granted
+      if (sensorsStatus.isGranted) {
+        print('📱 [iOS] Motion & Fitness granted, requesting HealthKit...');
+        final healthHelper = HealthPermissionsHelper();
+
+        // Mark onboarding as shown to prevent blocker in helper
+        await healthHelper.markOnboardingShown();
+
+        // Request HealthKit authorization
+        final healthGranted = await healthHelper.requestHealthPermissions(skipOnboarding: true);
+
+        if (healthGranted) {
+          print('✅ [iOS] HealthKit permissions granted successfully');
+          granted = true;
+        } else {
+          print('❌ [iOS] HealthKit permissions denied');
+          granted = false;
+
+          // Show dialog explaining HealthKit is required
+          Get.snackbar(
+            'Health Access Required',
+            'StepzSync needs access to your health data to track your steps and participate in races.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orange.withOpacity(0.9),
+            colorText: Colors.white,
+            duration: const Duration(seconds: 4),
+          );
+        }
+      } else {
+        print('❌ [iOS] Motion & Fitness permission denied');
+        granted = false;
       }
     }
 
@@ -108,7 +141,7 @@ class _ActivityPermissionScreenState extends State<ActivityPermissionScreen>
         content: Text(
           Platform.isAndroid
               ? 'Activity Recognition permission is required to track your steps during races.\n\nPlease enable it in Settings > Apps > StepzSync > Permissions.'
-              : 'Motion & Fitness permission is required to track your activity during races.\n\nPlease enable it in Settings > StepzSync > Motion & Fitness.',
+              : 'Motion & Fitness and Health permissions are required to track your activity during races.\n\nPlease enable them in Settings > StepzSync > Motion & Fitness and Settings > Health > Data Access & Devices > StepzSync.',
           style: GoogleFonts.poppins(fontSize: 14),
         ),
         actions: [
