@@ -660,9 +660,8 @@ class StepTrackingService extends GetxService {
       print('🔍 [STEP_WRITE_DEBUG] About to write incremental steps to Health Connect:');
       print('   📊 Incremental steps to write: $incrementalSteps');
       print('   📅 Date: ${DateTime.now()}');
-      print('   📊 Current total displayed: ${_todaySteps.value}');
-      print('   📊 Session baseline: ${_sessionBaseline.value}');
-      print('   📊 Pedometer baseline: ${_pedometerService.sessionBaseline}');
+      print('   📊 Current total displayed: ${todaySteps.value}');
+      print('   📊 Pedometer current count: ${_pedometerService.currentStepCount.value}');
 
       // ✅ FIX: Write ONLY incremental steps to HealthKit
       // HealthKit will ADD these steps to what it already has
