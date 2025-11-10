@@ -82,6 +82,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:stepzsync/config/app_colors.dart';
 import 'package:stepzsync/routes/app_routes.dart';
+import 'package:stepzsync/screens/splash_screen.dart';
 import 'package:stepzsync/services/auth_wrapper.dart';
 import 'package:stepzsync/services/dependency_injection.dart';
 import 'package:stepzsync/services/firebase_push_notification_service.dart';
@@ -400,7 +401,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         useMaterial3: true,
         colorScheme: AppColors.lightColorScheme,
       ),
-      home: AuthWrapper(),
+      home: SplashScreen(),
       getPages: AppRoutes.routes,
       // builder: EasyLoading.init(),
     );

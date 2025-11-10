@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../services/onboarding_service.dart';
 import 'login_screen.dart';
+import 'onboarding/onboarding_screen.dart';
 
-/// Simplified Splash Screen - Market Standard (1 second)
+/// Simplified Splash Screen - 2.5 seconds with onboarding check
 /// Based on research: TikTok/Instagram pattern
 /// No forced authentication - user chooses Login/Signup/Guest
 class SplashScreen extends StatefulWidget {
@@ -19,15 +21,23 @@ class _SplashScreenState extends State<SplashScreen> {
     _startTimer();
   }
 
-  /// Display splash for 1 second (market standard), then navigate to login
+  /// Display splash for 2.5 seconds, check onboarding status, then navigate
   void _startTimer() async {
-    // Show branding for 1 second only (market standard for frequent-use apps)
-    await Future.delayed(Duration(seconds: 1));
+    // Show branding for 2.5 seconds
+    await Future.delayed(Duration(milliseconds: 2500));
 
     if (mounted) {
-      // Navigate directly to LoginScreen
-      // User can choose: Login, Signup, or Continue as Guest
-      Get.off(() => LoginScreen());
+      // Check if user needs to see onboarding
+      final shouldShowOnboarding = await OnboardingService.shouldShowOnboarding();
+
+      if (shouldShowOnboarding) {
+        // Navigate to onboarding screens
+        Get.off(() => OnboardingScreen());
+      } else {
+        // Navigate directly to LoginScreen
+        // User can choose: Login, Signup, or Continue as Guest
+        Get.off(() => LoginScreen());
+      }
     }
   }
 

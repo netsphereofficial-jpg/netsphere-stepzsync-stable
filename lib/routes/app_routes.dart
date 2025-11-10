@@ -6,6 +6,7 @@ import '../screens/active_races/active_races_screen.dart';
 import '../screens/hall_of_fame/hall_of_fame_screen.dart';
 import '../screens/marathon/marathon_screen.dart';
 import '../screens/notifications/notification_list_screen.dart';
+import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/race/race_screen.dart';
 import '../screens/race_invites/race_invites_screen.dart';
 import '../screens/race_map/race_map_screen.dart';
@@ -14,6 +15,7 @@ import '../screens/races/quick_race/quick_race_selection_screen.dart';
 import '../screens/subscription/subscription_screen.dart';
 
 class AppRoutes {
+  static const String onboarding = '/onboarding';
   static const String quickRace = '/quick-race';
   static const String quickRaceWaiting = '/quick-race-waiting';
   static const String activeRaces = '/active-races';
@@ -31,6 +33,12 @@ class AppRoutes {
   static const String subscription = '/subscription';
 
   static List<GetPage> routes = [
+    GetPage(
+      name: onboarding,
+      page: () => const OnboardingScreen(),
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
     GetPage(
       name: quickRace,
       page: () => const QuickRaceSelectionScreen(),

@@ -110,7 +110,7 @@ class HealthSyncService extends GetxController {
   /// [skipOnboarding] - If true, skips the onboarding check for background sync operations
   Future<bool> requestPermissions({bool skipOnboarding = false}) async {
     try {
-      if (GuestUtils.isGuest()) return false;
+
 
       final granted = await _permissionsHelper.requestHealthPermissions(
         skipOnboarding: skipOnboarding,
