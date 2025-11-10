@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../config/app_colors.dart';
 import '../../controllers/onboarding_controller.dart';
 import '../../services/onboarding_service.dart';
+import '../../utils/health_permissions_helper.dart';
 import '../../widgets/dialogs/health_permission_handler_dialog.dart';
 
 /// Onboarding screen for health connect permission
@@ -60,6 +61,11 @@ class _HealthConnectPermissionScreenState extends State<HealthConnectPermissionS
   /// Handle connect health data button press
   Future<void> _handleConnectHealthData() async {
     final controller = Get.find<OnboardingController>();
+    final healthHelper = HealthPermissionsHelper();
+
+    // Mark the HealthPermissionsHelper's internal onboarding as shown
+    // This prevents the helper from blocking permission requests
+    await healthHelper.markOnboardingShown();
 
     // Use the comprehensive HealthPermissionHandlerDialog
     // This handles all the complex scenarios:
