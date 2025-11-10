@@ -24,6 +24,7 @@ import '../../services/local_notification_service.dart';
 import '../../services/step_tracking_service.dart';
 import '../../services/race_bot_service.dart';
 import '../../services/race_step_sync_service.dart';
+import '../../services/preferences_service.dart';
 import '../../screens/race_dnf_screen_widget.dart';
 
 class MapController extends GetxController with WidgetsBindingObserver {
@@ -92,6 +93,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   StreamSubscription<DocumentSnapshot>? _raceStreamSubscription;
   StreamSubscription<QuerySnapshot>? _participantsStreamSubscription;
+
+  // ✅ NEW: Live pedometer listener for real-time step updates in race screen
+  StreamSubscription<int>? _stepTrackingSubscription;
 
   // Participant state tracking for notifications
   final Map<String, int> _previousRanks = {};
@@ -393,6 +397,7 @@ class MapController extends GetxController with WidgetsBindingObserver {
     stopTimer();
     _raceStreamSubscription?.cancel();
     _participantsStreamSubscription?.cancel();
+    _stepTrackingSubscription?.cancel(); // ✅ NEW: Cancel live pedometer listener
     WidgetsBinding.instance.removeObserver(this);
 
     // Clear marker icon cache to prevent stale avatars from persisting across races
@@ -1986,6 +1991,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
         if (isParticipant) {
           print('✅ Current user is participant in active race - starting step tracking for race ${raceData.id}');
 
+          // ✅ NEW: Start live pedometer listener for real-time UI updates
+          _startLivePedometerListener(raceData.id!);
+
           // Get step tracking service and start tracking
           try {
             final stepService = Get.find<StepTrackingService>();
@@ -2019,6 +2027,100 @@ class MapController extends GetxController with WidgetsBindingObserver {
       }
     } catch (e) {
       print('❌ Error in defensive step tracking check: $e');
+    }
+  }
+
+  /// ✅ NEW: Start listening to live pedometer updates for real-time race display
+  /// This provides instant UI feedback while Cloud Functions handle server-side sync
+  void _startLivePedometerListener(String raceId) {
+    try {
+      // Cancel any existing listener
+      _stepTrackingSubscription?.cancel();
+
+      final stepService = Get.find<StepTrackingService>();
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+      if (currentUserId == null) {
+        print('❌ Cannot start pedometer listener: No user ID');
+        return;
+      }
+
+      print('🎧 Starting live pedometer listener for race $raceId');
+
+      // Listen to todaySteps stream from StepTrackingService
+      _stepTrackingSubscription = stepService.todaySteps.listen((totalSteps) {
+        _updateCurrentUserLocalSteps(raceId, currentUserId, totalSteps);
+      });
+
+      print('✅ Live pedometer listener started successfully');
+    } catch (e) {
+      print('❌ Error starting live pedometer listener: $e');
+    }
+  }
+
+  /// ✅ NEW: Update current user's displayed steps locally (UI-only, no Firebase write)
+  /// This provides real-time visual feedback while Cloud Function handles actual sync
+  Future<void> _updateCurrentUserLocalSteps(String raceId, String userId, int totalSteps) async {
+    try {
+      // Only update if race is active
+      if (raceStatus.value != 3) return;
+
+      // Find current user in participants list
+      final userIndex = participantsList.indexWhere((p) => p.userId == userId);
+      if (userIndex == -1) return;
+
+      // Get baseline from PreferencesService (fast local cache)
+      final prefsService = Get.find<PreferencesService>();
+      final baselineData = await prefsService.getRaceBaseline(raceId, userId);
+
+      if (baselineData == null) {
+        // No baseline found - might be first sync, wait for Cloud Function
+        return;
+      }
+
+      final baselineSteps = baselineData['baselineSteps'] as int? ?? 0;
+
+      // Calculate delta (steps walked during race)
+      final deltaSteps = totalSteps - baselineSteps;
+      if (deltaSteps < 0) {
+        // Negative delta means baseline is stale or Health Connect reset
+        // Wait for Cloud Function to fix it
+        return;
+      }
+
+      // Convert steps to distance (0.762 meters per step = 0.000762 km)
+      final deltaDistance = deltaSteps * 0.000762;
+
+      // Update local display (UI-only, NOT Firebase)
+      final currentParticipant = participantsList[userIndex];
+      participantsList[userIndex] = Participant(
+        userId: currentParticipant.userId,
+        userName: currentParticipant.userName,
+        distance: deltaDistance,
+        remainingDistance: (raceModel.value?.totalDistance ?? 0) - deltaDistance,
+        rank: currentParticipant.rank, // Keep existing rank
+        steps: deltaSteps,
+        calories: currentParticipant.calories,
+        avgSpeed: currentParticipant.avgSpeed, // Keep existing average speed
+        status: currentParticipant.status,
+        lastUpdated: currentParticipant.lastUpdated,
+        userProfilePicture: currentParticipant.userProfilePicture,
+        isCompleted: currentParticipant.isCompleted,
+        completedAt: currentParticipant.completedAt,
+        finishOrder: currentParticipant.finishOrder,
+        baselineSteps: currentParticipant.baselineSteps,
+        baselineDistance: currentParticipant.baselineDistance,
+        baselineCalories: currentParticipant.baselineCalories,
+        baselineTimestamp: currentParticipant.baselineTimestamp,
+      );
+
+      participantsList.refresh(); // Trigger UI update
+
+      // Note: We don't log every update to avoid log spam (happens every step)
+      // Firebase sync handled by Cloud Function separately
+    } catch (e) {
+      print('⚠️ Error updating local steps display: $e');
+      // Don't throw - this is just a UI enhancement, not critical
     }
   }
 
@@ -2097,6 +2199,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
         if (isParticipant) {
           print('✅ Current user is participant - starting step tracking for race ${raceData.id}');
+
+          // ✅ NEW: Start live pedometer listener for real-time UI updates
+          _startLivePedometerListener(raceData.id!);
 
           // ❌ DISABLED: Old client-side race step sync - now using Cloud Functions
           // The Cloud Function (syncHealthDataToRaces) handles ALL step distribution server-side

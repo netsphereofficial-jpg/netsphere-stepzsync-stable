@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:get/get.dart';
 import '../models/quick_race_model.dart';
 import 'firebase_service.dart';
+import 'health_sync_service.dart';
+import 'preferences_service.dart';
 
 class QuickRaceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -135,6 +138,31 @@ class QuickRaceService {
   }
 
   Future<void> _createParticipantDocument(String raceId, String userId) async {
+    // ✅ CRITICAL FIX: Capture baseline at join time (same as regular races)
+    print('📊 [QUICK_RACE] Capturing baseline at join time...');
+    int baselineSteps = 0;
+    double baselineDistance = 0.0;
+    int baselineCalories = 0;
+    final baselineTimestamp = DateTime.now();
+
+    try {
+      final healthSyncService = Get.find<HealthSyncService>();
+      final currentHealthData = await healthSyncService.fetchTodaySteps();
+
+      if (currentHealthData != null) {
+        baselineSteps = currentHealthData['steps'] as int? ?? 0;
+        baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
+        baselineCalories = currentHealthData['calories'] as int? ?? 0;
+
+        print('📊 [QUICK_RACE] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
+      } else {
+        print('⚠️ [QUICK_RACE] Could not fetch current health data, baseline set to 0');
+      }
+    } catch (e) {
+      print('⚠️ [QUICK_RACE] Error capturing baseline: $e');
+      // Continue with 0 baseline - don't fail join operation
+    }
+
     // Get current location with proper permission handling
     Position? currentPosition;
     try {
@@ -166,6 +194,7 @@ class QuickRaceService {
     final userProfile = await _getUserProfile(userId);
     final displayName = userProfile['displayName'] ?? userProfile['fullName'] ?? 'User';
 
+    // ✅ CRITICAL FIX: Save participant document with baseline fields
     await _firestore
         .collection('quick_races')
         .doc(raceId)
@@ -182,7 +211,36 @@ class QuickRaceService {
       'status': 'joined',
       'rank': 0,
       'progress': 0.0,
+      // ✅ NEW: Baseline fields for proper delta calculation
+      'baselineSteps': baselineSteps,
+      'baselineDistance': baselineDistance,
+      'baselineCalories': baselineCalories,
+      'baselineTimestamp': Timestamp.fromDate(baselineTimestamp),
     });
+
+    print('✅ [QUICK_RACE] Baseline saved to Firebase: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
+
+    // ✅ CRITICAL FIX: Save baseline to local storage for fast access during race
+    try {
+      final prefsService = Get.find<PreferencesService>();
+
+      final baselineData = {
+        'raceId': raceId,
+        'userId': userId,
+        'baselineSteps': baselineSteps,
+        'baselineDistance': baselineDistance,
+        'baselineCalories': baselineCalories,
+        'baselineTimestamp': baselineTimestamp.toIso8601String(),
+        'raceStartTime': DateTime.now().toIso8601String(), // Quick race starts when created
+      };
+
+      await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+      print('✅ [QUICK_RACE] Baseline saved to local storage - join complete');
+    } catch (e) {
+      print('⚠️ [QUICK_RACE] Could not save baseline to local storage: $e');
+      // Don't fail the join operation if local save fails
+      // Firebase has the baseline as backup
+    }
   }
 
   // Start a quick race when all participants are ready

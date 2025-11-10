@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PreferencesService {
@@ -19,6 +20,9 @@ class PreferencesService {
   // Premium dialog tracking
   static const String _appOpenCountKey = 'app_open_count';
   static const String _premiumDialogShownCountKey = 'premium_dialog_shown_count';
+
+  // Race baseline storage (local cache for fast access)
+  static const String _raceBaselinesKey = 'race_baselines';
 
   SharedPreferences? _preferences;
   bool _isInitialized = false;
@@ -274,6 +278,102 @@ class PreferencesService {
     await _ensureInitialized();
     await _preferences?.remove(_appOpenCountKey);
     await _preferences?.remove(_premiumDialogShownCountKey);
+  }
+
+  // ========================================
+  // Race Baseline Storage (Local Cache)
+  // ========================================
+
+  /// Save race baseline to local storage
+  /// This provides fast access during race syncing without Firebase queries
+  Future<void> saveRaceBaseline(String raceId, String userId, Map<String, dynamic> baselineData) async {
+    await _ensureInitialized();
+
+    // Get existing baselines
+    final baselines = await getAllRaceBaselines();
+
+    // Create key for this race+user combination
+    final key = '${raceId}_$userId';
+
+    // Add/update baseline
+    baselines[key] = baselineData;
+
+    // Save back to SharedPreferences
+    final json = jsonEncode(baselines);
+    await _preferences?.setString(_raceBaselinesKey, json);
+
+    print('📦 [PREFS] Saved baseline for race $raceId: $baselineData');
+  }
+
+  /// Get race baseline from local storage
+  /// Returns null if baseline not found
+  Future<Map<String, dynamic>?> getRaceBaseline(String raceId, String userId) async {
+    await _ensureInitialized();
+
+    final baselines = await getAllRaceBaselines();
+    final key = '${raceId}_$userId';
+
+    final baseline = baselines[key];
+    if (baseline != null) {
+      print('📦 [PREFS] Retrieved baseline for race $raceId: $baseline');
+    } else {
+      print('📦 [PREFS] No baseline found for race $raceId');
+    }
+
+    return baseline;
+  }
+
+  /// Remove race baseline from local storage (when race completes or user leaves)
+  Future<void> removeRaceBaseline(String raceId, String userId) async {
+    await _ensureInitialized();
+
+    // Get existing baselines
+    final baselines = await getAllRaceBaselines();
+
+    // Remove this race
+    final key = '${raceId}_$userId';
+    baselines.remove(key);
+
+    // Save back to SharedPreferences
+    final json = jsonEncode(baselines);
+    await _preferences?.setString(_raceBaselinesKey, json);
+
+    print('🗑️ [PREFS] Removed baseline for race $raceId');
+  }
+
+  /// Get all active race baselines
+  /// Returns Map<raceId_userId, baselineData>
+  Future<Map<String, Map<String, dynamic>>> getAllRaceBaselines() async {
+    await _ensureInitialized();
+
+    final json = _preferences?.getString(_raceBaselinesKey);
+    if (json == null || json.isEmpty) {
+      return {};
+    }
+
+    try {
+      final decoded = jsonDecode(json) as Map<String, dynamic>;
+
+      // Convert to Map<String, Map<String, dynamic>>
+      final result = <String, Map<String, dynamic>>{};
+      decoded.forEach((key, value) {
+        if (value is Map<String, dynamic>) {
+          result[key] = value;
+        }
+      });
+
+      return result;
+    } catch (e) {
+      print('⚠️ [PREFS] Error decoding race baselines: $e');
+      return {};
+    }
+  }
+
+  /// Clear all race baselines (for testing/cleanup)
+  Future<void> clearAllRaceBaselines() async {
+    await _ensureInitialized();
+    await _preferences?.remove(_raceBaselinesKey);
+    print('🗑️ [PREFS] Cleared all race baselines');
   }
 }
 

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:stepzsync/services/preferences_service.dart';
 import 'package:stepzsync/services/step_tracking_service.dart';
 import 'package:synchronized/synchronized.dart';
 import 'pedometer_service.dart';
@@ -472,19 +473,96 @@ class RaceStepSyncService extends GetxService {
   /// Fetches current server state and starts session tracking
   Future<void> _setRaceBaseline(String raceId, String raceTitle) async {
     try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        dev.log('❌ [RACE_SYNC] No authenticated user');
+        return;
+      }
+
+      // ✅ CRITICAL FIX: Load baseline from local storage FIRST (fast, no Firebase query)
+      // This uses the baseline we captured at join time
+      dev.log('📦 [RACE_SYNC] Loading baseline from local storage...');
+
+      int baselineSteps = 0;
+      double baselineDistance = 0.0;
+      int baselineCalories = 0;
+      DateTime raceStartTime = DateTime.now();
+      bool foundLocalBaseline = false;
+
+      try {
+        final prefsService = Get.find<PreferencesService>();
+        final localBaseline = await prefsService.getRaceBaseline(raceId, userId);
+
+        if (localBaseline != null) {
+          baselineSteps = localBaseline['baselineSteps'] ?? 0;
+          baselineDistance = (localBaseline['baselineDistance'] ?? 0.0).toDouble();
+          baselineCalories = localBaseline['baselineCalories'] ?? 0;
+          raceStartTime = DateTime.parse(localBaseline['raceStartTime'] ?? DateTime.now().toIso8601String());
+          foundLocalBaseline = true;
+
+          dev.log('✅ [RACE_SYNC] Loaded baseline from local storage:');
+          dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+          dev.log('   Race start: ${raceStartTime.toIso8601String()}');
+        }
+      } catch (e) {
+        dev.log('⚠️ [RACE_SYNC] Could not load baseline from local storage: $e');
+      }
+
+      // If local baseline not found, fall back to Firebase participant document
+      if (!foundLocalBaseline) {
+        dev.log('📊 [RACE_SYNC] No local baseline, loading from Firebase participant document...');
+
+        // Fetch participant data to get baseline from Firebase
+        final participantDoc = await _firestore
+            .collection('races')
+            .doc(raceId)
+            .collection('participants')
+            .doc(userId)
+            .get();
+
+        if (participantDoc.exists) {
+          final participantData = participantDoc.data();
+          if (participantData != null) {
+            baselineSteps = participantData['baselineSteps'] ?? 0;
+            baselineDistance = (participantData['baselineDistance'] ?? 0.0).toDouble();
+            baselineCalories = participantData['baselineCalories'] ?? 0;
+
+            // Also save to local storage for next time
+            try {
+              final prefsService = Get.find<PreferencesService>();
+              final baselineData = {
+                'raceId': raceId,
+                'userId': userId,
+                'baselineSteps': baselineSteps,
+                'baselineDistance': baselineDistance,
+                'baselineCalories': baselineCalories,
+                'baselineTimestamp': DateTime.now().toIso8601String(),
+                'raceStartTime': raceStartTime.toIso8601String(),
+              };
+              await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+              dev.log('✅ [RACE_SYNC] Cached baseline to local storage from Firebase');
+            } catch (e) {
+              dev.log('⚠️ [RACE_SYNC] Could not cache baseline: $e');
+            }
+
+            dev.log('✅ [RACE_SYNC] Loaded baseline from Firebase:');
+            dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+          }
+        }
+      }
+
       // Fetch race document to get actual start time
       final raceDoc = await _firestore.collection('races').doc(raceId).get();
       final raceData = raceDoc.data();
 
       // Get actual race start time from Firebase
-      DateTime raceStartTime;
       final actualStartTimeField = raceData?['actualStartTime'];
 
       if (actualStartTimeField is Timestamp) {
         raceStartTime = actualStartTimeField.toDate();
         dev.log('✅ [RACE_SYNC] Using actual race start time: ${raceStartTime.toIso8601String()}');
-      } else {
-        // Fallback: race hasn't officially started yet, or field doesn't exist
+      } else if (!foundLocalBaseline) {
+        // Only use current time if we don't have local baseline
         raceStartTime = DateTime.now();
         dev.log('⚠️ [RACE_SYNC] No actualStartTime found for race $raceId, using current time');
       }
@@ -492,76 +570,26 @@ class RaceStepSyncService extends GetxService {
       // Fetch participant data including completion status (source of truth)
       final participantData = await _fetchParticipantData(raceId);
 
-      // ✅ NEW: Get current HealthKit baseline for distance and calories
-      double healthKitBaselineDistance = 0.0;
-      int healthKitBaselineCalories = 0;
-      int healthKitStepsAtStart = 0;
-
-      // Check if we should use time-based baseline (query HealthKit from race start)
-      bool useTimeBasedBaseline = false;
-
-      try {
-        // Try to fetch server baseline to check if time-based baseline exists
-        final baselineDoc = await _firestore
-            .collection('users')
-            .doc(_auth.currentUser?.uid)
-            .collection('health_baselines')
-            .doc(raceId)
-            .get();
-
-        if (baselineDoc.exists) {
-          final baselineData = baselineDoc.data();
-          useTimeBasedBaseline = baselineData?['useTimeBasedBaseline'] == true;
-
-          if (useTimeBasedBaseline) {
-            healthKitStepsAtStart = baselineData?['healthKitStepsAtStart'] ?? 0;
-            healthKitBaselineDistance = (baselineData?['healthKitDistanceAtStart'] ?? 0.0).toDouble();
-            healthKitBaselineCalories = baselineData?['healthKitCaloriesAtStart'] ?? 0;
-            dev.log('📊 [RACE_SYNC] Using time-based baseline from server:');
-            dev.log('   Steps at start: $healthKitStepsAtStart');
-            dev.log('   Distance at start: ${healthKitBaselineDistance.toStringAsFixed(2)} km');
-            dev.log('   Calories at start: $healthKitBaselineCalories');
-          }
-        }
-      } catch (e) {
-        dev.log('⚠️ [RACE_SYNC] Could not fetch server baseline: $e');
-      }
-
-      // If not time-based, use legacy approach (current HealthKit values)
-      if (!useTimeBasedBaseline) {
-        try {
-          if (Get.isRegistered<StepTrackingService>()) {
-            final stepTrackingService = Get.find<StepTrackingService>();
-            healthKitBaselineDistance = stepTrackingService.todayDistance.value;
-            healthKitBaselineCalories = stepTrackingService.todayCalories.value;
-            dev.log('📍 [RACE_SYNC] Legacy baseline (today\'s HealthKit): ${healthKitBaselineDistance.toStringAsFixed(2)} km, $healthKitBaselineCalories cal');
-          } else {
-            dev.log('⚠️ [RACE_SYNC] StepTrackingService not registered, using 0 for HealthKit baseline');
-          }
-        } catch (e) {
-          dev.log('⚠️ [RACE_SYNC] Error fetching HealthKit baseline: $e');
-        }
-      }
-
-      // Create baseline with dual-layer tracking and completion status
+      // ✅ CRITICAL FIX: Create baseline using saved baseline from join time
+      // This ensures we calculate delta from when user joined, not from detection time
       final baseline = RaceBaseline(
         raceId: raceId,
         raceTitle: raceTitle,
         startTime: raceStartTime,  // ✅ FIXED: Use actual race start time
         serverSteps: participantData.steps,  // Server state (persistent)
-        serverDistance: participantData.distance,  // ✅ NEW: Server distance
-        serverCalories: participantData.calories,  // ✅ NEW: Server calories
+        serverDistance: participantData.distance,  // Server distance
+        serverCalories: participantData.calories,  // Server calories
         sessionRaceSteps: 0,       // Start counting from 0 in this session
-        sessionRaceDistance: 0.0,  // ✅ NEW: Start distance from 0
-        sessionRaceCalories: 0,    // ✅ NEW: Start calories from 0
-        healthKitBaselineDistance: healthKitBaselineDistance,  // ✅ NEW: HealthKit baseline
-        healthKitBaselineCalories: healthKitBaselineCalories,  // ✅ NEW: HealthKit baseline
-        useTimeBasedBaseline: useTimeBasedBaseline,  // ✅ NEW: Time-based flag
-        healthKitStepsAtStart: useTimeBasedBaseline ? healthKitStepsAtStart : null,
-        healthKitDistanceAtStart: useTimeBasedBaseline ? healthKitBaselineDistance : null,
-        healthKitCaloriesAtStart: useTimeBasedBaseline ? healthKitBaselineCalories : null,
-        isCompleted: participantData.isCompleted,  // ✅ Load completion status
-        completedAt: participantData.completedAt,  // ✅ Load completion time
+        sessionRaceDistance: 0.0,  // Start distance from 0
+        sessionRaceCalories: 0,    // Start calories from 0
+        healthKitBaselineDistance: baselineDistance,  // ✅ FIXED: Use saved baseline
+        healthKitBaselineCalories: baselineCalories,  // ✅ FIXED: Use saved baseline
+        useTimeBasedBaseline: true,  // ✅ ALWAYS use simple delta calculation
+        healthKitStepsAtStart: baselineSteps,  // ✅ FIXED: Saved baseline steps
+        healthKitDistanceAtStart: baselineDistance,  // ✅ FIXED: Saved baseline distance
+        healthKitCaloriesAtStart: baselineCalories,  // ✅ FIXED: Saved baseline calories
+        isCompleted: participantData.isCompleted,  // Load completion status
+        completedAt: participantData.completedAt,  // Load completion time
       );
 
       _raceBaselines[raceId] = baseline;
@@ -572,9 +600,9 @@ class RaceStepSyncService extends GetxService {
         dev.log('🏁 [RACE_SYNC] Loaded completed race: "$raceTitle" (finished ${baseline.completedAt})');
       } else {
         dev.log('✅ [RACE_SYNC] Set baseline for "$raceTitle":');
-        dev.log('   Server: ${participantData.steps} steps, ${participantData.distance.toStringAsFixed(2)} km, ${participantData.calories} cal');
-        dev.log('   Session: 0 steps, 0.00 km, 0 cal');
-        dev.log('   HealthKit baseline: ${healthKitBaselineDistance.toStringAsFixed(2)} km, $healthKitBaselineCalories cal');
+        dev.log('   Baseline (from join): ${baselineSteps} steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+        dev.log('   Server (current Firebase): ${participantData.steps} steps, ${participantData.distance.toStringAsFixed(2)} km, ${participantData.calories} cal');
+        dev.log('   Session: 0 steps, 0.00 km, 0 cal (starting fresh)');
         dev.log('   Started: ${raceStartTime.toIso8601String()}');
       }
     } catch (e) {
@@ -970,44 +998,56 @@ class RaceStepSyncService extends GetxService {
           int raceCalories;
 
           if (baseline.useTimeBasedBaseline) {
-            // TIME-BASED: Query HealthKit from race start to now
-            dev.log('📊 [RACE_SYNC] Using time-based baseline for race: ${baseline.raceTitle}');
+            // ✅ NEW SIMPLE DELTA CALCULATION: current - baseline
+            // Uses baseline captured at join time (stored locally + Firebase)
+            dev.log('📊 [RACE_SYNC] Using simple delta calculation for race: ${baseline.raceTitle}');
+
+            // Get current Health Connect data (today's total)
+            int currentTotalSteps = 0;
+            double currentTotalDistance = 0.0;
+            int currentTotalCalories = 0;
 
             try {
-              if (Get.isRegistered<HealthSyncService>()) {
-                final healthSyncService = Get.find<HealthSyncService>();
-                final raceProgress = await healthSyncService.getRaceProgressFromStart(baseline.startTime);
+              if (Get.isRegistered<StepTrackingService>()) {
+                final stepTrackingService = Get.find<StepTrackingService>();
+                currentTotalSteps = stepTrackingService.todaySteps.value;
+                currentTotalDistance = stepTrackingService.todayDistance.value;
+                currentTotalCalories = stepTrackingService.todayCalories.value;
 
-                if (raceProgress != null) {
-                  totalRaceSteps = raceProgress['steps'] as int;
-                  raceDistance = raceProgress['distance'] as double;
-                  raceCalories = raceProgress['calories'] as int;
-
-                  dev.log('   ✅ Time-based query result:');
-                  dev.log('      Steps from race start: $totalRaceSteps');
-                  dev.log('      Distance from race start: ${raceDistance.toStringAsFixed(2)} km');
-                  dev.log('      Calories from race start: $raceCalories');
-                } else {
-                  // Fallback to server values if query fails
-                  dev.log('   ⚠️ Time-based query failed, using server values');
-                  totalRaceSteps = baseline.serverSteps;
-                  raceDistance = baseline.serverDistance;
-                  raceCalories = baseline.serverCalories;
-                }
-              } else {
-                // Fallback if service not available
-                dev.log('   ⚠️ HealthSyncService not available, using server values');
-                totalRaceSteps = baseline.serverSteps;
-                raceDistance = baseline.serverDistance;
-                raceCalories = baseline.serverCalories;
+                dev.log('   📱 Current Health Connect total:');
+                dev.log('      Steps: $currentTotalSteps');
+                dev.log('      Distance: ${currentTotalDistance.toStringAsFixed(2)} km');
+                dev.log('      Calories: $currentTotalCalories');
               }
             } catch (e) {
-              dev.log('   ❌ Error querying time-based progress: $e');
-              // Fallback to server values
-              totalRaceSteps = baseline.serverSteps;
-              raceDistance = baseline.serverDistance;
-              raceCalories = baseline.serverCalories;
+              dev.log('   ⚠️ Error fetching current health data: $e');
             }
+
+            // ✅ SIMPLE DELTA FORMULA: delta = current - baseline
+            // This gives us steps SINCE user joined the race
+            final deltaSteps = currentTotalSteps - (baseline.healthKitStepsAtStart ?? 0);
+            final deltaDistance = currentTotalDistance - (baseline.healthKitDistanceAtStart ?? 0.0);
+            final deltaCalories = currentTotalCalories - (baseline.healthKitCaloriesAtStart ?? 0);
+
+            // For Android: If distance is estimated (not from Health Connect exercise sessions),
+            // recalculate from delta steps to ensure consistency
+            if (deltaDistance == 0.0 && deltaSteps > 0) {
+              const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
+              totalRaceSteps = deltaSteps;
+              raceDistance = deltaSteps * stepsToKm;
+              raceCalories = (deltaSteps * 0.04).round(); // 1 step ≈ 0.04 cal
+
+              dev.log('   📱 [ANDROID] Distance estimated from delta steps');
+            } else {
+              totalRaceSteps = deltaSteps;
+              raceDistance = deltaDistance;
+              raceCalories = deltaCalories;
+            }
+
+            dev.log('   ✅ Delta calculation:');
+            dev.log('      Baseline: ${baseline.healthKitStepsAtStart} steps, ${baseline.healthKitDistanceAtStart?.toStringAsFixed(2)} km');
+            dev.log('      Current: $currentTotalSteps steps, ${currentTotalDistance.toStringAsFixed(2)} km');
+            dev.log('      Delta (race progress): $totalRaceSteps steps, ${raceDistance.toStringAsFixed(2)} km, $raceCalories cal');
           } else {
             // LEGACY: Use pedometer-based dual-layer formula
             dev.log('📊 [RACE_SYNC] Using legacy pedometer-based baseline for race: ${baseline.raceTitle}');

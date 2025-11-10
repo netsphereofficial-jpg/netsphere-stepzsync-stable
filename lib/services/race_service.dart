@@ -10,6 +10,7 @@ import 'firebase_service.dart';
 import 'race_state_machine.dart';
 import 'health_sync_service.dart';
 import 'race_step_reconciliation_service.dart';
+import 'preferences_service.dart';
 import '../widgets/race/race_completion_celebration_dialog.dart';
 import '../controllers/race/completed_races_controller.dart';
 
@@ -514,6 +515,34 @@ class RaceService {
       // Get race distance for participant initialization
       final totalDistance = (raceData['totalDistance'] ?? 0.0).toDouble();
 
+      // ✅ CRITICAL FIX: Capture baseline at join time (not detection time)
+      // This prevents accumulative steps issue and late baseline capture glitch
+      // NOTE: User will wait here until baseline capture completes - this is intentional
+      // Loading indicator in UI will show during this operation
+      print('📊 [JOIN_RACE] Capturing baseline at join time (user will wait for this)...');
+      int baselineSteps = 0;
+      double baselineDistance = 0.0;
+      int baselineCalories = 0;
+      final baselineTimestamp = DateTime.now();
+
+      try {
+        final healthSyncService = Get.find<HealthSyncService>();
+        final currentHealthData = await healthSyncService.fetchTodaySteps();
+
+        if (currentHealthData != null) {
+          baselineSteps = currentHealthData['steps'] as int? ?? 0;
+          baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
+          baselineCalories = currentHealthData['calories'] as int? ?? 0;
+
+          print('📊 [JOIN_RACE] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
+        } else {
+          print('⚠️ [JOIN_RACE] Could not fetch current health data, baseline set to 0');
+        }
+      } catch (e) {
+        print('⚠️ [JOIN_RACE] Error capturing baseline: $e');
+        // Continue with 0 baseline - don't fail join operation
+      }
+
       // Create new participant using the same structure as race creation
       final newParticipant = Participant(
         userId: userId,
@@ -528,6 +557,10 @@ class RaceService {
         calories: 0,
         avgSpeed: 0.0,
         isCompleted: false,
+        baselineSteps: baselineSteps,
+        baselineDistance: baselineDistance,
+        baselineCalories: baselineCalories,
+        baselineTimestamp: baselineTimestamp,
       );
 
       // Use batch operation for all 3 collections
@@ -573,53 +606,32 @@ class RaceService {
       await batch.commit();
 
       print('✅ Participant added to race with 3-collection structure');
+      print('✅ Baseline saved to Firebase: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
 
-      // Initialize time-based baseline for this race
+      // ✅ CRITICAL FIX: Save baseline to local storage for fast access during race
+      // This eliminates the need for Firebase queries during every sync
+      // NOTE: User waits for this too - ensures baseline is ready before join completes
       try {
-        print('📊 Initializing time-based baseline for race $raceId');
+        final prefsService = Get.find<PreferencesService>();
 
-        // Get race start time (actualStartTime for active races, or current time for pending races)
-        final raceStartTime = raceData['actualStartTime'] != null
-            ? (raceData['actualStartTime'] as Timestamp).toDate()
-            : DateTime.now();
+        final baselineData = {
+          'raceId': raceId,
+          'userId': userId,
+          'baselineSteps': baselineSteps,
+          'baselineDistance': baselineDistance,
+          'baselineCalories': baselineCalories,
+          'baselineTimestamp': baselineTimestamp.toIso8601String(),
+          'raceStartTime': (raceData['actualStartTime'] != null
+              ? (raceData['actualStartTime'] as Timestamp).toDate()
+              : DateTime.now()).toIso8601String(),
+        };
 
-        // Get current HealthKit data to establish baseline
-        final healthSyncService = Get.find<HealthSyncService>();
-        final currentHealthData = await healthSyncService.fetchTodaySteps();
-
-        if (currentHealthData != null) {
-          final healthKitStepsAtStart = currentHealthData['steps'] as int? ?? 0;
-          final healthKitDistanceAtStart = currentHealthData['distance'] as double? ?? 0.0;
-          final healthKitCaloriesAtStart = currentHealthData['calories'] as int? ?? 0;
-
-          print('📊 Baseline captured: $healthKitStepsAtStart steps, ${healthKitDistanceAtStart.toStringAsFixed(2)} km, $healthKitCaloriesAtStart kcal');
-
-          // Store baseline in server (Cloud Function will handle this)
-          // For now, the RaceStepSyncService will create the baseline when it detects the new race
-          // We'll pass this information via the reconciliation service
-          try {
-            final reconciliationService = Get.find<RaceStepReconciliationService>();
-            // Initialize baseline on server
-            await reconciliationService.initializeRaceBaseline(
-              raceId: raceId,
-              raceTitle: raceData['title'] ?? 'Unknown Race',
-              raceStartTime: raceStartTime,
-              healthKitStepsAtStart: healthKitStepsAtStart,
-              healthKitDistanceAtStart: healthKitDistanceAtStart,
-              healthKitCaloriesAtStart: healthKitCaloriesAtStart,
-            );
-            print('✅ Time-based baseline initialized on server');
-          } catch (e) {
-            print('⚠️ Could not initialize baseline on server (will be created on first sync): $e');
-            // Don't fail the join operation if baseline initialization fails
-            // The RaceStepSyncService will create it on first detection
-          }
-        } else {
-          print('⚠️ Could not fetch current health data for baseline (will use 0)');
-        }
+        await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+        print('✅ [JOIN_RACE] Baseline saved to local storage - join complete, user can proceed');
       } catch (e) {
-        print('❌ Error initializing time-based baseline: $e');
-        // Don't fail the join operation if baseline initialization fails
+        print('⚠️ [JOIN_RACE] Could not save baseline to local storage: $e');
+        // Don't fail the join operation if local save fails
+        // Firebase has the baseline as backup
       }
 
       // If race is active or scheduled, start step tracking

@@ -390,6 +390,12 @@ class Participant {
   final DateTime? completedAt; // When participant finished
   final int? finishOrder; // 1st, 2nd, 3rd finisher, etc.
 
+  // Baseline fields for proper delta calculation
+  final int? baselineSteps; // Health Connect steps when user joined race
+  final double? baselineDistance; // Health Connect distance when user joined race
+  final int? baselineCalories; // Health Connect calories when user joined race
+  final DateTime? baselineTimestamp; // When baseline was captured (join time)
+
   Participant({
     required this.userId,
     required this.userName,
@@ -405,6 +411,10 @@ class Participant {
     this.isCompleted = false,
     this.completedAt,
     this.finishOrder,
+    this.baselineSteps,
+    this.baselineDistance,
+    this.baselineCalories,
+    this.baselineTimestamp,
   });
 
   // JSON Serialization
@@ -428,6 +438,12 @@ class Participant {
           ? DateTime.parse(json['completedAt'].toString())
           : null,
       finishOrder: json['finishOrder'],
+      baselineSteps: json['baselineSteps'],
+      baselineDistance: (json['baselineDistance'] ?? 0.0).toDouble(),
+      baselineCalories: json['baselineCalories'],
+      baselineTimestamp: json['baselineTimestamp'] != null
+          ? DateTime.parse(json['baselineTimestamp'].toString())
+          : null,
     );
   }
 
@@ -447,6 +463,10 @@ class Participant {
       'isCompleted': isCompleted,
       'completedAt': completedAt?.toIso8601String(),
       'finishOrder': finishOrder,
+      'baselineSteps': baselineSteps,
+      'baselineDistance': baselineDistance,
+      'baselineCalories': baselineCalories,
+      'baselineTimestamp': baselineTimestamp?.toIso8601String(),
     };
   }
 
@@ -480,6 +500,16 @@ class Participant {
                 : DateTime.parse(data['completedAt'].toString()))
           : null,
       finishOrder: data['finishOrder'],
+      baselineSteps: data['baselineSteps'],
+      baselineDistance: data['baselineDistance'] != null
+          ? (data['baselineDistance']).toDouble()
+          : null,
+      baselineCalories: data['baselineCalories'],
+      baselineTimestamp: data['baselineTimestamp'] != null
+          ? (data['baselineTimestamp'] is Timestamp
+                ? (data['baselineTimestamp'] as Timestamp).toDate()
+                : DateTime.parse(data['baselineTimestamp'].toString()))
+          : null,
     );
   }
 
@@ -503,6 +533,12 @@ class Participant {
           ? Timestamp.fromDate(completedAt!)
           : null,
       'finishOrder': finishOrder,
+      'baselineSteps': baselineSteps,
+      'baselineDistance': baselineDistance,
+      'baselineCalories': baselineCalories,
+      'baselineTimestamp': baselineTimestamp != null
+          ? Timestamp.fromDate(baselineTimestamp!)
+          : null,
     };
   }
 
@@ -528,6 +564,10 @@ class Participant {
     bool? isCompleted,
     DateTime? completedAt,
     int? finishOrder,
+    int? baselineSteps,
+    double? baselineDistance,
+    int? baselineCalories,
+    DateTime? baselineTimestamp,
   }) {
     return Participant(
       userId: userId ?? this.userId,
@@ -544,6 +584,10 @@ class Participant {
       isCompleted: isCompleted ?? this.isCompleted,
       completedAt: completedAt ?? this.completedAt,
       finishOrder: finishOrder ?? this.finishOrder,
+      baselineSteps: baselineSteps ?? this.baselineSteps,
+      baselineDistance: baselineDistance ?? this.baselineDistance,
+      baselineCalories: baselineCalories ?? this.baselineCalories,
+      baselineTimestamp: baselineTimestamp ?? this.baselineTimestamp,
     );
   }
 
