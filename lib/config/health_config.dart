@@ -4,40 +4,97 @@ import 'dart:io';
 /// Health data configuration for HealthKit (iOS) and Health Connect (Android)
 ///
 /// Defines what health data types we want to access and sync
+/// Updated to request ALL available Health Connect permissions
 class HealthConfig {
   /// Health data types to request and sync
+  /// This list includes ALL data types supported by Android Health Connect
   static List<HealthDataType> get dataTypes {
-    final types = <HealthDataType>[
-      HealthDataType.STEPS,
-      // Platform-specific distance type: iOS uses WALKING_RUNNING, Android uses DELTA
-      Platform.isIOS
-          ? HealthDataType.DISTANCE_WALKING_RUNNING
-          : HealthDataType.DISTANCE_DELTA,
-      HealthDataType.ACTIVE_ENERGY_BURNED,
-      HealthDataType.HEART_RATE,
-      HealthDataType.BLOOD_OXYGEN,
-      HealthDataType.RESPIRATORY_RATE,
-    ];
-
-    // EXERCISE_TIME is iOS-only (HealthKit concept)
-    // On Android Health Connect, there's no equivalent - we track via step activity
-    if (Platform.isIOS) {
-      types.add(HealthDataType.EXERCISE_TIME);
+    if (Platform.isAndroid) {
+      // All Android Health Connect supported data types
+      return [
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.BASAL_ENERGY_BURNED,
+        HealthDataType.BLOOD_GLUCOSE,
+        HealthDataType.BLOOD_OXYGEN,
+        HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+        HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+        HealthDataType.BODY_FAT_PERCENTAGE,
+        HealthDataType.BODY_MASS_INDEX,
+        HealthDataType.BODY_TEMPERATURE,
+        HealthDataType.BODY_WATER_MASS,
+        HealthDataType.DISTANCE_DELTA,
+        HealthDataType.FLIGHTS_CLIMBED,
+        HealthDataType.HEART_RATE,
+        HealthDataType.HEART_RATE_VARIABILITY_RMSSD,
+        HealthDataType.HEIGHT,
+        HealthDataType.LEAN_BODY_MASS,
+        HealthDataType.MENSTRUATION_FLOW,
+        HealthDataType.NUTRITION,
+        HealthDataType.RESPIRATORY_RATE,
+        HealthDataType.RESTING_HEART_RATE,
+        HealthDataType.SLEEP_ASLEEP,
+        HealthDataType.SLEEP_AWAKE,
+        HealthDataType.SLEEP_AWAKE_IN_BED,
+        HealthDataType.SLEEP_DEEP,
+        HealthDataType.SLEEP_LIGHT,
+        HealthDataType.SLEEP_OUT_OF_BED,
+        HealthDataType.SLEEP_REM,
+        HealthDataType.SLEEP_SESSION,
+        HealthDataType.SLEEP_UNKNOWN,
+        HealthDataType.SPEED,
+        HealthDataType.STEPS,
+        HealthDataType.TOTAL_CALORIES_BURNED,
+        HealthDataType.WATER,
+        HealthDataType.WEIGHT,
+        HealthDataType.WORKOUT,
+      ];
+    } else {
+      // iOS HealthKit - comprehensive list
+      return [
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.BASAL_ENERGY_BURNED,
+        HealthDataType.BLOOD_GLUCOSE,
+        HealthDataType.BLOOD_OXYGEN,
+        HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+        HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+        HealthDataType.BODY_FAT_PERCENTAGE,
+        HealthDataType.BODY_MASS_INDEX,
+        HealthDataType.BODY_TEMPERATURE,
+        HealthDataType.DISTANCE_WALKING_RUNNING,
+        HealthDataType.DISTANCE_SWIMMING,
+        HealthDataType.DISTANCE_CYCLING,
+        HealthDataType.EXERCISE_TIME,
+        HealthDataType.FLIGHTS_CLIMBED,
+        HealthDataType.HEART_RATE,
+        HealthDataType.HEART_RATE_VARIABILITY_SDNN,
+        HealthDataType.HEIGHT,
+        HealthDataType.LEAN_BODY_MASS,
+        HealthDataType.MINDFULNESS,
+        HealthDataType.RESTING_HEART_RATE,
+        HealthDataType.RESPIRATORY_RATE,
+        HealthDataType.SLEEP_ASLEEP,
+        HealthDataType.SLEEP_AWAKE,
+        HealthDataType.SLEEP_DEEP,
+        HealthDataType.SLEEP_IN_BED,
+        HealthDataType.SLEEP_LIGHT,
+        HealthDataType.SLEEP_REM,
+        HealthDataType.STEPS,
+        HealthDataType.WAIST_CIRCUMFERENCE,
+        HealthDataType.WALKING_HEART_RATE,
+        HealthDataType.WATER,
+        HealthDataType.WEIGHT,
+        HealthDataType.WORKOUT,
+      ];
     }
-
-    return types;
   }
 
-  /// Permissions for each data type (READ and WRITE access)
-  /// We need WRITE access to sync pedometer steps back to HealthKit
+  /// Permissions for each data type (READ_WRITE for maximum access)
+  /// Requesting READ_WRITE for all data types to allow comprehensive health data management
   static List<HealthDataAccess> get permissions {
     return dataTypes.map((type) {
-      // Only request WRITE permission for STEPS
-      // All other data types are READ only
-      if (type == HealthDataType.STEPS) {
-        return HealthDataAccess.READ_WRITE;
-      }
-      return HealthDataAccess.READ;
+      // Request READ_WRITE permission for all data types
+      // This allows both reading existing data and writing new data
+      return HealthDataAccess.READ_WRITE;
     }).toList();
   }
 
