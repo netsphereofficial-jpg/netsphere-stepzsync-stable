@@ -657,6 +657,13 @@ class StepTrackingService extends GetxService {
 
       print('✍️ Writing $incrementalSteps pedometer steps to HealthKit...');
 
+      print('🔍 [STEP_WRITE_DEBUG] About to write incremental steps to Health Connect:');
+      print('   📊 Incremental steps to write: $incrementalSteps');
+      print('   📅 Date: ${DateTime.now()}');
+      print('   📊 Current total displayed: ${_todaySteps.value}');
+      print('   📊 Session baseline: ${_sessionBaseline.value}');
+      print('   📊 Pedometer baseline: ${_pedometerService.sessionBaseline}');
+
       // ✅ FIX: Write ONLY incremental steps to HealthKit
       // HealthKit will ADD these steps to what it already has
       // Writing total (baseline + incremental) causes doubling!
@@ -667,6 +674,7 @@ class StepTrackingService extends GetxService {
 
       if (success) {
         print('✅ Successfully wrote $incrementalSteps incremental steps to HealthKit');
+        print('✅ [STEP_WRITE_DEBUG] Steps should now appear in Health Connect app');
 
         // Reset pedometer baseline since steps are now in HealthKit
         // Next HealthKit fetch will include these steps

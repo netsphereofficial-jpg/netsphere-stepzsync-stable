@@ -282,11 +282,53 @@ class HealthSyncService extends GetxController {
     DateTime end,
   ) async {
     try {
+      print('${HealthConfig.logPrefix} 🔍 [DEBUG] Querying Health Connect for steps:');
+      print('${HealthConfig.logPrefix}    📅 Start: ${start.toIso8601String()} (Local: ${start.toLocal()})');
+      print('${HealthConfig.logPrefix}    📅 End: ${end.toIso8601String()} (Local: ${end.toLocal()})');
+      print('${HealthConfig.logPrefix}    ⏱️ Duration: ${end.difference(start).inHours}h ${end.difference(start).inMinutes % 60}m');
+
       // ✅ FIX: Use aggregate query for steps to let HealthKit handle deduplication
       // This prevents counting duplicate step entries from multiple sources
       final steps = await _health.getTotalStepsInInterval(start, end) ?? 0;
 
       print('${HealthConfig.logPrefix} ✅ Fetched aggregated steps for period ${start.toString().substring(0, 10)}: $steps steps');
+
+      // 🔍 DEBUG: Fetch raw step data points to see what's being returned
+      try {
+        print('${HealthConfig.logPrefix} 🔍 [DEBUG] Fetching raw step data points for debugging...');
+        final rawStepData = await _health.getHealthDataFromTypes(
+          types: [HealthDataType.STEPS],
+          startTime: start,
+          endTime: end,
+        );
+
+        print('${HealthConfig.logPrefix} 🔍 [DEBUG] Raw data points returned: ${rawStepData.length}');
+
+        if (rawStepData.isEmpty) {
+          print('${HealthConfig.logPrefix} ⚠️ [DEBUG] No raw step data points found in Health Connect!');
+          print('${HealthConfig.logPrefix} ⚠️ [DEBUG] This means Health Connect has NO step data for this time range');
+        } else {
+          int totalFromRaw = 0;
+          for (var point in rawStepData) {
+            final value = (point.value as NumericHealthValue).numericValue.toInt();
+            totalFromRaw += value;
+            print('${HealthConfig.logPrefix} 🔍 [DEBUG] Step entry #${rawStepData.indexOf(point) + 1}:');
+            print('${HealthConfig.logPrefix}    📊 Steps: $value');
+            print('${HealthConfig.logPrefix}    🕐 From: ${point.dateFrom.toLocal()}');
+            print('${HealthConfig.logPrefix}    🕐 To: ${point.dateTo.toLocal()}');
+            print('${HealthConfig.logPrefix}    📱 Source: ${point.sourceName} (${point.sourceId})');
+            print('${HealthConfig.logPrefix}    🆔 UUID: ${point.uuid}');
+          }
+          print('${HealthConfig.logPrefix} 🔍 [DEBUG] Total steps from raw data: $totalFromRaw');
+          print('${HealthConfig.logPrefix} 🔍 [DEBUG] Aggregated steps: $steps');
+          if (totalFromRaw != steps) {
+            print('${HealthConfig.logPrefix} ⚠️ [DEBUG] MISMATCH! Raw sum ($totalFromRaw) != Aggregated ($steps)');
+            print('${HealthConfig.logPrefix} ⚠️ [DEBUG] This suggests Health Connect is deduplicating or filtering data');
+          }
+        }
+      } catch (debugError) {
+        print('${HealthConfig.logPrefix} ⚠️ [DEBUG] Error fetching raw data: $debugError');
+      }
 
       // Build platform-specific health data types list
       final List<HealthDataType> otherDataTypes = [
@@ -499,19 +541,34 @@ class HealthSyncService extends GetxController {
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
+      print('${HealthConfig.logPrefix} 🔍 [WRITE_DEBUG] Attempting to write steps to Health Connect:');
+      print('${HealthConfig.logPrefix}    📊 Steps: $steps');
+      print('${HealthConfig.logPrefix}    📅 Date: $date');
+      print('${HealthConfig.logPrefix}    🕐 Start: ${startOfDay.toLocal()} (ISO: ${startOfDay.toIso8601String()})');
+      print('${HealthConfig.logPrefix}    🕐 End: ${endOfDay.toLocal()} (ISO: ${endOfDay.toIso8601String()})');
+
       // Write to health system
       final now = DateTime.now();
+      final actualEndTime = now.isBefore(endOfDay) ? now : endOfDay;
+
+      print('${HealthConfig.logPrefix} 🔍 [WRITE_DEBUG] Actual write time range:');
+      print('${HealthConfig.logPrefix}    🕐 Write Start: ${startOfDay.toLocal()}');
+      print('${HealthConfig.logPrefix}    🕐 Write End: ${actualEndTime.toLocal()}');
+      print('${HealthConfig.logPrefix}    ⏱️ Duration: ${actualEndTime.difference(startOfDay).inHours}h ${actualEndTime.difference(startOfDay).inMinutes % 60}m');
+
       final success = await _health.writeHealthData(
         value: steps.toDouble(),
         type: HealthDataType.STEPS,
         startTime: startOfDay,
-        endTime: now.isBefore(endOfDay) ? now : endOfDay,
+        endTime: actualEndTime,
       );
 
       if (success) {
         print('${HealthConfig.logPrefix} ✅ Successfully wrote $steps steps to ${HealthConfig.healthAppName}');
+        print('${HealthConfig.logPrefix} 🔍 [WRITE_DEBUG] This data should now be visible in Health Connect app');
       } else {
         print('${HealthConfig.logPrefix} ❌ Failed to write steps to ${HealthConfig.healthAppName}');
+        print('${HealthConfig.logPrefix} ⚠️ [WRITE_DEBUG] Steps were NOT written - check permissions!');
       }
 
       return success;
