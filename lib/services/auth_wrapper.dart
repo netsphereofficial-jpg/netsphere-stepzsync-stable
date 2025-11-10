@@ -43,6 +43,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return StreamBuilder<User?>(
       stream: firebaseService.getAuthStateChanges(),
       builder: (context, authSnapshot) {
+        debugPrint('🔍 [AUTH_DEBUG] StreamBuilder - connectionState: ${authSnapshot.connectionState}, hasData: ${authSnapshot.hasData}, user: ${authSnapshot.data?.uid}');
+
         if (authSnapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingScreen();
         }
@@ -154,8 +156,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<AuthFlowState> _performAuthFlow(User? user) async {
     // No user → Login
     if (user == null) {
+      debugPrint('🔍 [AUTH_DEBUG] No user logged in → Login screen');
       return AuthFlowState(AuthDestination.login);
     }
+
+    debugPrint('🔍 [AUTH_DEBUG] User logged in: ${user.uid} (isAnonymous: ${user.isAnonymous})');
 
     // Guest users → Check/create profile, then home
     if (user.isAnonymous) {
@@ -184,6 +189,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // Check profile completion with minimal caching
     final profileState = await _getProfileState(user);
+    debugPrint('🔍 [AUTH_DEBUG] Profile state destination: ${profileState.destination}');
     return profileState;
   }
 
@@ -224,9 +230,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
       _cachedUserId = user.uid;
       _cachedProfileCompleted = isProfileCompleted;
 
-      return AuthFlowState(
-        isProfileCompleted ? AuthDestination.home : AuthDestination.profile,
-      );
+      final destination = isProfileCompleted ? AuthDestination.home : AuthDestination.profile;
+      debugPrint('🔍 [AUTH_DEBUG] Navigating to: $destination (profileCompleted: $isProfileCompleted)');
+
+      return AuthFlowState(destination);
     } catch (e) {
       debugPrint('❌ Error checking profile state: $e');
       _clearCache();
