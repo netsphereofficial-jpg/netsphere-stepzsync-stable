@@ -95,122 +95,126 @@ import 'package:stepzsync/services/admob_service.dart';
 import 'package:stepzsync/controllers/race/race_map_controller.dart';
 
 void main() async {
+  // SENTRY DISABLED FOR DEVELOPMENT - Reduces log noise
+  // TODO: Re-enable Sentry for production builds
   // Initialize Sentry for crash reporting and performance monitoring
-  await SentryFlutter.init(
-    (options) {
-      options.dsn = 'https://d68ccd6f430770ef47af850a1deeeccb@o4510167218847744.ingest.us.sentry.io/4510167221338112';
-      options.tracesSampleRate = 1.0; // Capture 100% of transactions in dev
-      options.environment = 'development'; // Change to 'production' for release
-      options.enableAutoSessionTracking = true;
-      options.attachScreenshot = true;
-      options.attachViewHierarchy = true;
+  // await SentryFlutter.init(
+  //   (options) {
+  //     options.dsn = 'https://d68ccd6f430770ef47af850a1deeeccb@o4510167218847744.ingest.us.sentry.io/4510167221338112';
+  //     options.tracesSampleRate = 1.0; // Capture 100% of transactions in dev
+  //     options.environment = 'development'; // Change to 'production' for release
+  //     options.enableAutoSessionTracking = true;
+  //     options.attachScreenshot = true;
+  //     options.attachViewHierarchy = true;
+  //
+  //     // Performance monitoring
+  //     options.enableAutoPerformanceTracing = true;
+  //     options.profilesSampleRate = 1.0;
+  //
+  //     // Error handling
+  //     options.beforeSend = (event, hint) {
+  //       // Filter out non-critical errors
+  //       return event;
+  //     };
+  //   },
+  //   appRunner: () async {
 
-      // Performance monitoring
-      options.enableAutoPerformanceTracing = true;
-      options.profilesSampleRate = 1.0;
+  // Initialize Flutter bindings
+  WidgetsFlutterBinding.ensureInitialized();
 
-      // Error handling
-      options.beforeSend = (event, hint) {
-        // Filter out non-critical errors
-        return event;
-      };
-    },
-    appRunner: () async {
-      // WidgetsFlutterBinding is initialized by SentryFlutter.init automatically
+  try {
+    // ✅ OPTIMIZATION: Initialize Firebase and Season Service
+    // These run sequentially for now to ensure stability
+    print('🚀 [STARTUP] Starting initialization...');
 
-      try {
-        // ✅ OPTIMIZATION: Initialize Firebase and Season Service
-        // These run sequentially for now to ensure stability
-        print('🚀 [STARTUP] Starting initialization...');
+    final firebaseService = FirebaseService();
+    await firebaseService.ensureInitialized();
+    print('✅ [STARTUP] Firebase initialized');
 
-        final firebaseService = FirebaseService();
-        await firebaseService.ensureInitialized();
-        print('✅ [STARTUP] Firebase initialized');
+    // Initialize AdMob for rewarded ads (non-blocking)
+    if (!kIsWeb) {
+      AdMobService.initialize().catchError((e) {
+        print('⚠️ Failed to initialize AdMob: $e');
+        return null;
+      });
+      // Preload first ad in background
+      Future.microtask(() {
+        AdMobService().loadRewardedAd();
+      });
+    }
 
-        // Initialize AdMob for rewarded ads (non-blocking)
-        if (!kIsWeb) {
-          AdMobService.initialize().catchError((e) {
-            print('⚠️ Failed to initialize AdMob: $e');
-            return null;
-          });
-          // Preload first ad in background
-          Future.microtask(() {
-            AdMobService().loadRewardedAd();
-          });
-        }
+    // ✅ DEFERRED: Season Service initialization moved to LeaderboardController
+    // This saves ~200-500ms on startup since seasons are only needed when
+    // user opens the leaderboard screen (bottom nav index 1)
+    // SeasonService will auto-initialize when LeaderboardController loads
 
-        // ✅ DEFERRED: Season Service initialization moved to LeaderboardController
-        // This saves ~200-500ms on startup since seasons are only needed when
-        // user opens the leaderboard screen (bottom nav index 1)
-        // SeasonService will auto-initialize when LeaderboardController loads
+    // Setup dependency injection (fast, non-blocking)
+    // StepTrackingService will request permission internally before starting pedometer
+    DependencyInjection.setup();
+    print('✅ [STARTUP] Dependency injection configured');
 
-        // Setup dependency injection (fast, non-blocking)
-        // StepTrackingService will request permission internally before starting pedometer
-        DependencyInjection.setup();
-        print('✅ [STARTUP] Dependency injection configured');
+    // ✅ DEFERRED: Race monitoring will start after home screen loads
+    // This is moved to HomeController to avoid blocking app startup
+    // RaceStateMachine.startScheduledRaceMonitoring();
 
-        // ✅ DEFERRED: Race monitoring will start after home screen loads
-        // This is moved to HomeController to avoid blocking app startup
-        // RaceStateMachine.startScheduledRaceMonitoring();
+    // ✅ OPTIMIZATION: Mobile-specific services (not available on web)
+    // Initialize only critical services, defer non-critical ones
+    if (!kIsWeb) {
+      // Set up background message handler for Firebase (fast, non-blocking)
+      FirebaseMessaging.onBackgroundMessage(
+        FirebasePushNotificationService.handleBackgroundMessage,
+      );
 
-        // ✅ OPTIMIZATION: Mobile-specific services (not available on web)
-        // Initialize only critical services, defer non-critical ones
-        if (!kIsWeb) {
-          // Set up background message handler for Firebase (fast, non-blocking)
-          FirebaseMessaging.onBackgroundMessage(
-            FirebasePushNotificationService.handleBackgroundMessage,
-          );
+      // ✅ OPTIMIZATION: Initialize notification services in parallel
+      // These are independent and can run concurrently
+      print('🔔 [STARTUP] Initializing notification services...');
 
-          // ✅ OPTIMIZATION: Initialize notification services in parallel
-          // These are independent and can run concurrently
-          print('🔔 [STARTUP] Initializing notification services...');
+      await Future.wait([
+        // Local notification service (sets up channels)
+        LocalNotificationService.initialize().catchError((e) {
+          print('⚠️ Failed to initialize Local Notification Service: $e');
+          return null; // Don't block app startup if local notifications fail
+        }),
+        // Firebase push notification service (gets FCM token)
+        FirebasePushNotificationService.initialize().catchError((e) {
+          print('⚠️ Failed to initialize Firebase Push Notification Service: $e');
+          return null; // Don't block app startup if FCM fails
+        }),
+      ]);
 
-          await Future.wait([
-            // Local notification service (sets up channels)
-            LocalNotificationService.initialize().catchError((e) {
-              print('⚠️ Failed to initialize Local Notification Service: $e');
-              return null; // Don't block app startup if local notifications fail
-            }),
-            // Firebase push notification service (gets FCM token)
-            FirebasePushNotificationService.initialize().catchError((e) {
-              print('⚠️ Failed to initialize Firebase Push Notification Service: $e');
-              return null; // Don't block app startup if FCM fails
-            }),
-          ]);
+      print('✅ [STARTUP] Notification services initialized');
 
-          print('✅ [STARTUP] Notification services initialized');
+      // ✅ OPTIMIZATION: Preload common race marker icons in background (non-blocking)
+      // This prevents 180ms icon generation delay when opening race map
+      // Runs asynchronously, doesn't block app startup
+      Future.microtask(() {
+        MarkerIconPreloader.preloadCommonRankIcons();
+      });
 
-          // ✅ OPTIMIZATION: Preload common race marker icons in background (non-blocking)
-          // This prevents 180ms icon generation delay when opening race map
-          // Runs asynchronously, doesn't block app startup
-          Future.microtask(() {
-            MarkerIconPreloader.preloadCommonRankIcons();
-          });
+      // ✅ DEFERRED: Background services will initialize lazily when needed
+      // These services are not needed until user enables them or joins a race
+      // Moving them to lazy initialization saves 2-4 seconds on startup
 
-          // ✅ DEFERRED: Background services will initialize lazily when needed
-          // These services are not needed until user enables them or joins a race
-          // Moving them to lazy initialization saves 2-4 seconds on startup
+      // Background Step Sync Service → Initialized when user enables in settings
+      // Race Step Sync Service → Initialized when user joins/creates a race
+      // Both are now lazy-loaded via dependency injection
 
-          // Background Step Sync Service → Initialized when user enables in settings
-          // Race Step Sync Service → Initialized when user joins/creates a race
-          // Both are now lazy-loaded via dependency injection
+      print('🚀 [STARTUP] Mobile services initialization complete');
+    }
 
-          print('🚀 [STARTUP] Mobile services initialization complete');
-        }
+    // Enable Firebase Performance Monitoring
+    FirebasePerformance.instance.setPerformanceCollectionEnabled(true);
 
-        // Enable Firebase Performance Monitoring
-        FirebasePerformance.instance.setPerformanceCollectionEnabled(true);
+    print('✅ [STARTUP] All initialization complete - launching app');
+    runApp(MyApp());
+  } catch (e, stackTrace) {
+    print('❌ [STARTUP] Critical error during initialization: $e');
+    print('📍 [STARTUP] Stack trace: $stackTrace');
+    rethrow;
+  }
 
-        print('✅ [STARTUP] All initialization complete - launching app');
-        runApp(MyApp());
-      } catch (e, stackTrace) {
-        print('❌ [STARTUP] Critical error during initialization: $e');
-        print('📍 [STARTUP] Stack trace: $stackTrace');
-        // Rethrow to let Sentry capture it
-        rethrow;
-      }
-    },
-  );
+  //   },
+  // );
 }
 
 /*
