@@ -708,22 +708,84 @@ class RaceService {
       });
 
       // Update all participants status from 'joined' to 'active' in subcollection
-      // ✅ OPTIMIZED: Removed participants array update to maintain consistency with Phase 0 optimization
+      // ✅ CRITICAL FIX: Also capture and store baseline for ALL participants at race start
       final participantsSnapshot = await _racesCollection
           .doc(raceId)
           .collection('participants')
           .get();
 
+      print('📊 [START_RACE] Capturing baseline for ${participantsSnapshot.docs.length} participants...');
+
       final batch = _firestore.batch();
+      int successfulBaselineCaptures = 0;
+
       for (var doc in participantsSnapshot.docs) {
-        batch.update(doc.reference, {
-          'status': 'active',
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
+        final participantUserId = doc.id;
+        final participantData = doc.data();
+        final isBot = participantData['isBot'] == true;
+
+        if (isBot) {
+          // Bot participants: Set baseline to 0 explicitly
+          batch.update(doc.reference, {
+            'status': 'active',
+            'lastUpdated': FieldValue.serverTimestamp(),
+            'baselineSteps': 0,
+            'baselineDistance': 0.0,
+            'baselineCalories': 0,
+            'baselineTimestamp': FieldValue.serverTimestamp(),
+          });
+          print('🤖 [START_RACE] Set baseline=0 for bot participant: ${participantData['userName']}');
+        } else {
+          // Real participants: Capture baseline using multi-source fallback
+          final baselineData = await _captureBaselineWithFallback(raceId, participantUserId);
+
+          if (baselineData != null) {
+            batch.update(doc.reference, {
+              'status': 'active',
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'baselineSteps': baselineData['steps'],
+              'baselineDistance': baselineData['distance'],
+              'baselineCalories': baselineData['calories'],
+              'baselineTimestamp': FieldValue.serverTimestamp(),
+            });
+            successfulBaselineCaptures++;
+            print('✅ [START_RACE] Baseline captured for ${participantData['userName']}: ${baselineData['steps']} steps');
+
+            // Save to local storage if this is the current user
+            if (participantUserId == userId) {
+              try {
+                if (Get.isRegistered<PreferencesService>()) {
+                  final prefsService = Get.find<PreferencesService>();
+                  await prefsService.saveRaceBaseline(raceId, participantUserId, {
+                    'raceId': raceId,
+                    'userId': participantUserId,
+                    'baselineSteps': baselineData['steps'],
+                    'baselineDistance': baselineData['distance'],
+                    'baselineCalories': baselineData['calories'],
+                    'baselineTimestamp': DateTime.now().toIso8601String(),
+                    'raceStartTime': DateTime.now().toIso8601String(),
+                  });
+                  print('✅ [START_RACE] Current user baseline saved to local storage');
+                }
+              } catch (e) {
+                print('⚠️ [START_RACE] Could not save to local storage: $e');
+              }
+            }
+          } else {
+            // Failed to capture baseline - block race start per user requirement
+            print('❌ [START_RACE] Failed to capture baseline for ${participantData['userName']}');
+            return {
+              'status': 500,
+              'message': 'Failed to capture baseline for participant ${participantData['userName']}. Please wait and try again.',
+            };
+          }
+        }
       }
+
       await batch.commit();
 
       print('✅ Updated all participants status to active in subcollection');
+      print('✅ Captured baseline for $successfulBaselineCaptures/${participantsSnapshot.docs.length} participants');
 
       // 🆕 CRITICAL FIX: Initialize or update baseline for all participants when race starts
       // This ensures baseline is set at actual race start time, not join time
@@ -1356,21 +1418,28 @@ class RaceService {
         return _createBaselineData(healthData, raceId, userId);
       }
 
-      // Source 2: Firebase daily_steps collection
+      // Source 2: HealthSyncCoordinator cache
+      final coordinatorData = await _tryCoordinatorSource();
+      if (coordinatorData != null && coordinatorData['steps'] > 0) {
+        print('✅ [RACE_SERVICE] Baseline from HealthSyncCoordinator cache');
+        return _createBaselineData(coordinatorData, raceId, userId);
+      }
+
+      // Source 3: Firebase daily_steps collection
       final firebaseData = await _tryFirebaseSource(userId);
       if (firebaseData != null && firebaseData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from Firebase daily_steps');
         return _createBaselineData(firebaseData, raceId, userId);
       }
 
-      // Source 3: StepTrackingService in-memory state
+      // Source 4: StepTrackingService in-memory state
       final stepServiceData = await _tryStepServiceSource();
       if (stepServiceData != null && stepServiceData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from StepTrackingService');
         return _createBaselineData(stepServiceData, raceId, userId);
       }
 
-      // Source 4: Local SQLite cache (last resort)
+      // Source 5: Local SQLite cache (last resort)
       final sqliteData = await _trySqliteSource();
       if (sqliteData != null && sqliteData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from SQLite cache');
@@ -1399,6 +1468,39 @@ class RaceService {
       }
     } catch (e) {
       print('⚠️ [RACE_SERVICE] Health source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get health data from HealthSyncCoordinator cache
+  static Future<Map<String, dynamic>?> _tryCoordinatorSource() async {
+    try {
+      if (!Get.isRegistered<HealthSyncCoordinator>()) {
+        return null;
+      }
+
+      final coordinator = Get.find<HealthSyncCoordinator>();
+      final debugInfo = coordinator.getDebugInfo();
+
+      final steps = debugInfo['lastProcessedSteps'] as int;
+      final distance = debugInfo['lastProcessedDistance'] as double;
+      final calories = debugInfo['lastProcessedCalories'] as int;
+      final date = debugInfo['lastProcessedDate'] as String?;
+
+      // Check if data is from today
+      final now = DateTime.now();
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      if (date == today && steps > 0) {
+        print('✅ [RACE_SERVICE] Using HealthSyncCoordinator cache: $steps steps (from $date)');
+        return {
+          'steps': steps,
+          'distance': distance,
+          'calories': calories,
+        };
+      }
+    } catch (e) {
+      print('⚠️ [RACE_SERVICE] Coordinator source failed: $e');
     }
     return null;
   }
