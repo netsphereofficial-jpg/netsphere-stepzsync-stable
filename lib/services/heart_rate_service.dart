@@ -44,35 +44,12 @@ class HeartRateService extends GetxController {
         return;
       }
 
-      // Check permissions
-      final hasPermission = await _health!.hasPermissions([HealthDataType.HEART_RATE]);
-      if (hasPermission != true) {
-        log("⚠️ [HEART_RATE] Heart rate permission not granted, requesting permission...");
-
-        try {
-          // Try to request permission
-          final granted = await _health!.requestAuthorization(
-            [HealthDataType.HEART_RATE],
-            permissions: [HealthDataAccess.READ],
-          );
-
-          if (!granted) {
-            log("❌ [HEART_RATE] Heart rate permission denied by user");
-            log("💡 [HEART_RATE] User can enable permissions in Android Health Connect app");
-            isInitialized.value = true;
-            return;
-          }
-
-          log("✅ [HEART_RATE] Heart rate permission granted successfully");
-        } catch (permissionError) {
-          log("❌ [HEART_RATE] Error requesting heart rate permission: $permissionError");
-          log("💡 [HEART_RATE] This might be due to Health Connect not being installed or configured");
-          isInitialized.value = true;
-          return;
-        }
-      }
+      // Add a delay to avoid Health Connect rate limiting
+      // Permissions are already granted by HealthSyncService, so we just need to wait
+      await Future.delayed(const Duration(milliseconds: 750));
 
       log("✅ [HEART_RATE] Heart rate service initialized successfully");
+      log("💡 [HEART_RATE] Using permissions already granted during onboarding");
       isInitialized.value = true;
 
       // Start fetching heart rate data

@@ -11,7 +11,9 @@ import '../../core/utils/snackbar_utils.dart';
 import '../../models/place_model.dart';
 import '../../services/auth/firebase_auth_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/health_sync_service.dart';
 import '../../services/places_service.dart';
+import '../../services/preferences_service.dart';
 import '../../screens/races/quick_race/quick_race_waiting_room_screen.dart';
 
 class QuickRaceController extends GetxController {
@@ -196,6 +198,36 @@ class QuickRaceController extends GetxController {
         return null;
       }
 
+      // ✅ CRITICAL: Capture baseline BEFORE transaction (outside transaction for performance)
+      // We'll capture for the first race attempt and reuse if we retry with another race
+      log('📊 [QUICK_RACE] Pre-capturing baseline for joiner before transaction...');
+      Map<String, dynamic>? baselineData;
+      try {
+        if (Get.isRegistered<HealthSyncService>()) {
+          final healthSyncService = Get.find<HealthSyncService>();
+          final currentHealthData = await healthSyncService.fetchTodaySteps();
+
+          if (currentHealthData != null) {
+            final baselineSteps = currentHealthData['steps'] as int? ?? 0;
+            final baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
+            final baselineCalories = currentHealthData['calories'] as int? ?? 0;
+
+            baselineData = {
+              'baselineSteps': baselineSteps,
+              'baselineDistance': baselineDistance,
+              'baselineCalories': baselineCalories,
+              'baselineTimestamp': Timestamp.fromDate(DateTime.now()),
+            };
+
+            log('📊 [QUICK_RACE] Joiner baseline pre-captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km');
+          } else {
+            log('⚠️ [QUICK_RACE] Could not fetch health data for joiner, baseline will be 0');
+          }
+        }
+      } catch (e) {
+        log('⚠️ [QUICK_RACE] Error pre-capturing baseline for joiner: $e');
+      }
+
       // Try to join each matching race using atomic transaction
       for (var raceDoc in matchingRaces.docs) {
         final raceRef = _firebaseService.firestore.collection('races').doc(raceDoc.id);
@@ -253,7 +285,7 @@ class QuickRaceController extends GetxController {
               'updatedAt': FieldValue.serverTimestamp(),
             });
 
-            // Add participant to subcollection
+            // Add participant to subcollection WITH baseline
             final participant = Participant(
               userId: currentUser.uid,
               userName: userName,
@@ -266,8 +298,15 @@ class QuickRaceController extends GetxController {
               calories: 0,
               avgSpeed: 0.0,
               isCompleted: false,
+              baselineSteps: baselineData?['baselineSteps'] ?? 0,
+              baselineDistance: baselineData?['baselineDistance'] ?? 0.0,
+              baselineCalories: baselineData?['baselineCalories'] ?? 0,
+              baselineTimestamp: baselineData != null
+                  ? (baselineData['baselineTimestamp'] as Timestamp).toDate()
+                  : DateTime.now(),
             );
 
+            log('✅ [QUICK_RACE] Adding joiner with baseline: ${baselineData?['baselineSteps'] ?? 0} steps');
             transaction.set(participantRef, participant.toFirestore());
 
             // Add to user_races collection
@@ -289,6 +328,28 @@ class QuickRaceController extends GetxController {
 
           if (result != null) {
             log('✅ Transaction completed successfully for race ${result.id}');
+
+            // Save baseline to local storage after successful join
+            if (baselineData != null) {
+              try {
+                if (Get.isRegistered<PreferencesService>()) {
+                  final prefsService = Get.find<PreferencesService>();
+                  await prefsService.saveRaceBaseline(result.id!, currentUser.uid, {
+                    'raceId': result.id!,
+                    'userId': currentUser.uid,
+                    'baselineSteps': baselineData['baselineSteps'],
+                    'baselineDistance': baselineData['baselineDistance'],
+                    'baselineCalories': baselineData['baselineCalories'],
+                    'baselineTimestamp': (baselineData['baselineTimestamp'] as Timestamp).toDate().toIso8601String(),
+                    'raceStartTime': DateTime.now().toIso8601String(),
+                  });
+                  log('✅ [QUICK_RACE] Joiner baseline saved to local storage');
+                }
+              } catch (e) {
+                log('⚠️ [QUICK_RACE] Could not save joiner baseline to local storage: $e');
+              }
+            }
+
             return result;
           }
         } catch (e) {
@@ -414,7 +475,9 @@ class QuickRaceController extends GetxController {
         log('Could not get end address: $e');
       }
 
-      // Create participant for the race creator
+      // ✅ CRITICAL: Capture baseline BEFORE creating participant
+      // We need raceId first, so we'll capture baseline after race creation
+      // For now, create participant with placeholder baseline (will update after race created)
       final creatorParticipant = Participant(
         userId: currentUser.uid,
         userName: currentUser.displayName ??
@@ -429,6 +492,10 @@ class QuickRaceController extends GetxController {
         calories: 0,
         avgSpeed: 0.0,
         isCompleted: false,
+        baselineSteps: 0, // Will be updated after race creation
+        baselineDistance: 0.0,
+        baselineCalories: 0,
+        baselineTimestamp: DateTime.now(),
       );
 
       // Create race using RaceData model
@@ -480,11 +547,27 @@ class QuickRaceController extends GetxController {
         'startedAt': FieldValue.serverTimestamp(),
       });
 
-      // Add participant to race's participants subcollection
+      // ✅ CRITICAL: Capture baseline NOW that we have raceId
+      log('📊 [QUICK_RACE] Capturing baseline for race creator...');
+      final baselineData = await _captureBaseline(raceId, currentUser.uid);
+
+      // Update participant with actual baseline data
+      final participantData = creatorParticipant.toFirestore();
+      if (baselineData != null) {
+        participantData['baselineSteps'] = baselineData['baselineSteps'];
+        participantData['baselineDistance'] = baselineData['baselineDistance'];
+        participantData['baselineCalories'] = baselineData['baselineCalories'];
+        participantData['baselineTimestamp'] = baselineData['baselineTimestamp'];
+        log('✅ [QUICK_RACE] Creator baseline added to participant document');
+      } else {
+        log('⚠️ [QUICK_RACE] Baseline capture failed, using 0 values');
+      }
+
+      // Add participant to race's participants subcollection with baseline
       await raceDocRef
           .collection('participants')
           .doc(currentUser.uid)
-          .set(creatorParticipant.toFirestore());
+          .set(participantData);
 
       log('✅ Quick race created with ID: $raceId (statusId: 3 - Active)');
       log('📍 Start: $startAddress');
@@ -535,6 +618,78 @@ class QuickRaceController extends GetxController {
       log('❌ Error creating quick race: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Capture baseline health data at race join time
+  /// Returns map with baseline data or null if capture fails
+  Future<Map<String, dynamic>?> _captureBaseline(String raceId, String userId) async {
+    try {
+      log('📊 [QUICK_RACE] Capturing baseline at join time...');
+
+      int baselineSteps = 0;
+      double baselineDistance = 0.0;
+      int baselineCalories = 0;
+      final baselineTimestamp = DateTime.now();
+
+      // Fetch current health data
+      try {
+        if (Get.isRegistered<HealthSyncService>()) {
+          final healthSyncService = Get.find<HealthSyncService>();
+          final currentHealthData = await healthSyncService.fetchTodaySteps();
+
+          if (currentHealthData != null) {
+            baselineSteps = currentHealthData['steps'] as int? ?? 0;
+            baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
+            baselineCalories = currentHealthData['calories'] as int? ?? 0;
+
+            log('📊 [QUICK_RACE] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
+          } else {
+            log('⚠️ [QUICK_RACE] Could not fetch current health data, baseline set to 0');
+          }
+        } else {
+          log('⚠️ [QUICK_RACE] HealthSyncService not registered, baseline set to 0');
+        }
+      } catch (e) {
+        log('⚠️ [QUICK_RACE] Error fetching health data: $e');
+        // Continue with 0 baseline - don't fail join operation
+      }
+
+      final baselineData = {
+        'baselineSteps': baselineSteps,
+        'baselineDistance': baselineDistance,
+        'baselineCalories': baselineCalories,
+        'baselineTimestamp': Timestamp.fromDate(baselineTimestamp),
+        'raceId': raceId,
+        'userId': userId,
+        'raceStartTime': DateTime.now().toIso8601String(),
+      };
+
+      // Save to local storage for fast access during race
+      try {
+        if (Get.isRegistered<PreferencesService>()) {
+          final prefsService = Get.find<PreferencesService>();
+          await prefsService.saveRaceBaseline(raceId, userId, {
+            'raceId': raceId,
+            'userId': userId,
+            'baselineSteps': baselineSteps,
+            'baselineDistance': baselineDistance,
+            'baselineCalories': baselineCalories,
+            'baselineTimestamp': baselineTimestamp.toIso8601String(),
+            'raceStartTime': DateTime.now().toIso8601String(),
+          });
+          log('✅ [QUICK_RACE] Baseline saved to local storage');
+        }
+      } catch (e) {
+        log('⚠️ [QUICK_RACE] Could not save baseline to local storage: $e');
+        // Don't fail join operation if local save fails
+      }
+
+      log('✅ [QUICK_RACE] Baseline capture complete: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km');
+      return baselineData;
+    } catch (e) {
+      log('❌ [QUICK_RACE] Error capturing baseline: $e');
+      return null;
     }
   }
 

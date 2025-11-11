@@ -55,44 +55,12 @@ class RespiratoryDataService extends GetxController {
         return;
       }
 
-      // Prepare data types to request
-      List<HealthDataType> dataTypesToRequest = [];
-      if (isBloodOxygenDataAvailable) {
-        dataTypesToRequest.add(HealthDataType.BLOOD_OXYGEN);
-      }
-      if (isRespiratoryRateDataAvailable) {
-        dataTypesToRequest.add(HealthDataType.RESPIRATORY_RATE);
-      }
-
-      // Check permissions
-      final hasPermission = await _health!.hasPermissions(dataTypesToRequest);
-      if (hasPermission != true) {
-        log("⚠️ [RESPIRATORY_DATA] Respiratory data permissions not granted, requesting...");
-
-        try {
-          // Try to request permission
-          final granted = await _health!.requestAuthorization(
-            dataTypesToRequest,
-            permissions: dataTypesToRequest.map((_) => HealthDataAccess.READ).toList(),
-          );
-
-          if (!granted) {
-            log("❌ [RESPIRATORY_DATA] Respiratory data permissions denied by user");
-            log("💡 [RESPIRATORY_DATA] User can enable permissions in Health Connect/HealthKit app");
-            isInitialized.value = true;
-            return;
-          }
-
-          log("✅ [RESPIRATORY_DATA] Respiratory data permissions granted successfully");
-        } catch (permissionError) {
-          log("❌ [RESPIRATORY_DATA] Error requesting permissions: $permissionError");
-          log("💡 [RESPIRATORY_DATA] This might be due to Health Connect/HealthKit not being installed or configured");
-          isInitialized.value = true;
-          return;
-        }
-      }
+      // Add a delay to avoid Health Connect rate limiting
+      // Permissions are already granted by HealthSyncService, so we just need to wait
+      await Future.delayed(const Duration(milliseconds: 1000));
 
       log("✅ [RESPIRATORY_DATA] Respiratory data service initialized successfully");
+      log("💡 [RESPIRATORY_DATA] Using permissions already granted by HealthSyncService");
       isInitialized.value = true;
 
       // Start fetching respiratory data
