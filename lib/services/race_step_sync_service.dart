@@ -1101,13 +1101,59 @@ class RaceStepSyncService extends GetxService {
 
             // Check for negative delta (device reboot or pedometer reset)
             if (deltaSteps < 0) {
-              dev.log('   ⚠️ Negative delta detected ($deltaSteps) - device may have rebooted');
-              dev.log('   Using server state as fallback');
+              dev.log('   ⚠️ Negative delta detected ($deltaSteps) - pedometer reset detected');
+              dev.log('   RECALIBRATING baseline to continue tracking...');
 
-              // Use server state (last known good value)
-              totalRaceSteps = baseline.serverSteps;
-              raceDistance = baseline.serverDistance;
-              raceCalories = baseline.serverCalories;
+              // Calculate new baseline: current_pedometer - already_recorded_progress
+              final alreadyRecordedSteps = baseline.serverSteps;
+              final newBaseline = currentPedometerSteps - alreadyRecordedSteps;
+
+              if (newBaseline >= 0) {
+                dev.log('   🔧 Recalibration:');
+                dev.log('      Old baseline: ${baseline.healthKitStepsAtStart} steps');
+                dev.log('      Already recorded: $alreadyRecordedSteps steps');
+                dev.log('      Current pedometer: $currentPedometerSteps steps');
+                dev.log('      New baseline: $newBaseline steps');
+
+                // Update baseline
+                baseline.healthKitStepsAtStart = newBaseline;
+
+                // Save updated baseline
+                try {
+                  final userId = _auth.currentUser?.uid;
+                  if (userId != null) {
+                    final prefsService = Get.find<PreferencesService>();
+                    final baselineData = {
+                      'raceId': raceId,
+                      'userId': userId,
+                      'baselineSteps': newBaseline,
+                      'baselineDistance': baseline.healthKitDistanceAtStart ?? 0.0,
+                      'baselineCalories': baseline.healthKitCaloriesAtStart ?? 0,
+                      'baselineTimestamp': DateTime.now().toIso8601String(),
+                      'raceStartTime': baseline.startTime.toIso8601String(),
+                    };
+                    await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+                    dev.log('   ✅ Updated baseline saved to local storage');
+                  }
+                } catch (e) {
+                  dev.log('   ⚠️ Could not save updated baseline: $e');
+                }
+
+                // Use server state for THIS cycle (baseline will be used in next cycle)
+                totalRaceSteps = baseline.serverSteps;
+                raceDistance = baseline.serverDistance;
+                raceCalories = baseline.serverCalories;
+
+                dev.log('   ✅ Baseline recalibrated, using server state for this cycle');
+              } else {
+                dev.log('   ❌ Invalid recalibration (negative baseline: $newBaseline)');
+                dev.log('   Using server state as fallback');
+
+                // Use server state (last known good value)
+                totalRaceSteps = baseline.serverSteps;
+                raceDistance = baseline.serverDistance;
+                raceCalories = baseline.serverCalories;
+              }
             } else {
               // Calculate distance and calories from pedometer steps using formulas
               const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
@@ -1237,11 +1283,88 @@ class RaceStepSyncService extends GetxService {
           }
 
           // ✅ CRITICAL FIX: Monotonic increasing validation
-          // REJECT writes that would decrease steps (prevents data corruption from race conditions)
+          // DETECT writes that would decrease steps and recalibrate baseline instead of rejecting
           if (cappedTotalRaceSteps < baseline.maxStepsEverSeen) {
-            dev.log('❌ [RACE_SYNC] REJECTED: Attempt to decrease steps from ${baseline.maxStepsEverSeen} to $cappedTotalRaceSteps');
-            dev.log('   This indicates a race condition - skipping this sync cycle to prevent data loss');
-            continue;  // Skip this race, do NOT write stale data
+            dev.log('⚠️ [RACE_SYNC] Detected attempt to decrease steps from ${baseline.maxStepsEverSeen} to $cappedTotalRaceSteps');
+            dev.log('   This likely indicates a pedometer reset - recalibrating baseline...');
+
+            // Calculate new baseline: current_pedometer - already_recorded_progress
+            // This allows new steps to accumulate from the current position
+            final alreadyRecordedSteps = baseline.maxStepsEverSeen;
+            final currentPedometerReading = _pedometerService.currentStepCount.value;
+            final newBaseline = currentPedometerReading - alreadyRecordedSteps;
+
+            if (newBaseline > 0) {
+              dev.log('🔧 [RACE_SYNC] RECALIBRATING baseline for "${baseline.raceTitle}":');
+              dev.log('   Old baseline: ${baseline.healthKitStepsAtStart} steps');
+              dev.log('   Already recorded progress: $alreadyRecordedSteps steps');
+              dev.log('   Current pedometer: $currentPedometerReading steps');
+              dev.log('   New baseline: $newBaseline steps');
+              dev.log('   Formula: new_baseline = current_pedometer - already_recorded_progress');
+              dev.log('   Result: $newBaseline = $currentPedometerReading - $alreadyRecordedSteps');
+
+              // Update baseline
+              baseline.healthKitStepsAtStart = newBaseline;
+
+              // Save the updated baseline to local storage
+              try {
+                final userId = _auth.currentUser?.uid;
+                if (userId != null) {
+                  final prefsService = Get.find<PreferencesService>();
+                  final baselineData = {
+                    'raceId': raceId,
+                    'userId': userId,
+                    'baselineSteps': newBaseline,
+                    'baselineDistance': baseline.healthKitDistanceAtStart ?? 0.0,
+                    'baselineCalories': baseline.healthKitCaloriesAtStart ?? 0,
+                    'baselineTimestamp': DateTime.now().toIso8601String(),
+                    'raceStartTime': baseline.startTime.toIso8601String(),
+                  };
+                  await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+                  dev.log('✅ [RACE_SYNC] Updated baseline saved to local storage');
+                }
+              } catch (e) {
+                dev.log('⚠️ [RACE_SYNC] Could not save updated baseline: $e');
+              }
+
+              // Recalculate with new baseline
+              final newDeltaSteps = currentPedometerReading - newBaseline;
+              totalRaceSteps = newDeltaSteps;
+              raceDistance = newDeltaSteps * STEPS_TO_KM_FACTOR;
+              raceCalories = (newDeltaSteps * STEPS_TO_CALORIES_FACTOR).round();
+
+              // Update capped values
+              cappedTotalRaceSteps = totalRaceSteps;
+              cappedRaceDistance = raceDistance;
+
+              // Revalidate with new values
+              final revalidationResults = RaceValidationUtils.validateAll(
+                previousSteps: baseline.serverSteps,
+                newSteps: totalRaceSteps,
+                timeSinceLastSync: raceTime,
+                participantDistance: raceDistance,
+                raceTotalDistance: totalDistance,
+                raceTitle: baseline.raceTitle,
+              );
+
+              if (RaceValidationUtils.hasErrors(revalidationResults)) {
+                dev.log('⚠️ [RACE_SYNC] Validation errors after recalibration, applying caps...');
+                // Apply same capping logic as before
+                if (raceDistance > totalDistance * 1.1) {
+                  cappedRaceDistance = totalDistance * 1.1;
+                  cappedTotalRaceSteps = (cappedRaceDistance / STEPS_TO_KM_FACTOR).round();
+                }
+              }
+
+              dev.log('✅ [RACE_SYNC] Baseline recalibrated successfully, continuing with sync...');
+              dev.log('   New race progress: $cappedTotalRaceSteps steps, ${cappedRaceDistance.toStringAsFixed(2)} km');
+
+              // Continue with the sync using recalculated values
+              // (fall through to the write logic below)
+            } else {
+              dev.log('❌ [RACE_SYNC] Invalid recalibration (negative baseline), skipping this cycle');
+              continue;  // Skip this race if recalibration produces invalid baseline
+            }
           }
 
           // ✅ CRITICAL FIX: Check if server has newer data (timestamp validation)
