@@ -481,6 +481,7 @@ class RaceStepSyncService extends GetxService {
 
       // ✅ CRITICAL FIX: Load baseline from local storage FIRST (fast, no Firebase query)
       // This uses the baseline we captured at join time
+      // ✅ RETRY MECHANISM: Wait and retry if baseline not immediately available
       dev.log('📦 [RACE_SYNC] Loading baseline from local storage...');
 
       int baselineSteps = 0;
@@ -489,28 +490,56 @@ class RaceStepSyncService extends GetxService {
       DateTime raceStartTime = DateTime.now();
       bool foundLocalBaseline = false;
 
-      try {
-        final prefsService = Get.find<PreferencesService>();
-        final localBaseline = await prefsService.getRaceBaseline(raceId, userId);
+      // Retry logic with exponential backoff (max 3 retries, 100ms, 200ms, 400ms)
+      int maxRetries = 3;
+      int retryDelay = 100; // milliseconds
 
-        if (localBaseline != null) {
-          baselineSteps = localBaseline['baselineSteps'] ?? 0;
-          baselineDistance = (localBaseline['baselineDistance'] ?? 0.0).toDouble();
-          baselineCalories = localBaseline['baselineCalories'] ?? 0;
-          raceStartTime = DateTime.parse(localBaseline['raceStartTime'] ?? DateTime.now().toIso8601String());
-          foundLocalBaseline = true;
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          final prefsService = Get.find<PreferencesService>();
+          final localBaseline = await prefsService.getRaceBaseline(raceId, userId);
 
-          dev.log('✅ [RACE_SYNC] Loaded baseline from local storage:');
-          dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
-          dev.log('   Race start: ${raceStartTime.toIso8601String()}');
+          if (localBaseline != null) {
+            baselineSteps = localBaseline['baselineSteps'] ?? 0;
+            baselineDistance = (localBaseline['baselineDistance'] ?? 0.0).toDouble();
+            baselineCalories = localBaseline['baselineCalories'] ?? 0;
+            raceStartTime = DateTime.parse(localBaseline['raceStartTime'] ?? DateTime.now().toIso8601String());
+
+            // ✅ VALIDATION: Only accept non-zero baseline
+            if (baselineSteps > 0) {
+              foundLocalBaseline = true;
+              dev.log('✅ [RACE_SYNC] Loaded VALID baseline from local storage (attempt ${attempt + 1}):');
+              dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+              dev.log('   Race start: ${raceStartTime.toIso8601String()}');
+              break; // Success - exit retry loop
+            } else {
+              dev.log('⚠️ [RACE_SYNC] Baseline found but INVALID (steps = 0) on attempt ${attempt + 1}');
+              if (attempt < maxRetries - 1) {
+                dev.log('   ⏳ Waiting ${retryDelay}ms before retry...');
+                await Future.delayed(Duration(milliseconds: retryDelay));
+                retryDelay *= 2; // Exponential backoff
+              }
+            }
+          } else {
+            dev.log('⚠️ [RACE_SYNC] No local baseline found on attempt ${attempt + 1}/${maxRetries}');
+            if (attempt < maxRetries - 1) {
+              dev.log('   ⏳ Waiting ${retryDelay}ms before retry...');
+              await Future.delayed(Duration(milliseconds: retryDelay));
+              retryDelay *= 2; // Exponential backoff
+            }
+          }
+        } catch (e) {
+          dev.log('⚠️ [RACE_SYNC] Error loading baseline from local storage (attempt ${attempt + 1}): $e');
+          if (attempt < maxRetries - 1) {
+            await Future.delayed(Duration(milliseconds: retryDelay));
+            retryDelay *= 2;
+          }
         }
-      } catch (e) {
-        dev.log('⚠️ [RACE_SYNC] Could not load baseline from local storage: $e');
       }
 
-      // If local baseline not found, fall back to Firebase participant document
+      // If local baseline not found after retries, fall back to Firebase participant document
       if (!foundLocalBaseline) {
-        dev.log('📊 [RACE_SYNC] No local baseline, loading from Firebase participant document...');
+        dev.log('📊 [RACE_SYNC] No valid local baseline after retries, loading from Firebase participant document...');
 
         // Fetch participant data to get baseline from Firebase
         final participantDoc = await _firestore
@@ -527,27 +556,43 @@ class RaceStepSyncService extends GetxService {
             baselineDistance = (participantData['baselineDistance'] ?? 0.0).toDouble();
             baselineCalories = participantData['baselineCalories'] ?? 0;
 
-            // Also save to local storage for next time
-            try {
-              final prefsService = Get.find<PreferencesService>();
-              final baselineData = {
-                'raceId': raceId,
-                'userId': userId,
-                'baselineSteps': baselineSteps,
-                'baselineDistance': baselineDistance,
-                'baselineCalories': baselineCalories,
-                'baselineTimestamp': DateTime.now().toIso8601String(),
-                'raceStartTime': raceStartTime.toIso8601String(),
-              };
-              await prefsService.saveRaceBaseline(raceId, userId, baselineData);
-              dev.log('✅ [RACE_SYNC] Cached baseline to local storage from Firebase');
-            } catch (e) {
-              dev.log('⚠️ [RACE_SYNC] Could not cache baseline: $e');
-            }
+            // ✅ VALIDATION: Ensure Firebase baseline is also non-zero
+            if (baselineSteps > 0) {
+              foundLocalBaseline = true; // Mark as found so we proceed
 
-            dev.log('✅ [RACE_SYNC] Loaded baseline from Firebase:');
-            dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+              // Also save to local storage for next time
+              try {
+                final prefsService = Get.find<PreferencesService>();
+                final baselineData = {
+                  'raceId': raceId,
+                  'userId': userId,
+                  'baselineSteps': baselineSteps,
+                  'baselineDistance': baselineDistance,
+                  'baselineCalories': baselineCalories,
+                  'baselineTimestamp': DateTime.now().toIso8601String(),
+                  'raceStartTime': raceStartTime.toIso8601String(),
+                };
+                await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+                dev.log('✅ [RACE_SYNC] Cached VALID baseline to local storage from Firebase');
+              } catch (e) {
+                dev.log('⚠️ [RACE_SYNC] Could not cache baseline: $e');
+              }
+
+              dev.log('✅ [RACE_SYNC] Loaded VALID baseline from Firebase:');
+              dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+            } else {
+              dev.log('❌ [RACE_SYNC] Firebase baseline is INVALID (steps = 0)!');
+              dev.log('   ⚠️ This race may have been created without proper baseline capture');
+              dev.log('   ⏸️ Will NOT create baseline object to prevent step drift');
+              return; // Exit early - don't create baseline with zero values
+            }
+          } else {
+            dev.log('❌ [RACE_SYNC] Participant data is null in Firebase');
+            return; // Exit early
           }
+        } else {
+          dev.log('❌ [RACE_SYNC] Participant document does not exist in Firebase');
+          return; // Exit early
         }
       }
 
@@ -569,6 +614,22 @@ class RaceStepSyncService extends GetxService {
 
       // Fetch participant data including completion status (source of truth)
       final participantData = await _fetchParticipantData(raceId);
+
+      // ✅ FINAL SAFETY CHECK: Ensure baseline is valid before creating RaceBaseline object
+      if (baselineSteps == 0) {
+        dev.log('❌ [RACE_SYNC] CRITICAL: Refusing to create baseline with 0 steps!');
+        dev.log('   This would cause all current steps to be attributed to the race (step drift)');
+        dev.log('   baselineSteps: $baselineSteps');
+        dev.log('   baselineDistance: $baselineDistance');
+        dev.log('   baselineCalories: $baselineCalories');
+        dev.log('   ⚠️ Race baseline will NOT be created. Sync will be skipped for this race.');
+        return; // Exit early - do NOT create baseline
+      }
+
+      dev.log('✅ [RACE_SYNC] Final baseline validation passed - creating RaceBaseline object:');
+      dev.log('   baselineSteps: $baselineSteps (VALID - non-zero)');
+      dev.log('   baselineDistance: ${baselineDistance.toStringAsFixed(2)} km');
+      dev.log('   baselineCalories: $baselineCalories cal');
 
       // ✅ CRITICAL FIX: Create baseline using saved baseline from join time
       // This ensures we calculate delta from when user joined, not from detection time
@@ -990,6 +1051,29 @@ class RaceStepSyncService extends GetxService {
           if (baseline.isCompleted) {
             dev.log('⏭️ [RACE_SYNC] Skipping sync for completed race: "${baseline.raceTitle}"');
             continue;
+          }
+
+          // ✅ CRITICAL VALIDATION: Ensure baseline is valid (non-zero) before syncing
+          // This prevents step drift when app restarts before baseline is loaded
+          if (baseline.useTimeBasedBaseline) {
+            final baselineSteps = baseline.healthKitStepsAtStart ?? 0;
+
+            if (baselineSteps == 0) {
+              dev.log('⚠️ [RACE_SYNC] INVALID BASELINE DETECTED for race ${baseline.raceTitle}:');
+              dev.log('   Baseline steps: $baselineSteps (ZERO - will cause drift!)');
+              dev.log('   ⏸️ SKIPPING sync until valid baseline is loaded from local storage or Firebase');
+              dev.log('   Race will be synced on next refresh cycle when baseline is available');
+
+              // Force re-load baseline from local storage or Firebase
+              dev.log('🔄 [RACE_SYNC] Attempting to reload baseline from storage...');
+              await _setRaceBaseline(raceId, baseline.raceTitle);
+
+              // Skip this sync cycle - baseline will be ready next time
+              continue;
+            }
+
+            dev.log('✅ [RACE_SYNC] Baseline validation passed:');
+            dev.log('   Baseline steps: $baselineSteps (VALID)');
           }
 
           // ✅ TIME-BASED BASELINE LOGIC
