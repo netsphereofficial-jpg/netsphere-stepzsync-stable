@@ -59,7 +59,6 @@ class ProfileViewController extends GetxController {
         _setDefaultValues();
       }
     } catch (e) {
-      print('Error setting user details: $e');
       _setDefaultValues();
     } finally {
       isLoading.value = false;

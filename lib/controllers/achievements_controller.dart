@@ -50,7 +50,6 @@ class AchievementsController extends GetxController {
       isLoading.value = true;
       hasError.value = false;
 
-      log('🏆 Loading achievements...');
 
       // Check if first visit
       isFirstVisit.value = await _checkFirstVisit();
@@ -62,24 +61,17 @@ class AchievementsController extends GetxController {
       }
 
       // Load user data
-      log('📊 Loading user XP data...');
       _userXP = await _xpService.getUserXP(userId);
 
-      log('📊 Loading user overall stats...');
       _userStats = await _getUserOverallStats(userId);
 
-      log('📊 Loading season XP data...');
       _seasonXP = await _getSeasonXP(userId);
 
       // Calculate achievements
       _calculateAchievements();
 
-      log('✅ Achievements loaded successfully');
-      log('   Unlocked: ${unlockedCount.value}/${totalCount.value}');
-      log('   Completion: ${completionPercentage.value.toStringAsFixed(1)}%');
     } catch (e, stackTrace) {
-      log('❌ Error loading achievements: $e');
-      log('Stack trace: $stackTrace');
+
       hasError.value = true;
       errorMessage.value = 'Failed to load achievements';
     } finally {

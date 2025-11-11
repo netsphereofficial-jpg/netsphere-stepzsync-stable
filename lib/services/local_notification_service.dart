@@ -12,7 +12,6 @@ class LocalNotificationService {
   static final NotificationRepository _notificationRepository = NotificationRepository();
 
   static Future<void> initialize() async {
-    print('🔔 Initializing LocalNotificationService...');
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -36,7 +35,6 @@ class LocalNotificationService {
       onDidReceiveNotificationResponse: null,
     );
 
-    print('🔔 LocalNotificationService initialized: $initialized');
 
     // Create notification channels for Android
     await createNotificationChannels();
@@ -110,7 +108,6 @@ class LocalNotificationService {
       }
 
     } catch (e) {
-      debugPrint('Error in sendNotificationAndStore: $e');
     }
   }
 
@@ -219,7 +216,6 @@ class LocalNotificationService {
         }
       }
     } catch (e) {
-      debugPrint('Error adding to local notification list: $e');
     }
   }
 
@@ -240,7 +236,6 @@ class LocalNotificationService {
         metadata: notification.metadata,
       );
     } catch (e) {
-      debugPrint('Error storing notification in Firebase: $e');
     }
   }
 
@@ -631,22 +626,4 @@ class LocalNotificationService {
     }
   }
 
-  /// Debug notification with detailed info
-  static Future<void> sendDebugNotification() async {
-    print('🔧 Sending debug notification...');
-
-    final status = await getNotificationStatus();
-    final timeStr = DateTime.now().toString().split('.')[0];
-
-    await sendNotificationAndStore(
-      title: 'Debug Info 🔧',
-      message: 'Platform: ${status['platform']}, Enabled: ${status['enabled']}, Time: $timeStr',
-      notificationType: 'Debug',
-      category: 'Debug',
-      icon: '🔧',
-      sendLocalNotification: true,
-      storeInLocal: false,
-      storeInFirebase: false,
-    );
-  }
 }

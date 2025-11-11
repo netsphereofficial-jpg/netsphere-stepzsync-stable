@@ -28,7 +28,6 @@ class PedometerPermissionMonitor extends GetxService {
   @override
   void onInit() {
     super.onInit();
-    print('🔒 PedometerPermissionMonitor: Initializing...');
 
     // Initial permission check
     checkPermission();
@@ -42,13 +41,11 @@ class PedometerPermissionMonitor extends GetxService {
       checkPermission();
     });
 
-    print('✅ PedometerPermissionMonitor: Initialized');
   }
 
   @override
   void onClose() {
     _periodicCheckTimer?.cancel();
-    print('🔒 PedometerPermissionMonitor: Disposed');
     super.onClose();
   }
 

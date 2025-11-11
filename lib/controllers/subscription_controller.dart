@@ -71,16 +71,13 @@ class SubscriptionController extends GetxController {
       // Check if payment service is available
       final isAvailable = await _paymentService.isAvailable();
       if (!isAvailable) {
-        debugPrint('⚠️ In-app purchases not available on this device');
       }
 
       // Set up purchase stream listener
       _setupPurchaseListener();
 
-      debugPrint('✅ Services initialized successfully');
 
     } catch (e) {
-      debugPrint('❌ Failed to initialize services: $e');
       // SnackbarUtils.showError(
       //   'Initialization Error',
       //   'Failed to initialize subscription services',
@@ -97,7 +94,6 @@ class SubscriptionController extends GetxController {
       final user = await _firebaseCore.getCurrentUser();
       if (user != null) {
         _currentUserId = user.uid;
-        debugPrint('👤 Current user: ${user.uid}');
 
         // Start listening to subscription changes
         _startSubscriptionListener();
@@ -105,12 +101,10 @@ class SubscriptionController extends GetxController {
         // Load initial subscription data
         await loadSubscriptionData();
       } else {
-        debugPrint('⚠️ No authenticated user found');
         // Set default free subscription for non-authenticated users
         currentSubscription.value = UserSubscription.free();
       }
     } catch (e) {
-      debugPrint('❌ Failed to initialize user data: $e');
       currentSubscription.value = UserSubscription.free();
     }
   }
@@ -126,10 +120,8 @@ class SubscriptionController extends GetxController {
         .listen(
       (subscription) {
         currentSubscription.value = subscription;
-        debugPrint('🔄 Subscription updated from Firebase: ${subscription.currentPlan.name}');
       },
       onError: (error) {
-        debugPrint('❌ Subscription stream error: $error');
       },
     );
   }
@@ -146,7 +138,6 @@ class SubscriptionController extends GetxController {
       await loadAvailablePlans();
 
     } catch (e) {
-      debugPrint('❌ Failed to load subscription data: $e');
       // SnackbarUtils.showError(
       //   'Loading Error',
       //   'Failed to load subscription data',
@@ -168,7 +159,6 @@ class SubscriptionController extends GetxController {
       final subscription = await _firebaseService.getSubscription(_currentUserId!);
       currentSubscription.value = subscription;
 
-      debugPrint('✅ Subscription loaded: ${subscription.currentPlan.name}');
 
     } catch (e) {
       debugPrint('❌ Failed to load subscription: $e');

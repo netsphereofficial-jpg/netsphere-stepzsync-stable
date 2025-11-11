@@ -2672,7 +2672,6 @@ class MapController extends GetxController with WidgetsBindingObserver {
           .toList();
 
       // ✅ DEBUG: Log all participant userIds to verify bot detection
-      print('🔍 DEBUG: Race ${race.id} has ${participants.length} total participants');
       for (final p in participants) {
         final isBot = p.userId.startsWith('u_');
         print('   ${isBot ? "🤖 BOT" : "👤 USER"}: userId=${p.userId}, name=${p.userName}, distance=${p.distance}km');
@@ -2777,7 +2776,6 @@ class MarkerIconPreloader {
     if (_isPreloaded) return;
 
     try {
-      print('🎨 [PRELOAD] Generating rank 1-10 icons in background...');
       final startTime = DateTime.now();
 
       // Generate placeholder icons for ranks 1-10 in parallel
@@ -2797,9 +2795,7 @@ class MarkerIconPreloader {
 
       final elapsed = DateTime.now().difference(startTime).inMilliseconds;
       _isPreloaded = true;
-      print('✅ [PRELOAD] Preloaded 10 rank icons in ${elapsed}ms (saves ~180ms on map open)');
     } catch (e) {
-      print('⚠️ [PRELOAD] Failed, will generate on-demand: $e');
       // ✅ SAFETY: Failure doesn't break anything
     }
   }

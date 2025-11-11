@@ -165,9 +165,7 @@ class RaceInviteService {
           );
 
           if (snapshot.docs.isEmpty) {
-            debugPrint(
-              '📭 No pending invite documents found for user $_currentUserId',
-            );
+
             return <RaceInviteModel>[];
           }
 

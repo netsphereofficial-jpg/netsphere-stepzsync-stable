@@ -32,9 +32,7 @@ class NotificationRepository {
         print('🔍 Added isRead filter: $isRead');
       }
 
-      print('📤 Executing Firestore query...');
       final querySnapshot = await query.get();
-      print('📥 Query completed. Found ${querySnapshot.docs.length} documents');
 
       final notifications = querySnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;

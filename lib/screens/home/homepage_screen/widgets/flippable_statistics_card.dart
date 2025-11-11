@@ -122,7 +122,6 @@ class _FlippableStatisticsCardState extends State<FlippableStatisticsCard>
       // Default to false if controller not registered
       return false;
     } catch (e) {
-      debugPrint('Error checking subscription access: $e');
       return false;
     }
   }

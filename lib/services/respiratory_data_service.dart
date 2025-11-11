@@ -30,11 +30,9 @@ class RespiratoryDataService extends GetxController {
 
   Future<void> _initializeRespiratoryDataService() async {
     try {
-      log("🫁 [RESPIRATORY_DATA] Initializing respiratory data service...");
 
       // Skip health permission for guest users
       if (GuestUtils.isGuest()) {
-        log("ℹ️ [RESPIRATORY_DATA] Skipping health permission for guest user");
         isInitialized.value = true;
         return;
       }
@@ -50,7 +48,6 @@ class RespiratoryDataService extends GetxController {
       isRespiratoryRateAvailable.value = isRespiratoryRateDataAvailable;
 
       if (!isBloodOxygenDataAvailable && !isRespiratoryRateDataAvailable) {
-        log("❌ [RESPIRATORY_DATA] Neither blood oxygen nor respiratory rate data available on this device");
         isInitialized.value = true;
         return;
       }
@@ -58,17 +55,13 @@ class RespiratoryDataService extends GetxController {
       // Add a delay to avoid Health Connect rate limiting
       // Permissions are already granted by HealthSyncService, so we just need to wait
       await Future.delayed(const Duration(milliseconds: 1000));
-
-      log("✅ [RESPIRATORY_DATA] Respiratory data service initialized successfully");
-      log("💡 [RESPIRATORY_DATA] Using permissions already granted by HealthSyncService");
-      isInitialized.value = true;
+ isInitialized.value = true;
 
       // Start fetching respiratory data
       await _fetchInitialRespiratoryData();
       _startRespiratoryDataMonitoring();
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error initializing respiratory data service: $e");
       isInitialized.value = true;
     }
   }
@@ -91,7 +84,6 @@ class RespiratoryDataService extends GetxController {
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error fetching initial respiratory data: $e");
       // Set demo values for testing when there's an error
       if (isBloodOxygenAvailable.value) {
         currentBloodOxygen.value = _generateDemoBloodOxygen();
@@ -121,20 +113,17 @@ class RespiratoryDataService extends GetxController {
           final bloodOxygen = (latestReading.value as NumericHealthValue).numericValue.round();
           currentBloodOxygen.value = bloodOxygen;
 
-          log("🫁 [RESPIRATORY_DATA] Latest blood oxygen: $bloodOxygen %");
         }
 
         // Calculate average blood oxygen from recent data
         _calculateAverageBloodOxygen(bloodOxygenData);
       } else {
-        log("⚠️ [RESPIRATORY_DATA] No recent blood oxygen data found");
         // Set demo values for testing when no data is available
         currentBloodOxygen.value = _generateDemoBloodOxygen();
         averageBloodOxygen.value = currentBloodOxygen.value;
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error fetching blood oxygen data: $e");
       currentBloodOxygen.value = _generateDemoBloodOxygen();
       averageBloodOxygen.value = currentBloodOxygen.value;
     }
@@ -157,20 +146,17 @@ class RespiratoryDataService extends GetxController {
           final respiratoryRate = (latestReading.value as NumericHealthValue).numericValue.round();
           currentRespiratoryRate.value = respiratoryRate;
 
-          log("🫁 [RESPIRATORY_DATA] Latest respiratory rate: $respiratoryRate RPM");
         }
 
         // Calculate average respiratory rate from recent data
         _calculateAverageRespiratoryRate(respiratoryRateData);
       } else {
-        log("⚠️ [RESPIRATORY_DATA] No recent respiratory rate data found");
         // Set demo values for testing when no data is available
         currentRespiratoryRate.value = _generateDemoRespiratoryRate();
         averageRespiratoryRate.value = currentRespiratoryRate.value;
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error fetching respiratory rate data: $e");
       currentRespiratoryRate.value = _generateDemoRespiratoryRate();
       averageRespiratoryRate.value = currentRespiratoryRate.value;
     }
@@ -215,7 +201,6 @@ class RespiratoryDataService extends GetxController {
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error calculating average blood oxygen: $e");
     }
   }
 
@@ -239,11 +224,9 @@ class RespiratoryDataService extends GetxController {
 
       if (count > 0) {
         averageBloodOxygen.value = (sum / count).round();
-        log("🫁 [RESPIRATORY_DATA] Average blood oxygen calculated: ${averageBloodOxygen.value}% from $count readings");
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error in blood oxygen average calculation: $e");
     }
   }
 
@@ -274,7 +257,6 @@ class RespiratoryDataService extends GetxController {
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error calculating average respiratory rate: $e");
     }
   }
 
@@ -298,11 +280,9 @@ class RespiratoryDataService extends GetxController {
 
       if (count > 0) {
         averageRespiratoryRate.value = (sum / count).round();
-        log("🫁 [RESPIRATORY_DATA] Average respiratory rate calculated: ${averageRespiratoryRate.value} RPM from $count readings");
       }
 
     } catch (e) {
-      log("❌ [RESPIRATORY_DATA] Error in respiratory rate average calculation: $e");
     }
   }
 
@@ -317,7 +297,6 @@ class RespiratoryDataService extends GetxController {
   Future<void> refreshRespiratoryData() async {
     if (!isInitialized.value) return;
 
-    log("🫁 [RESPIRATORY_DATA] Manually refreshing respiratory data...");
     await _fetchInitialRespiratoryData();
   }
 

@@ -543,7 +543,6 @@ class LeaderboardService {
     int offset = 0,
   }) async {
     try {
-      log('📊 Fetching season leaderboard for: $seasonId (limit: $limit, offset: $offset)');
 
       // Step 1: Fetch ALL registered users from user_profiles
       final allUsersSnapshot = await _firestore

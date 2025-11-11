@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/race_models.dart';
 import 'firebase_service.dart';
+import 'race_service.dart';
 
 class RaceRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -10,7 +11,7 @@ class RaceRepository {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  // Start race - updates race document status
+  // Start race - delegates to RaceService which includes baseline capture
   Future<Map<String, dynamic>?> startRaceApiCall(String? raceId) async {
     if (raceId == null || currentUserId == null) {
       return {
@@ -20,15 +21,10 @@ class RaceRepository {
     }
 
     try {
-      await _firestore.collection('races').doc(raceId).update({
-        'status': 'active',
-        'statusId': 3, // Set statusId to 3 (active) for real-time updates
-        'startedAt': FieldValue.serverTimestamp(),
-        'startedBy': currentUserId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      return {'status': 200, 'message': 'Race started successfully!'};
+      // ✅ CRITICAL FIX: Delegate to RaceService which has baseline capture logic
+      // This ensures baseline is captured when organizer manually starts the race
+      print('🔄 [RACE_REPOSITORY] Delegating to RaceService.startRaceApiCall for baseline capture');
+      return await RaceService.startRaceApiCall(raceId);
     } catch (e) {
       return {'status': 500, 'message': 'Failed to start race: $e'};
     }

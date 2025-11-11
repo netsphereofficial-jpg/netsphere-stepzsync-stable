@@ -61,16 +61,13 @@ class HealthSyncService extends GetxController {
   Future<void> _initializeHealthService() async {
     // Check if already initialized
     if (_initCompleter.isCompleted) {
-      print('${HealthConfig.logPrefix} Already initialized');
       return;
     }
 
     try {
-      print('${HealthConfig.logPrefix} Initializing health sync service...');
 
       // Skip for guest users
       if (GuestUtils.isGuest()) {
-        print('${HealthConfig.logPrefix} Skipping health sync for guest user');
         isHealthAvailable.value = false;
         _initCompleter.complete(false);
         return;
@@ -81,7 +78,6 @@ class HealthSyncService extends GetxController {
       isHealthAvailable.value = available;
 
       if (!available) {
-        print('${HealthConfig.logPrefix} Health services not available');
         _initCompleter.complete(false);
         return;
       }
@@ -91,15 +87,12 @@ class HealthSyncService extends GetxController {
       hasPermissions.value = hasPerms;
 
       if (!hasPerms) {
-        print('${HealthConfig.logPrefix} Health permissions not granted yet');
       } else {
-        print('${HealthConfig.logPrefix} ✅ Health sync service initialized successfully');
       }
 
       // Complete initialization (successful even without permissions)
       _initCompleter.complete(available);
     } catch (e) {
-      print('${HealthConfig.logPrefix} ❌ Error initializing health service: $e');
       isHealthAvailable.value = false;
       _initCompleter.complete(false);
     }
@@ -123,7 +116,6 @@ class HealthSyncService extends GetxController {
 
       return granted;
     } catch (e) {
-      print('${HealthConfig.logPrefix} Error requesting permissions: $e');
       return false;
     }
   }
@@ -282,10 +274,7 @@ class HealthSyncService extends GetxController {
     DateTime end,
   ) async {
     try {
-      print('${HealthConfig.logPrefix} 🔍 [DEBUG] Querying Health Connect for steps:');
-      print('${HealthConfig.logPrefix}    📅 Start: ${start.toIso8601String()} (Local: ${start.toLocal()})');
-      print('${HealthConfig.logPrefix}    📅 End: ${end.toIso8601String()} (Local: ${end.toLocal()})');
-      print('${HealthConfig.logPrefix}    ⏱️ Duration: ${end.difference(start).inHours}h ${end.difference(start).inMinutes % 60}m');
+
 
       // ✅ FIX: Use aggregate query for steps to let HealthKit handle deduplication
       // This prevents counting duplicate step entries from multiple sources
@@ -305,8 +294,6 @@ class HealthSyncService extends GetxController {
         print('${HealthConfig.logPrefix} 🔍 [DEBUG] Raw data points returned: ${rawStepData.length}');
 
         if (rawStepData.isEmpty) {
-          print('${HealthConfig.logPrefix} ⚠️ [DEBUG] No raw step data points found in Health Connect!');
-          print('${HealthConfig.logPrefix} ⚠️ [DEBUG] This means Health Connect has NO step data for this time range');
         } else {
           int totalFromRaw = 0;
           for (var point in rawStepData) {

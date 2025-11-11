@@ -43,21 +43,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return StreamBuilder<User?>(
       stream: firebaseService.getAuthStateChanges(),
       builder: (context, authSnapshot) {
-        debugPrint('🔍 [AUTH_DEBUG] ========== AUTH STATE CHECK ==========');
-        debugPrint('🔍 [AUTH_DEBUG] StreamBuilder triggered');
-        debugPrint('🔍 [AUTH_DEBUG] Connection state: ${authSnapshot.connectionState}');
-        debugPrint('🔍 [AUTH_DEBUG] Has data: ${authSnapshot.hasData}');
-        debugPrint('🔍 [AUTH_DEBUG] Has error: ${authSnapshot.hasError}');
+
         if (authSnapshot.hasError) {
-          debugPrint('🔍 [AUTH_DEBUG] Error: ${authSnapshot.error}');
         }
-        debugPrint('🔍 [AUTH_DEBUG] User UID: ${authSnapshot.data?.uid}');
-        debugPrint('🔍 [AUTH_DEBUG] User email: ${authSnapshot.data?.email}');
-        debugPrint('🔍 [AUTH_DEBUG] User is anonymous: ${authSnapshot.data?.isAnonymous}');
-        debugPrint('🔍 [AUTH_DEBUG] =====================================');
 
         if (authSnapshot.connectionState == ConnectionState.waiting) {
-          debugPrint('🔍 [AUTH_DEBUG] ⏳ Waiting for auth state...');
           return _buildLoadingScreen();
         }
 
@@ -168,11 +158,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<AuthFlowState> _performAuthFlow(User? user) async {
     // No user → Login
     if (user == null) {
-      debugPrint('🔍 [AUTH_DEBUG] No user logged in → Login screen');
       return AuthFlowState(AuthDestination.login);
     }
 
-    debugPrint('🔍 [AUTH_DEBUG] User logged in: ${user.uid} (isAnonymous: ${user.isAnonymous})');
 
     // Guest users → Check/create profile, then home
     if (user.isAnonymous) {
@@ -201,7 +189,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // Check profile completion with minimal caching
     final profileState = await _getProfileState(user);
-    debugPrint('🔍 [AUTH_DEBUG] Profile state destination: ${profileState.destination}');
     return profileState;
   }
 
@@ -243,7 +230,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       _cachedProfileCompleted = isProfileCompleted;
 
       final destination = isProfileCompleted ? AuthDestination.home : AuthDestination.profile;
-      debugPrint('🔍 [AUTH_DEBUG] Navigating to: $destination (profileCompleted: $isProfileCompleted)');
 
       return AuthFlowState(destination);
     } catch (e) {

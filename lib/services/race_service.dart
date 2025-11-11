@@ -5,14 +5,19 @@ import 'package:get/get.dart';
 import '../models/race_models.dart';
 import '../models/api_response.dart';
 import '../core/models/race_data_model.dart';
+import '../database/step_database.dart';
+import '../models/daily_step_data.dart';
 import 'step_tracking_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_service.dart';
 import 'race_state_machine.dart';
+import 'health_sync_coordinator.dart';
 import 'health_sync_service.dart';
 import 'race_step_reconciliation_service.dart';
 import 'preferences_service.dart';
 import '../widgets/race/race_completion_celebration_dialog.dart';
 import '../controllers/race/completed_races_controller.dart';
+import '../core/utils/snackbar_utils.dart';
 
 class RaceService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -364,6 +369,25 @@ class RaceService {
       // Get race distance for participant initialization
       final totalDistance = (raceData['totalDistance'] ?? 0.0).toDouble();
 
+      // ✅ CRITICAL FIX: Capture baseline with multi-source fallback validation
+      // This prevents zero baseline acceptance that causes step drift
+      print('📊 [JOIN_RACE_AS_USER] Capturing baseline for user $targetUserId...');
+
+      Map<String, dynamic>? baselineData = await _captureBaselineWithFallback(raceId, targetUserId);
+
+      // ✅ VALIDATION: Never accept zero baseline - block join operation if all sources fail
+      if (baselineData == null) {
+        print('❌ [JOIN_RACE_AS_USER] Baseline capture failed - aborting join operation');
+        return ApiResponse.error('Health data not ready. Please wait a few seconds and try again.');
+      }
+
+      final baselineSteps = baselineData['steps'] as int;
+      final baselineDistance = baselineData['distance'] as double;
+      final baselineCalories = baselineData['calories'] as int;
+      final baselineTimestamp = baselineData['timestamp'] as DateTime;
+
+      print('✅ [JOIN_RACE_AS_USER] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
+
       // Create new participant using the same structure as race creation
       final newParticipant = Participant(
         userId: targetUserId,
@@ -378,6 +402,10 @@ class RaceService {
         calories: 0,
         avgSpeed: 0.0,
         isCompleted: false,
+        baselineSteps: baselineSteps,
+        baselineDistance: baselineDistance,
+        baselineCalories: baselineCalories,
+        baselineTimestamp: baselineTimestamp,
       );
 
       // Start batch operation for all 3 collections
@@ -515,33 +543,31 @@ class RaceService {
       // Get race distance for participant initialization
       final totalDistance = (raceData['totalDistance'] ?? 0.0).toDouble();
 
-      // ✅ CRITICAL FIX: Capture baseline at join time (not detection time)
+      // ✅ CRITICAL FIX: Capture baseline at join time with multi-source fallback validation
       // This prevents accumulative steps issue and late baseline capture glitch
       // NOTE: User will wait here until baseline capture completes - this is intentional
       // Loading indicator in UI will show during this operation
       print('📊 [JOIN_RACE] Capturing baseline at join time (user will wait for this)...');
-      int baselineSteps = 0;
-      double baselineDistance = 0.0;
-      int baselineCalories = 0;
-      final baselineTimestamp = DateTime.now();
 
-      try {
-        final healthSyncService = Get.find<HealthSyncService>();
-        final currentHealthData = await healthSyncService.fetchTodaySteps();
+      // Multi-source fallback baseline capture with validation (3 retry attempts)
+      Map<String, dynamic>? baselineData = await _captureBaselineWithFallback(raceId, userId);
 
-        if (currentHealthData != null) {
-          baselineSteps = currentHealthData['steps'] as int? ?? 0;
-          baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
-          baselineCalories = currentHealthData['calories'] as int? ?? 0;
-
-          print('📊 [JOIN_RACE] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
-        } else {
-          print('⚠️ [JOIN_RACE] Could not fetch current health data, baseline set to 0');
-        }
-      } catch (e) {
-        print('⚠️ [JOIN_RACE] Error capturing baseline: $e');
-        // Continue with 0 baseline - don't fail join operation
+      // ✅ VALIDATION: Never accept zero baseline - block join operation if all sources fail
+      if (baselineData == null) {
+        print('❌ [JOIN_RACE] Baseline capture failed after all retries - aborting join operation');
+        SnackbarUtils.showError(
+          'Health Data Not Ready',
+          'Cannot join race: health data is not available. Please wait a few seconds and try again.',
+        );
+        return ApiResponse.error('Health data not ready. Please wait a few seconds and try again.');
       }
+
+      final baselineSteps = baselineData['steps'] as int;
+      final baselineDistance = baselineData['distance'] as double;
+      final baselineCalories = baselineData['calories'] as int;
+      final baselineTimestamp = baselineData['timestamp'] as DateTime;
+
+      print('✅ [JOIN_RACE] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
 
       // Create new participant using the same structure as race creation
       final newParticipant = Participant(
@@ -713,17 +739,18 @@ class RaceService {
           final raceTitle = raceData['title'] as String? ?? 'Unknown Race';
 
           // Only initialize baseline for current user (each user initializes their own)
-          if (Get.isRegistered<HealthSyncService>() && Get.isRegistered<RaceStepReconciliationService>()) {
-            final healthSyncService = Get.find<HealthSyncService>();
+          if (Get.isRegistered<RaceStepReconciliationService>()) {
             final reconciliationService = Get.find<RaceStepReconciliationService>();
 
-            // Fetch current HealthKit data for current user
-            final currentHealthData = await healthSyncService.fetchTodaySteps();
+            // ✅ CRITICAL FIX: Use multi-source fallback instead of just healthSyncService
+            // This prevents zero baseline if Health Connect hasn't loaded yet
+            print('📊 [START_RACE] Capturing baseline with multi-source fallback...');
+            final baselineData = await _captureBaselineWithFallback(raceId, userId);
 
-            if (currentHealthData != null) {
-              final healthKitStepsAtStart = currentHealthData['steps'] as int? ?? 0;
-              final healthKitDistanceAtStart = currentHealthData['distance'] as double? ?? 0.0;
-              final healthKitCaloriesAtStart = currentHealthData['calories'] as int? ?? 0;
+            if (baselineData != null) {
+              final healthKitStepsAtStart = baselineData['steps'] as int;
+              final healthKitDistanceAtStart = baselineData['distance'] as double;
+              final healthKitCaloriesAtStart = baselineData['calories'] as int;
 
               print('📊 Current user baseline at race start:');
               print('   Steps: $healthKitStepsAtStart');
@@ -829,7 +856,6 @@ class RaceService {
       final participantsSnapshot = await raceRef.collection('participants').get();
 
       if (participantsSnapshot.docs.isEmpty) {
-        print('⚠️ No participants found in subcollection');
         return;
       }
 
@@ -871,7 +897,6 @@ class RaceService {
       }
 
       if (!participantFound) {
-        print('⚠️ Participant $userId not found in subcollection');
         return;
       }
 
@@ -995,7 +1020,6 @@ class RaceService {
           .get();
 
       if (top3Snapshot.docs.isEmpty) {
-        print('⚠️ No participants found for leaderPreview update');
         return;
       }
 
@@ -1307,5 +1331,159 @@ class RaceService {
     } catch (e) {
       // Error clearing old races: $e
     }
+  }
+
+  // ============================================================================
+  // BASELINE CAPTURE WITH MULTI-SOURCE FALLBACK
+  // ============================================================================
+
+  /// Capture baseline with multi-source fallback and validation
+  /// Returns null if all sources fail after retries
+  /// NEVER accepts zero baseline values - ensures data integrity
+  static Future<Map<String, dynamic>?> _captureBaselineWithFallback(
+    String raceId,
+    String userId, {
+    int maxRetries = 3,
+  }) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      print('📊 [RACE_SERVICE] Baseline capture attempt $attempt/$maxRetries');
+
+      // Try multiple data sources in priority order
+      // Source 1: Health Connect/HealthKit (primary)
+      final healthData = await _tryHealthSource();
+      if (healthData != null && healthData['steps'] > 0) {
+        print('✅ [RACE_SERVICE] Baseline from HealthKit/Health Connect');
+        return _createBaselineData(healthData, raceId, userId);
+      }
+
+      // Source 2: Firebase daily_steps collection
+      final firebaseData = await _tryFirebaseSource(userId);
+      if (firebaseData != null && firebaseData['steps'] > 0) {
+        print('✅ [RACE_SERVICE] Baseline from Firebase daily_steps');
+        return _createBaselineData(firebaseData, raceId, userId);
+      }
+
+      // Source 3: StepTrackingService in-memory state
+      final stepServiceData = await _tryStepServiceSource();
+      if (stepServiceData != null && stepServiceData['steps'] > 0) {
+        print('✅ [RACE_SERVICE] Baseline from StepTrackingService');
+        return _createBaselineData(stepServiceData, raceId, userId);
+      }
+
+      // Source 4: Local SQLite cache (last resort)
+      final sqliteData = await _trySqliteSource();
+      if (sqliteData != null && sqliteData['steps'] > 0) {
+        print('✅ [RACE_SERVICE] Baseline from SQLite cache');
+        return _createBaselineData(sqliteData, raceId, userId);
+      }
+
+      // All sources failed - retry with delay
+      if (attempt < maxRetries) {
+        print('⚠️ [RACE_SERVICE] All sources returned 0 or failed, retrying in 2 seconds...');
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    // All retries exhausted
+    print('❌ [RACE_SERVICE] Baseline capture failed after $maxRetries attempts');
+    return null;
+  }
+
+  /// Try to get health data from HealthKit/Health Connect
+  static Future<Map<String, dynamic>?> _tryHealthSource() async {
+    try {
+      final healthSyncService = Get.find<HealthSyncService>();
+      final data = await healthSyncService.fetchTodaySteps();
+      if (data != null && data['steps'] > 0) {
+        return data;
+      }
+    } catch (e) {
+      print('⚠️ [RACE_SERVICE] Health source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get data from Firebase daily_steps collection
+  static Future<Map<String, dynamic>?> _tryFirebaseSource(String userId) async {
+    try {
+      final today = DateTime.now();
+      final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('daily_steps')
+          .doc(dateKey)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && (data['steps'] ?? 0) > 0) {
+          return {
+            'steps': data['steps'] ?? 0,
+            'distance': data['distance'] ?? 0.0,
+            'calories': data['calories'] ?? 0,
+          };
+        }
+      }
+    } catch (e) {
+      print('⚠️ [RACE_SERVICE] Firebase source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get data from StepTrackingService in-memory state
+  static Future<Map<String, dynamic>?> _tryStepServiceSource() async {
+    try {
+      if (Get.isRegistered<StepTrackingService>()) {
+        final stepService = Get.find<StepTrackingService>();
+        final steps = stepService.todaySteps.value;
+        if (steps > 0) {
+          return {
+            'steps': steps,
+            'distance': stepService.todayDistance.value,
+            'calories': stepService.todayCalories.value,
+          };
+        }
+      }
+    } catch (e) {
+      print('⚠️ [RACE_SERVICE] StepService source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get data from local SQLite cache
+  static Future<Map<String, dynamic>?> _trySqliteSource() async {
+    try {
+      final db = StepDatabase.instance;
+      final today = DateTime.now();
+      final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final data = await db.getDailyData(dateKey);
+      if (data != null && data.steps > 0) {
+        return {
+          'steps': data.steps,
+          'distance': data.distance,
+          'calories': data.calories,
+        };
+      }
+    } catch (e) {
+      print('⚠️ [RACE_SERVICE] SQLite source failed: $e');
+    }
+    return null;
+  }
+
+  /// Create baseline data object from health data
+  static Map<String, dynamic> _createBaselineData(
+    Map<String, dynamic> healthData,
+    String raceId,
+    String userId,
+  ) {
+    return {
+      'steps': healthData['steps'] ?? 0,
+      'distance': healthData['distance'] ?? 0.0,
+      'calories': healthData['calories'] ?? 0,
+      'timestamp': DateTime.now(),
+    };
   }
 }

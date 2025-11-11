@@ -512,7 +512,6 @@ Future<bool> _initializeServicesAndCheck() async {
     // This allows steps to sync continuously even when app is minimized
     // final bgService = Get.find<BackgroundService>();
     // await bgService.enableLocationTracking();
-    print('✅ Background step syncing enabled');
     return true;
   } catch (e) {
     print('⚠️ Background service failed to start: $e');

@@ -14,7 +14,6 @@ class UnifiedNotificationService {
     try {
       final currentUserId = _auth.currentUser?.uid;
       if (currentUserId == null) {
-        log('❌ No current user for notification monitoring');
         return;
       }
 
@@ -24,7 +23,6 @@ class UnifiedNotificationService {
       await stopMonitoring();
 
       // Listen for new notifications for current user
-      log('🎧 Setting up Firebase listener for user: $currentUserId');
 
       _notificationSubscription = _firestore
           .collection('user_notifications')
@@ -38,11 +36,7 @@ class UnifiedNotificationService {
             },
           );
 
-      log('🎧 Firebase listener setup complete');
-
-      log('✅ Unified notification monitoring started');
     } catch (e) {
-      log('❌ Error starting friend notification monitoring: $e');
     }
   }
 
@@ -51,26 +45,21 @@ class UnifiedNotificationService {
     try {
       await _notificationSubscription?.cancel();
       _notificationSubscription = null;
-      log('🛑 Unified notification monitoring stopped');
     } catch (e) {
-      log('❌ Error stopping notification monitoring: $e');
     }
   }
 
   /// Handle notification updates from Firebase
   static void _handleNotificationUpdates(QuerySnapshot snapshot) {
     try {
-      log('📬 Received notification updates: ${snapshot.docChanges.length} changes');
 
       for (var change in snapshot.docChanges) {
-        log('📝 Doc change type: ${change.type}, doc ID: ${change.doc.id}');
 
         if (change.type == DocumentChangeType.added) {
           _processNewNotification(change.doc);
         }
       }
     } catch (e) {
-      log('❌ Error handling notification updates: $e');
     }
   }
 
@@ -108,10 +97,7 @@ class UnifiedNotificationService {
 
       // Don't mark as read immediately - keep it unread so it shows in the notification bell
 
-      log('✅ Notification processed: $type');
-    } catch (e) {
-      log('❌ Error processing friend notification: $e');
-    }
+    } catch (e) {}
   }
 
   /// Manually check for unread notifications
@@ -153,7 +139,6 @@ class UnifiedNotificationService {
       }
 
       await batch.commit();
-      log('🗑️ Cleared all notifications for user: $currentUserId');
     } catch (e) {
       log('❌ Error clearing friend notifications: $e');
     }

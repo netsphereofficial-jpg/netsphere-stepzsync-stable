@@ -32,9 +32,7 @@ class FirebaseService {
       await _configureFirestoreOfflinePersistence();
 
       _isInitialized = true;
-      log("✅ Firebase initialized successfully with offline persistence");
     } catch (e) {
-      log("❌ Firebase initialization failed: $e");
       // Don't throw - let app continue without Firebase
       // Services should handle null/error states gracefully
     }
@@ -52,12 +50,7 @@ class FirebaseService {
 
       firestore.settings = settings;
 
-      log("✅ Firestore offline persistence enabled");
-      log("   - Baseline data will be cached locally");
-      log("   - Faster reads from cache");
-      log("   - Data survives app restarts");
     } catch (e) {
-      log("⚠️ Error configuring Firestore persistence: $e");
       // Don't throw - Firebase can still work without persistence
     }
   }

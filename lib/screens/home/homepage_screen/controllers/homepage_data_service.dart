@@ -95,12 +95,10 @@ class HomepageDataService extends GetxController {
   Future<void> initializeCriticalData() async {
     // Guard: Prevent duplicate initialization
     if (_isInitializing || _isFullyInitialized) {
-      print('⏭️ HomepageDataService: Skipping duplicate initialization (initializing: $_isInitializing, initialized: $_isFullyInitialized)');
       return;
     }
 
     _isInitializing = true;
-    print('🚀 HomepageDataService: Starting critical data initialization');
 
     // 📊 Start Firebase Performance trace
     final trace = FirebasePerformance.instance.newTrace('homepage_critical_init');
@@ -110,12 +108,10 @@ class HomepageDataService extends GetxController {
       // Only load essential user data that affects initial UI
       await loadUserName();
       isInitialLoading.value = false;
-      print('✅ HomepageDataService: Critical data initialization complete');
 
       // 📊 Mark trace as successful
       trace.putAttribute('status', 'success');
     } catch (e) {
-      print('❌ HomepageDataService: Error during critical data initialization: $e');
       isInitialLoading.value = false;
 
       // 📊 Mark trace as failed
@@ -132,12 +128,10 @@ class HomepageDataService extends GetxController {
   Future<void> initializeSecondaryData() async {
     // Guard: Prevent duplicate initialization
     if (_isFullyInitialized) {
-      print('⏭️ HomepageDataService: Secondary data already initialized');
       return;
     }
 
     if (_isInitializing) {
-      print('⏳ HomepageDataService: Waiting for ongoing initialization to complete...');
       // Wait for ongoing initialization with timeout
       int attempts = 0;
       while (_isInitializing && attempts < 50) {
@@ -145,13 +139,11 @@ class HomepageDataService extends GetxController {
         attempts++;
       }
       if (_isFullyInitialized) {
-        print('✅ HomepageDataService: Initialization already completed by another call');
         return;
       }
     }
 
     _isInitializing = true;
-    print('🚀 HomepageDataService: Starting secondary data initialization');
 
     // 📊 Start Firebase Performance trace
     final trace = FirebasePerformance.instance.newTrace('homepage_secondary_init');
@@ -176,12 +168,10 @@ class HomepageDataService extends GetxController {
       _isFullyInitialized = true;
       _setupOptimizedRefresh();
 
-      print('✅ HomepageDataService: Secondary data initialization complete');
 
       // 📊 Mark trace as successful
       trace.putAttribute('status', 'success');
     } catch (e) {
-      print('❌ HomepageDataService: Error during secondary data initialization: $e');
 
       // 📊 Mark trace as failed
       trace.putAttribute('status', 'failed');
@@ -321,7 +311,6 @@ class HomepageDataService extends GetxController {
               _processActiveRaceCount(snapshot, currentUserId);
             },
             onError: (error) {
-              print('Error listening to active race count: $error');
               activeJoinedRaceCount.value = 0;
             },
           );
@@ -382,9 +371,7 @@ class HomepageDataService extends GetxController {
       }
 
       activeJoinedRaceCount.value = count;
-      print('Real-time active race count updated: $count');
     } catch (e) {
-      print('Error processing active race count: $e');
       activeJoinedRaceCount.value = 0;
     }
   }
@@ -930,16 +917,13 @@ class HomepageDataService extends GetxController {
     await trace.start();
 
     try {
-      print('💓 HomepageDataService: Initializing HeartRateService...');
 
       // Get or create the permanent heart rate service instance
       if (Get.isRegistered<HeartRateService>()) {
         _heartRateService = Get.find<HeartRateService>();
-        print('✅ Found existing HeartRateService instance');
         trace.putAttribute('service_type', 'existing');
       } else {
         _heartRateService = Get.put(HeartRateService(), permanent: true);
-        print('✅ Created new HeartRateService instance');
         trace.putAttribute('service_type', 'new');
       }
 
@@ -967,8 +951,7 @@ class HomepageDataService extends GetxController {
           trace.setMetric('wait_time_ms', attempts * 100);
         }
 
-        print('💓 Current heart rate: ${_heartRateService?.currentHeartRate.value}');
-        print('💓 Heart rate available: ${_heartRateService?.isHeartRateAvailable.value}');
+
 
         // Set initial values immediately
         _setInitialHeartRateValues();

@@ -45,7 +45,6 @@ class RaceStepReconciliationService extends GetxService {
   @override
   Future<void> onInit() async {
     super.onInit();
-    dev.log('✅ [RACE_RECONCILIATION] Service initialized');
   }
 
   /// Sync health data to all active races using Cloud Functions.
@@ -67,7 +66,6 @@ class RaceStepReconciliationService extends GetxService {
     // 1. Authentication check
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
-      dev.log('⚠️ [RACE_RECONCILIATION] No authenticated user, skipping sync');
       return false;
     }
 
@@ -75,14 +73,12 @@ class RaceStepReconciliationService extends GetxService {
     if (!forceSync && _lastSyncTimestamp != null) {
       final timeSinceLastSync = DateTime.now().difference(_lastSyncTimestamp!);
       if (timeSinceLastSync < MIN_SYNC_INTERVAL) {
-        dev.log('⏭️ [RACE_RECONCILIATION] Rate limited, skipping sync (last sync: ${timeSinceLastSync.inSeconds}s ago)');
         return false;
       }
     }
 
     // 3. Prevent concurrent syncs
     if (isSyncing.value) {
-      dev.log('⏭️ [RACE_RECONCILIATION] Sync already in progress, skipping');
       return false;
     }
 
@@ -91,20 +87,12 @@ class RaceStepReconciliationService extends GetxService {
     errorMessage.value = '';
 
     try {
-      dev.log('🏥 [RACE_RECONCILIATION] Syncing health data to races:');
-      dev.log('   Steps: $totalSteps, Distance: ${totalDistance.toStringAsFixed(2)} km, Calories: $totalCalories');
 
-      // 🔍 DETAILED DISTANCE LOGGING
-      dev.log('📏 [DISTANCE_CHECK] Distance value breakdown:');
-      dev.log('   Raw distance value: $totalDistance');
-      dev.log('   Distance is zero: ${totalDistance == 0.0}');
-      dev.log('   Distance is positive: ${totalDistance > 0.0}');
+
 
       // Calculate expected distance from steps as fallback
       const double STEPS_TO_KM_FACTOR = 0.000762;
       final calculatedDistance = totalSteps * STEPS_TO_KM_FACTOR;
-      dev.log('   Expected distance from $totalSteps steps: ${calculatedDistance.toStringAsFixed(4)} km');
-      dev.log('   Difference from health data: ${(totalDistance - calculatedDistance).abs().toStringAsFixed(4)} km');
 
       // 4. Prepare payload
       final now = DateTime.now();
@@ -127,7 +115,6 @@ class RaceStepReconciliationService extends GetxService {
       dev.log('   date: $dateString');
 
       // 5. Call Cloud Function
-      dev.log('☁️ [RACE_RECONCILIATION] Calling syncHealthDataToRaces Cloud Function...');
       final callable = _functions.httpsCallable('syncHealthDataToRaces');
       final result = await callable.call(payload);
 
@@ -138,9 +125,7 @@ class RaceStepReconciliationService extends GetxService {
       final message = data['message'] as String? ?? 'Unknown response';
 
       if (success) {
-        dev.log('✅ [RACE_RECONCILIATION] Sync successful!');
-        dev.log('   Races updated: $racesUpdated');
-        dev.log('   Message: $message');
+
 
         lastSyncRaceCount.value = racesUpdated;
         lastSyncTime.value = DateTime.now().toIso8601String();
@@ -148,14 +133,11 @@ class RaceStepReconciliationService extends GetxService {
 
         return true;
       } else {
-        dev.log('❌ [RACE_RECONCILIATION] Sync failed: $message');
         hasError.value = true;
         errorMessage.value = message;
         return false;
       }
     } catch (e, stackTrace) {
-      dev.log('❌ [RACE_RECONCILIATION] Error syncing health data: $e');
-      dev.log('   Stack trace: $stackTrace');
 
       hasError.value = true;
       errorMessage.value = e.toString();
@@ -189,15 +171,10 @@ class RaceStepReconciliationService extends GetxService {
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
-      dev.log('⚠️ [RACE_RECONCILIATION] No authenticated user, cannot initialize baseline');
       return false;
     }
 
     try {
-      dev.log('📊 [RACE_RECONCILIATION] Initializing baseline for race: $raceTitle');
-      dev.log('   Race ID: $raceId');
-      dev.log('   Start Time: ${raceStartTime.toIso8601String()}');
-      dev.log('   Baseline: $healthKitStepsAtStart steps, ${healthKitDistanceAtStart.toStringAsFixed(2)} km, $healthKitCaloriesAtStart kcal');
 
       // Call Cloud Function to initialize baseline
       final callable = _functions.httpsCallable('initializeRaceBaseline');
@@ -217,15 +194,12 @@ class RaceStepReconciliationService extends GetxService {
       final message = data['message'] as String? ?? 'Unknown error';
 
       if (success) {
-        dev.log('✅ [RACE_RECONCILIATION] Baseline initialized successfully');
         return true;
       } else {
-        dev.log('❌ [RACE_RECONCILIATION] Failed to initialize baseline: $message');
         return false;
       }
     } catch (e, stackTrace) {
-      dev.log('❌ [RACE_RECONCILIATION] Error initializing baseline: $e');
-      dev.log('   Stack trace: $stackTrace');
+
       return false;
     }
   }

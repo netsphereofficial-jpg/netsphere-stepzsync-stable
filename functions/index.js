@@ -696,6 +696,27 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
           console.log(`      This is the first sync for this race`);
           console.log(`      Initial baseline will be: ${totalSteps} steps, ${totalDistance.toFixed(2)} km, ${totalCalories} cal`);
 
+          // 🛡️ CRITICAL VALIDATION: Prevent zero baseline creation
+          // Zero baselines cause step drift where ALL future steps get added to races
+          // This happens during app restarts before Health Connect responds with real data
+          if (totalSteps === 0 && totalDistance === 0 && totalCalories === 0) {
+            console.log(`   ❌ [BASELINE_VALIDATION] REJECTED: Cannot create baseline with all zero values!`);
+            console.log(`      This indicates health data not yet loaded (app restart, Health Connect rate limit, etc.)`);
+            console.log(`      Throwing error to notify client that health data is not ready`);
+            throw new functions.https.HttpsError(
+              'failed-precondition',
+              'Cannot create race baseline with zero health data. Health data is not yet loaded. Please wait a few seconds and try again.'
+            );
+          }
+
+          // Additional safety: Warn if only steps is zero (suspicious)
+          if (totalSteps === 0 && (totalDistance > 0 || totalCalories > 0)) {
+            console.log(`   ⚠️ [BASELINE_VALIDATION] WARNING: Steps is zero but distance/calories are not`);
+            console.log(`      Steps: ${totalSteps}, Distance: ${totalDistance}, Calories: ${totalCalories}`);
+            console.log(`      This is unusual but may be valid in edge cases (e.g., wheelchair user)`);
+            console.log(`      Proceeding with baseline creation but flagging for review`);
+          }
+
           baselineData = {
             raceId: raceId,
             raceTitle: raceData.title || 'Untitled Race',
@@ -709,7 +730,7 @@ exports.syncHealthDataToRaces = functions.https.onCall(async (data, context) => 
             lastUpdatedAt: admin.firestore.Timestamp.now(),
           };
           batch.set(baselineRef, baselineData);
-          console.log(`      ✅ Baseline queued for creation in batch`);
+          console.log(`      ✅ Baseline validation passed - queued for creation in batch`);
         } else {
           console.log(`   📖 [BASELINE] Found existing baseline`);
           baselineData = baselineDoc.data();
@@ -1578,6 +1599,27 @@ exports.initializeRaceBaseline = functions.https.onCall(async (data, context) =>
   console.log(`   Race: ${raceTitle}`);
   console.log(`   Start Time: ${raceStartTime}`);
   console.log(`   Baseline: ${healthKitStepsAtStart} steps, ${healthKitDistanceAtStart.toFixed(2)} km, ${healthKitCaloriesAtStart} cal`);
+
+  // 🛡️ CRITICAL VALIDATION: Prevent zero baseline initialization
+  // Zero baselines cause step drift where ALL future steps get added to races
+  // This happens during app restarts or when health data hasn't loaded yet
+  if (healthKitStepsAtStart === 0 && healthKitDistanceAtStart === 0 && healthKitCaloriesAtStart === 0) {
+    console.log(`   ⚠️ [BASELINE_VALIDATION] REJECTED: Cannot initialize baseline with all zero values!`);
+    console.log(`      This indicates health data not yet loaded (app restart, Health Connect rate limit, etc.)`);
+    console.log(`      Client should retry baseline initialization after health data loads`);
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Cannot initialize baseline with zero health data. Please wait for health data to load and try again.'
+    );
+  }
+
+  // Additional safety: Warn if only steps is zero (suspicious)
+  if (healthKitStepsAtStart === 0 && (healthKitDistanceAtStart > 0 || healthKitCaloriesAtStart > 0)) {
+    console.log(`   ⚠️ [BASELINE_VALIDATION] WARNING: Steps is zero but distance/calories are not`);
+    console.log(`      Steps: ${healthKitStepsAtStart}, Distance: ${healthKitDistanceAtStart}, Calories: ${healthKitCaloriesAtStart}`);
+    console.log(`      This is unusual but may be valid in edge cases (e.g., wheelchair user)`);
+    console.log(`      Proceeding with baseline initialization but flagging for review`);
+  }
 
   try {
     // Parse race start time

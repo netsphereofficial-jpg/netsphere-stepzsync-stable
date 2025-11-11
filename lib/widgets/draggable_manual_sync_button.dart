@@ -153,17 +153,7 @@ class _DraggableManualSyncButtonState extends State<DraggableManualSyncButton>
     if (!_stepTrackingService.canManualSync) {
       // Show cooldown message
       HapticFeedback.heavyImpact();
-      Get.snackbar(
-        'Sync Cooldown',
-        'Please wait ${_secondsRemaining}s before syncing again',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.orange.withValues(alpha: 0.95),
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(16),
-        borderRadius: 16,
-        icon: const Icon(Icons.timer, color: Colors.white),
-      );
+
       return;
     }
 

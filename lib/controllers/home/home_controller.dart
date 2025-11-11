@@ -45,7 +45,6 @@ class HomeController extends GetxController with GetSingleTickerProviderStateMix
 
     // ✅ OPTIMIZATION: Start deferred services after home screen loads
     // These were moved from main.dart to improve startup time
-    _startDeferredServices();
   }
 
 
@@ -53,58 +52,16 @@ class HomeController extends GetxController with GetSingleTickerProviderStateMix
   /// Initialize friend notification service
   Future<void> _initializeFriendNotifications() async {
     try {
-      print('🔄 HomeController: Initializing notification services...');
 
       // Start monitoring all notifications from Firebase (friends, chat, etc.)
       await UnifiedNotificationService.startMonitoring();
-      print('✅ HomeController: Notification monitoring started');
 
       // Check for any unread notifications on startup
       await UnifiedNotificationService.checkForUnreadNotifications();
-      print('✅ HomeController: Checked for unread notifications');
     } catch (e) {
-      print('❌ Error initializing friend notifications: $e');
     }
   }
 
-  /// ✅ OPTIMIZATION: Start deferred services that were moved from main.dart
-  /// These services are not critical for app startup and can be initialized
-  /// after the home screen is displayed to the user
-  void _startDeferredServices() {
-    // Run in background to avoid blocking UI
-    Future.microtask(() async {
-      try {
-        print('🚀 [DEFERRED] Starting deferred background services...');
-
-        // Start automatic race start monitoring for scheduled races
-        // This was moved from main.dart to avoid blocking app startup
-        try {
-          RaceStateMachine.startScheduledRaceMonitoring();
-          print('✅ [DEFERRED] Race monitoring started');
-        } catch (e) {
-          print('❌ [DEFERRED] Failed to start race monitoring: $e');
-        }
-
-        // Background Step Sync Service (only if user has enabled it in settings)
-        // This was moved from main.dart to avoid blocking app startup
-        try {
-          if (Get.isRegistered<BackgroundStepSyncService>()) {
-            final bgSyncService = Get.find<BackgroundStepSyncService>();
-            print('✅ [DEFERRED] Background sync service already initialized');
-          } else {
-            print('ℹ️ [DEFERRED] Background sync will initialize when user enables it');
-          }
-        } catch (e) {
-          print('❌ [DEFERRED] Background sync service error: $e');
-        }
-
-        print('✅ [DEFERRED] All deferred services started successfully');
-      } catch (e) {
-        print('❌ [DEFERRED] Error starting deferred services: $e');
-      }
-    });
-  }
-  
   void changeIndex(int index) {
     selectedIndex.value = index;
     

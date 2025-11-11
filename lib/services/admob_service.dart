@@ -12,6 +12,7 @@ class AdMobService {
   RewardedAd? _rewardedAd;
   bool _isAdLoaded = false;
   bool _isAdLoading = false;
+  bool _isInitialized = false;
 
   /// Test ad units (replace with your actual ad units in production)
   /// To get real ad units:
@@ -30,15 +31,21 @@ class AdMobService {
     throw UnsupportedError('Unsupported platform');
   }
 
-  /// Initialize AdMob SDK
-  /// Call this once during app startup
-  static Future<void> initialize() async {
+  /// Initialize AdMob SDK on-demand (lazy initialization)
+  /// Called automatically when first needed
+  Future<void> _ensureInitialized() async {
+    if (_isInitialized) return;
+
     await MobileAds.instance.initialize();
-    print('🎬 AdMob SDK initialized');
+    _isInitialized = true;
+    print('🎬 AdMob SDK initialized (lazy)');
   }
 
   /// Load a rewarded video ad
   Future<void> loadRewardedAd() async {
+    // Ensure AdMob SDK is initialized before loading ads
+    await _ensureInitialized();
+
     if (_isAdLoading || _isAdLoaded) {
       print('⚠️ Ad is already loaded or loading');
       return;
@@ -58,7 +65,6 @@ class AdMobService {
           _isAdLoading = false;
         },
         onAdFailedToLoad: (error) {
-          print('❌ Failed to load rewarded ad: $error');
           _isAdLoading = false;
           _isAdLoaded = false;
         },

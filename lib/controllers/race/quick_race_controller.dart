@@ -2,18 +2,23 @@ import 'dart:developer';
 import 'dart:math' as dart_math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 
 import '../../core/models/race_data_model.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../database/step_database.dart';
+import '../../models/daily_step_data.dart';
 import '../../models/place_model.dart';
 import '../../services/auth/firebase_auth_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/health_sync_coordinator.dart';
 import '../../services/health_sync_service.dart';
 import '../../services/places_service.dart';
 import '../../services/preferences_service.dart';
+import '../../services/step_tracking_service.dart';
 import '../../screens/races/quick_race/quick_race_waiting_room_screen.dart';
 
 class QuickRaceController extends GetxController {
@@ -201,32 +206,22 @@ class QuickRaceController extends GetxController {
       // ✅ CRITICAL: Capture baseline BEFORE transaction (outside transaction for performance)
       // We'll capture for the first race attempt and reuse if we retry with another race
       log('📊 [QUICK_RACE] Pre-capturing baseline for joiner before transaction...');
-      Map<String, dynamic>? baselineData;
-      try {
-        if (Get.isRegistered<HealthSyncService>()) {
-          final healthSyncService = Get.find<HealthSyncService>();
-          final currentHealthData = await healthSyncService.fetchTodaySteps();
 
-          if (currentHealthData != null) {
-            final baselineSteps = currentHealthData['steps'] as int? ?? 0;
-            final baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
-            final baselineCalories = currentHealthData['calories'] as int? ?? 0;
+      // Use the multi-source fallback to get baseline
+      // Note: We need a temporary raceId for the _captureBaseline call, but we'll override it later
+      final Map<String, dynamic>? baselineData = await _captureBaseline('temp', currentUser.uid);
 
-            baselineData = {
-              'baselineSteps': baselineSteps,
-              'baselineDistance': baselineDistance,
-              'baselineCalories': baselineCalories,
-              'baselineTimestamp': Timestamp.fromDate(DateTime.now()),
-            };
-
-            log('📊 [QUICK_RACE] Joiner baseline pre-captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km');
-          } else {
-            log('⚠️ [QUICK_RACE] Could not fetch health data for joiner, baseline will be 0');
-          }
-        }
-      } catch (e) {
-        log('⚠️ [QUICK_RACE] Error pre-capturing baseline for joiner: $e');
+      // 🛡️ VALIDATION: Block race join if baseline capture fails
+      if (baselineData == null) {
+        log('❌ [QUICK_RACE] Baseline capture failed - cannot join race');
+        SnackbarUtils.showError(
+          'Health Data Not Ready',
+          'Cannot join race: health data is not available. Please wait a few seconds and try again.',
+        );
+        return null;
       }
+
+      log('✅ [QUICK_RACE] Joiner baseline pre-captured: ${baselineData['baselineSteps']} steps from ${baselineData['dataSource']}');
 
       // Try to join each matching race using atomic transaction
       for (var raceDoc in matchingRaces.docs) {
@@ -551,17 +546,31 @@ class QuickRaceController extends GetxController {
       log('📊 [QUICK_RACE] Capturing baseline for race creator...');
       final baselineData = await _captureBaseline(raceId, currentUser.uid);
 
+      // 🛡️ VALIDATION: Block race creation if baseline capture fails
+      if (baselineData == null) {
+        log('❌ [QUICK_RACE] Baseline capture failed - deleting race and aborting creation');
+
+        // Clean up: Delete the race document since we can't proceed
+        try {
+          await raceDocRef.delete();
+        } catch (e) {
+          log('⚠️ [QUICK_RACE] Failed to clean up race document: $e');
+        }
+
+        SnackbarUtils.showError(
+          'Health Data Not Ready',
+          'Cannot create race: health data is not available. Please wait a few seconds and try again.',
+        );
+        return;
+      }
+
       // Update participant with actual baseline data
       final participantData = creatorParticipant.toFirestore();
-      if (baselineData != null) {
-        participantData['baselineSteps'] = baselineData['baselineSteps'];
-        participantData['baselineDistance'] = baselineData['baselineDistance'];
-        participantData['baselineCalories'] = baselineData['baselineCalories'];
-        participantData['baselineTimestamp'] = baselineData['baselineTimestamp'];
-        log('✅ [QUICK_RACE] Creator baseline added to participant document');
-      } else {
-        log('⚠️ [QUICK_RACE] Baseline capture failed, using 0 values');
-      }
+      participantData['baselineSteps'] = baselineData['baselineSteps'];
+      participantData['baselineDistance'] = baselineData['baselineDistance'];
+      participantData['baselineCalories'] = baselineData['baselineCalories'];
+      participantData['baselineTimestamp'] = baselineData['baselineTimestamp'];
+      log('✅ [QUICK_RACE] Creator baseline added to participant document');
 
       // Add participant to race's participants subcollection with baseline
       await raceDocRef
@@ -621,76 +630,240 @@ class QuickRaceController extends GetxController {
     }
   }
 
-  /// Capture baseline health data at race join time
-  /// Returns map with baseline data or null if capture fails
-  Future<Map<String, dynamic>?> _captureBaseline(String raceId, String userId) async {
-    try {
-      log('📊 [QUICK_RACE] Capturing baseline at join time...');
+  /// Capture baseline health data at race join time with multi-source fallback
+  /// Returns map with baseline data or null if all sources fail
+  ///
+  /// 🛡️ CRITICAL: Never accepts zero baselines - uses fallback sources
+  /// Fallback hierarchy: HealthKit → Coordinator → Firebase → StepService → SQLite
+  Future<Map<String, dynamic>?> _captureBaseline(String raceId, String userId, {int maxRetries = 3}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      log('📊 [QUICK_RACE] Baseline capture attempt $attempt/$maxRetries');
 
-      int baselineSteps = 0;
-      double baselineDistance = 0.0;
-      int baselineCalories = 0;
-      final baselineTimestamp = DateTime.now();
+      // Try multiple data sources in priority order
 
-      // Fetch current health data
-      try {
-        if (Get.isRegistered<HealthSyncService>()) {
-          final healthSyncService = Get.find<HealthSyncService>();
-          final currentHealthData = await healthSyncService.fetchTodaySteps();
-
-          if (currentHealthData != null) {
-            baselineSteps = currentHealthData['steps'] as int? ?? 0;
-            baselineDistance = currentHealthData['distance'] as double? ?? 0.0;
-            baselineCalories = currentHealthData['calories'] as int? ?? 0;
-
-            log('📊 [QUICK_RACE] Baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
-          } else {
-            log('⚠️ [QUICK_RACE] Could not fetch current health data, baseline set to 0');
-          }
-        } else {
-          log('⚠️ [QUICK_RACE] HealthSyncService not registered, baseline set to 0');
-        }
-      } catch (e) {
-        log('⚠️ [QUICK_RACE] Error fetching health data: $e');
-        // Continue with 0 baseline - don't fail join operation
+      // 1. PRIMARY: Health Connect/HealthKit
+      final healthData = await _tryHealthSource();
+      if (healthData != null && healthData['steps'] > 0) {
+        return _createBaselineData(healthData, raceId, userId);
       }
 
-      final baselineData = {
-        'baselineSteps': baselineSteps,
-        'baselineDistance': baselineDistance,
-        'baselineCalories': baselineCalories,
-        'baselineTimestamp': Timestamp.fromDate(baselineTimestamp),
-        'raceId': raceId,
-        'userId': userId,
-        'raceStartTime': DateTime.now().toIso8601String(),
-      };
-
-      // Save to local storage for fast access during race
-      try {
-        if (Get.isRegistered<PreferencesService>()) {
-          final prefsService = Get.find<PreferencesService>();
-          await prefsService.saveRaceBaseline(raceId, userId, {
-            'raceId': raceId,
-            'userId': userId,
-            'baselineSteps': baselineSteps,
-            'baselineDistance': baselineDistance,
-            'baselineCalories': baselineCalories,
-            'baselineTimestamp': baselineTimestamp.toIso8601String(),
-            'raceStartTime': DateTime.now().toIso8601String(),
-          });
-          log('✅ [QUICK_RACE] Baseline saved to local storage');
-        }
-      } catch (e) {
-        log('⚠️ [QUICK_RACE] Could not save baseline to local storage: $e');
-        // Don't fail join operation if local save fails
+      // 2. FALLBACK 1: HealthSyncCoordinator cache
+      final coordinatorData = await _tryCoordinatorSource();
+      if (coordinatorData != null && coordinatorData['steps'] > 0) {
+        return _createBaselineData(coordinatorData, raceId, userId);
       }
 
-      log('✅ [QUICK_RACE] Baseline capture complete: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km');
-      return baselineData;
-    } catch (e) {
-      log('❌ [QUICK_RACE] Error capturing baseline: $e');
-      return null;
+      // 3. FALLBACK 2: Firebase daily_steps
+      final firebaseData = await _tryFirebaseSource();
+      if (firebaseData != null && firebaseData['steps'] > 0) {
+        return _createBaselineData(firebaseData, raceId, userId);
+      }
+
+      // 4. FALLBACK 3: StepTrackingService memory
+      final stepServiceData = await _tryStepServiceSource();
+      if (stepServiceData != null && stepServiceData['steps'] > 0) {
+        return _createBaselineData(stepServiceData, raceId, userId);
+      }
+
+      // 5. FALLBACK 4: Local SQLite cache
+      final sqliteData = await _trySqliteSource();
+      if (sqliteData != null && sqliteData['steps'] > 0) {
+        return _createBaselineData(sqliteData, raceId, userId);
+      }
+
+      // Wait before retry
+      if (attempt < maxRetries) {
+        log('⏳ [QUICK_RACE] All sources returned 0, waiting 2s before retry...');
+        await Future.delayed(Duration(seconds: 2));
+      }
     }
+
+    // All retries exhausted
+    log('❌ [QUICK_RACE] All fallback sources failed after $maxRetries attempts');
+    return null;
+  }
+
+  /// Create baseline data structure and save to local storage
+  Future<Map<String, dynamic>> _createBaselineData(
+    Map<String, dynamic> healthData,
+    String raceId,
+    String userId,
+  ) async {
+    final baselineSteps = healthData['steps'] as int;
+    final baselineDistance = healthData['distance'] as double;
+    final baselineCalories = healthData['calories'] as int;
+    final source = healthData['source'] as String?;
+    final baselineTimestamp = DateTime.now();
+
+    log('✅ [QUICK_RACE] Baseline captured from $source: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km');
+
+    final baselineData = {
+      'baselineSteps': baselineSteps,
+      'baselineDistance': baselineDistance,
+      'baselineCalories': baselineCalories,
+      'baselineTimestamp': Timestamp.fromDate(baselineTimestamp),
+      'raceId': raceId,
+      'userId': userId,
+      'raceStartTime': DateTime.now().toIso8601String(),
+      'dataSource': source ?? 'unknown',
+    };
+
+    // Save to local storage for fast access during race
+    try {
+      if (Get.isRegistered<PreferencesService>()) {
+        final prefsService = Get.find<PreferencesService>();
+        await prefsService.saveRaceBaseline(raceId, userId, {
+          'raceId': raceId,
+          'userId': userId,
+          'baselineSteps': baselineSteps,
+          'baselineDistance': baselineDistance,
+          'baselineCalories': baselineCalories,
+          'baselineTimestamp': baselineTimestamp.toIso8601String(),
+          'raceStartTime': DateTime.now().toIso8601String(),
+          'dataSource': source ?? 'unknown',
+        });
+        log('✅ [QUICK_RACE] Baseline saved to local storage');
+      }
+    } catch (e) {
+      log('⚠️ [QUICK_RACE] Could not save baseline to local storage: $e');
+      // Don't fail if local save fails
+    }
+
+    return baselineData;
+  }
+
+  /// Try to get health data from Health Connect/HealthKit
+  Future<Map<String, dynamic>?> _tryHealthSource() async {
+    try {
+      if (!Get.isRegistered<HealthSyncService>()) {
+        return null;
+      }
+
+      final healthService = Get.find<HealthSyncService>();
+      final healthData = await healthService.fetchTodaySteps();
+
+      if (healthData != null && healthData['steps'] > 0) {
+        log('✅ [QUICK_RACE] Using Health Connect/HealthKit: ${healthData['steps']} steps');
+        return {...healthData, 'source': 'healthkit'};
+      }
+    } catch (e) {
+      log('⚠️ [QUICK_RACE] Health source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get health data from HealthSyncCoordinator cache
+  Future<Map<String, dynamic>?> _tryCoordinatorSource() async {
+    try {
+      if (!Get.isRegistered<HealthSyncCoordinator>()) {
+        return null;
+      }
+
+      final coordinator = Get.find<HealthSyncCoordinator>();
+      final debugInfo = coordinator.getDebugInfo();
+
+      final steps = debugInfo['lastProcessedSteps'] as int;
+      final distance = debugInfo['lastProcessedDistance'] as double;
+      final calories = debugInfo['lastProcessedCalories'] as int;
+      final date = debugInfo['lastProcessedDate'] as String?;
+
+      // Check if data is from today
+      final now = DateTime.now();
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      if (date == today && steps > 0) {
+        log('✅ [QUICK_RACE] Using HealthSyncCoordinator cache: $steps steps (from $date)');
+        return {
+          'steps': steps,
+          'distance': distance,
+          'calories': calories,
+          'source': 'coordinator_cache',
+        };
+      }
+    } catch (e) {
+      log('⚠️ [QUICK_RACE] Coordinator source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get health data from Firebase daily_steps
+  Future<Map<String, dynamic>?> _tryFirebaseSource() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return null;
+
+      final today = DateTime.now();
+      final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('daily_steps')
+          .doc(dateKey)
+          .get();
+
+      final firebaseData = doc.exists ? doc.data() : null;
+
+      if (firebaseData != null && (firebaseData['steps'] ?? 0) > 0) {
+        log('✅ [QUICK_RACE] Using Firebase daily_steps: ${firebaseData['steps']} steps');
+        return {
+          'steps': firebaseData['steps'] ?? 0,
+          'distance': firebaseData['distance'] ?? 0.0,
+          'calories': firebaseData['calories'] ?? 0,
+          'source': 'firebase_daily_steps',
+        };
+      }
+    } catch (e) {
+      log('⚠️ [QUICK_RACE] Firebase source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get health data from StepTrackingService in-memory state
+  Future<Map<String, dynamic>?> _tryStepServiceSource() async {
+    try {
+      if (!Get.isRegistered<StepTrackingService>()) {
+        return null;
+      }
+
+      final stepService = Get.find<StepTrackingService>();
+      final steps = stepService.todaySteps.value;
+
+      if (steps > 0) {
+        log('✅ [QUICK_RACE] Using StepTrackingService: $steps steps');
+        return {
+          'steps': steps,
+          'distance': stepService.todayDistance.value,
+          'calories': stepService.todayCalories.value,
+          'source': 'step_service_memory',
+        };
+      }
+    } catch (e) {
+      log('⚠️ [QUICK_RACE] StepService source failed: $e');
+    }
+    return null;
+  }
+
+  /// Try to get health data from local SQLite cache
+  Future<Map<String, dynamic>?> _trySqliteSource() async {
+    try {
+      final db = StepDatabase.instance;
+      final today = DailyStepData.getTodayDate();
+      final localData = await db.getDailyData(today);
+
+      if (localData != null && localData.steps > 0) {
+        log('✅ [QUICK_RACE] Using SQLite cache: ${localData.steps} steps');
+        return {
+          'steps': localData.steps,
+          'distance': localData.distance,
+          'calories': localData.calories,
+          'source': 'sqlite_cache',
+        };
+      }
+    } catch (e) {
+      log('⚠️ [QUICK_RACE] SQLite source failed: $e');
+    }
+    return null;
   }
 
   /// Calculate end point coordinates based on distance

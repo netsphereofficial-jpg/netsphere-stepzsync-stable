@@ -23,11 +23,9 @@ class HeartRateService extends GetxController {
 
   Future<void> _initializeHeartRateService() async {
     try {
-      log("💓 [HEART_RATE] Initializing heart rate service...");
 
       // Skip health permission for guest users
       if (GuestUtils.isGuest()) {
-        log("ℹ️ [HEART_RATE] Skipping health permission for guest user");
         isInitialized.value = true;
         return;
       }
@@ -39,7 +37,6 @@ class HeartRateService extends GetxController {
       isHeartRateAvailable.value = isAvailable;
 
       if (!isAvailable) {
-        log("❌ [HEART_RATE] Heart rate data not available on this device");
         isInitialized.value = true;
         return;
       }
@@ -48,16 +45,13 @@ class HeartRateService extends GetxController {
       // Permissions are already granted by HealthSyncService, so we just need to wait
       await Future.delayed(const Duration(milliseconds: 750));
 
-      log("✅ [HEART_RATE] Heart rate service initialized successfully");
-      log("💡 [HEART_RATE] Using permissions already granted during onboarding");
-      isInitialized.value = true;
+    isInitialized.value = true;
 
       // Start fetching heart rate data
       await _fetchInitialHeartRate();
       _startHeartRateMonitoring();
 
     } catch (e) {
-      log("❌ [HEART_RATE] Error initializing heart rate service: $e");
       isInitialized.value = true;
     }
   }
@@ -85,20 +79,17 @@ class HeartRateService extends GetxController {
           final heartRate = (latestReading.value as NumericHealthValue).numericValue.round();
           currentHeartRate.value = heartRate;
 
-          log("💓 [HEART_RATE] Latest heart rate: $heartRate BPM");
         }
 
         // Calculate average heart rate from recent data
         _calculateAverageHeartRate(heartRateData);
       } else {
-        log("⚠️ [HEART_RATE] No recent heart rate data found");
         // Set demo values for testing when no data is available
         currentHeartRate.value = _generateDemoHeartRate();
         averageHeartRate.value = currentHeartRate.value;
       }
 
     } catch (e) {
-      log("❌ [HEART_RATE] Error fetching initial heart rate: $e");
       // Set demo values for testing when there's an error
       currentHeartRate.value = _generateDemoHeartRate();
       averageHeartRate.value = currentHeartRate.value;
@@ -138,7 +129,6 @@ class HeartRateService extends GetxController {
       }
 
     } catch (e) {
-      log("❌ [HEART_RATE] Error calculating average heart rate: $e");
     }
   }
 
@@ -162,11 +152,9 @@ class HeartRateService extends GetxController {
 
       if (count > 0) {
         averageHeartRate.value = (sum / count).round();
-        log("💓 [HEART_RATE] Average heart rate calculated: ${averageHeartRate.value} BPM from $count readings");
       }
 
     } catch (e) {
-      log("❌ [HEART_RATE] Error in average calculation: $e");
     }
   }
 
@@ -181,7 +169,6 @@ class HeartRateService extends GetxController {
   Future<void> refreshHeartRate() async {
     if (!isInitialized.value) return;
 
-    log("💓 [HEART_RATE] Manually refreshing heart rate data...");
     await _fetchInitialHeartRate();
   }
 

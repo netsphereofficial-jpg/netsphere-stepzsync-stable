@@ -58,7 +58,6 @@ class UnifiedNotificationService {
 
       // Step 2: Send local push notification if requested
       if (sendLocalPush) {
-        print('📱 Sending local push notification...');
         await LocalNotificationService.sendNotificationAndStore(
           title: title,
           message: message,
@@ -118,7 +117,6 @@ class UnifiedNotificationService {
   /// Push notification for existing Firestore notification
   static Future<void> pushExistingNotification(NotificationModel notification) async {
     try {
-      print('📤 Pushing existing notification: ${notification.title}');
 
       await LocalNotificationService.sendNotificationAndStore(
         title: notification.title,

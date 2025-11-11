@@ -40,7 +40,6 @@ class AppLifecycleManager with WidgetsBindingObserver {
     await _checkColdStart();
 
     _isInitialized = true;
-    print('🔄 [LIFECYCLE] App lifecycle manager initialized');
   }
 
   /// Check if this is a cold start (app was killed and reopened)
@@ -54,11 +53,9 @@ class AppLifecycleManager with WidgetsBindingObserver {
       if (wasSessionActive) {
         // App was killed while running (cold start)
         isColdStart.value = true;
-        print('🔄 [LIFECYCLE] Cold start detected (app was killed)');
       } else {
         // App was properly closed
         isColdStart.value = true;
-        print('🔄 [LIFECYCLE] Cold start detected (normal launch)');
       }
 
       // Check if first launch today
@@ -80,9 +77,7 @@ class AppLifecycleManager with WidgetsBindingObserver {
       await prefs.setBool(_kAppSessionActiveKey, true);
       await prefs.setString(_kLastLaunchDateKey, DateTime.now().toIso8601String());
 
-      print('🔄 [LIFECYCLE] First launch today: ${isFirstLaunchToday.value}');
     } catch (e) {
-      print('🔄 [LIFECYCLE] Error checking cold start: $e');
       isColdStart.value = true; // Default to cold start on error
     }
   }
@@ -92,7 +87,6 @@ class AppLifecycleManager with WidgetsBindingObserver {
     final previousState = currentState.value;
     currentState.value = state;
 
-    print('🔄 [LIFECYCLE] State changed: $previousState → $state');
 
     switch (state) {
       case AppLifecycleState.resumed:
@@ -118,20 +112,16 @@ class AppLifecycleManager with WidgetsBindingObserver {
 
     // Determine if this is a cold start or hot resume
     if (isColdStart.value) {
-      print('🔄 [LIFECYCLE] App resumed from cold start');
       _triggerColdStartCallbacks();
       isColdStart.value = false; // Reset after first resume
     } else {
-      print('🔄 [LIFECYCLE] App resumed from background');
 
       // Check if app was paused for more than 30 minutes
       if (_lastPauseTime != null) {
         final pauseDuration = _lastResumeTime!.difference(_lastPauseTime!);
         if (pauseDuration.inMinutes > 30) {
-          print('🔄 [LIFECYCLE] App was paused for ${pauseDuration.inMinutes} minutes (treat as cold start)');
           _triggerColdStartCallbacks();
         } else {
-          print('🔄 [LIFECYCLE] App was paused for ${pauseDuration.inSeconds} seconds');
         }
       }
 
@@ -140,40 +130,33 @@ class AppLifecycleManager with WidgetsBindingObserver {
   }
 
   void _handleInactive() {
-    print('🔄 [LIFECYCLE] App became inactive');
   }
 
   void _handlePause() {
     _lastPauseTime = DateTime.now();
-    print('🔄 [LIFECYCLE] App paused at ${_lastPauseTime}');
     _triggerPauseCallbacks();
   }
 
   void _handleDetached() async {
-    print('🔄 [LIFECYCLE] App detached (closing)');
 
     // Mark session as inactive
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kAppSessionActiveKey, false);
     } catch (e) {
-      print('🔄 [LIFECYCLE] Error marking session inactive: $e');
     }
   }
 
   /// Register callback for cold start events
   void registerColdStartCallback(VoidCallback callback) {
     _onColdStartCallbacks.add(callback);
-    print('🔄 [LIFECYCLE] Registered cold start callback (${_onColdStartCallbacks.length} total)');
 
     // If this is a cold start and app is already resumed, trigger callback immediately
     // but DON'T reset isColdStart flag here, let other callbacks register too
     if (isColdStart.value && currentState.value == AppLifecycleState.resumed) {
-      print('🔄 [LIFECYCLE] App already resumed - will trigger callback immediately');
       try {
         callback();
       } catch (e) {
-        print('🔄 [LIFECYCLE] Error in immediate cold start callback: $e');
       }
     }
   }
@@ -202,12 +185,10 @@ class AppLifecycleManager with WidgetsBindingObserver {
   }
 
   void _triggerColdStartCallbacks() {
-    print('🔄 [LIFECYCLE] Triggering ${_onColdStartCallbacks.length} cold start callbacks');
     for (final callback in _onColdStartCallbacks) {
       try {
         callback();
       } catch (e) {
-        print('🔄 [LIFECYCLE] Error in cold start callback: $e');
       }
     }
   }
@@ -217,7 +198,6 @@ class AppLifecycleManager with WidgetsBindingObserver {
       try {
         callback();
       } catch (e) {
-        print('🔄 [LIFECYCLE] Error in resume callback: $e');
       }
     }
   }
@@ -227,7 +207,6 @@ class AppLifecycleManager with WidgetsBindingObserver {
       try {
         callback();
       } catch (e) {
-        print('🔄 [LIFECYCLE] Error in pause callback: $e');
       }
     }
   }
@@ -254,6 +233,5 @@ class AppLifecycleManager with WidgetsBindingObserver {
     _onResumeCallbacks.clear();
     _onPauseCallbacks.clear();
     _isInitialized = false;
-    print('🔄 [LIFECYCLE] App lifecycle manager disposed');
   }
 }

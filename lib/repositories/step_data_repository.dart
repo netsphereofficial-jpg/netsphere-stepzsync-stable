@@ -440,11 +440,9 @@ class StepDataRepository {
       if (profileCreatedAt != null) {
         final now = DateTime.now();
         totalDays = now.difference(profileCreatedAt).inDays + 1; // +1 to include first day
-        dev.log('✅ Calculated days from profile creation: $totalDays days (created: ${profileCreatedAt.toString().substring(0, 10)})');
       } else {
         // Fallback: Use document count if profile creation date not provided
         totalDays = snapshot.docs.length;
-        dev.log('⚠️ Using document count as days (no profile creation date provided): $totalDays days');
       }
 
       dev.log('✅ Firebase aggregation complete: $totalDays days, $totalSteps steps, ${totalDistance.toStringAsFixed(2)} km');

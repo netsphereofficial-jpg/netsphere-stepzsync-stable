@@ -125,23 +125,13 @@ void main() async {
   try {
     // ✅ OPTIMIZATION: Initialize Firebase and Season Service
     // These run sequentially for now to ensure stability
-    print('🚀 [STARTUP] Starting initialization...');
 
     final firebaseService = FirebaseService();
     await firebaseService.ensureInitialized();
-    print('✅ [STARTUP] Firebase initialized');
 
-    // Initialize AdMob for rewarded ads (non-blocking)
-    if (!kIsWeb) {
-      AdMobService.initialize().catchError((e) {
-        print('⚠️ Failed to initialize AdMob: $e');
-        return null;
-      });
-      // Preload first ad in background
-      Future.microtask(() {
-        AdMobService().loadRewardedAd();
-      });
-    }
+    // ✅ DEFERRED: AdMob initialization moved to lazy loading
+    // AdMob SDK will initialize automatically when loadRewardedAd() is first called
+    // This saves startup time by only initializing when ads are actually needed
 
     // ✅ DEFERRED: Season Service initialization moved to LeaderboardController
     // This saves ~200-500ms on startup since seasons are only needed when
@@ -151,7 +141,6 @@ void main() async {
     // Setup dependency injection (fast, non-blocking)
     // StepTrackingService will request permission internally before starting pedometer
     DependencyInjection.setup();
-    print('✅ [STARTUP] Dependency injection configured');
 
     // ✅ DEFERRED: Race monitoring will start after home screen loads
     // This is moved to HomeController to avoid blocking app startup
@@ -167,22 +156,18 @@ void main() async {
 
       // ✅ OPTIMIZATION: Initialize notification services in parallel
       // These are independent and can run concurrently
-      print('🔔 [STARTUP] Initializing notification services...');
 
       await Future.wait([
         // Local notification service (sets up channels)
         LocalNotificationService.initialize().catchError((e) {
-          print('⚠️ Failed to initialize Local Notification Service: $e');
           return null; // Don't block app startup if local notifications fail
         }),
         // Firebase push notification service (gets FCM token)
         FirebasePushNotificationService.initialize().catchError((e) {
-          print('⚠️ Failed to initialize Firebase Push Notification Service: $e');
           return null; // Don't block app startup if FCM fails
         }),
       ]);
 
-      print('✅ [STARTUP] Notification services initialized');
 
       // ✅ OPTIMIZATION: Preload common race marker icons in background (non-blocking)
       // This prevents 180ms icon generation delay when opening race map
@@ -199,17 +184,14 @@ void main() async {
       // Race Step Sync Service → Initialized when user joins/creates a race
       // Both are now lazy-loaded via dependency injection
 
-      print('🚀 [STARTUP] Mobile services initialization complete');
     }
 
     // Enable Firebase Performance Monitoring
     FirebasePerformance.instance.setPerformanceCollectionEnabled(true);
 
-    print('✅ [STARTUP] All initialization complete - launching app');
     runApp(MyApp());
   } catch (e, stackTrace) {
-    print('❌ [STARTUP] Critical error during initialization: $e');
-    print('📍 [STARTUP] Stack trace: $stackTrace');
+
     rethrow;
   }
 

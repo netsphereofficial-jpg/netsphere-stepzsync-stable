@@ -14,6 +14,7 @@ import '../../screens/active_races/active_races_screen.dart';
 import '../../screens/home/homepage_screen/controllers/homepage_data_service.dart';
 import '../../services/auth/firebase_auth_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/health_sync_service.dart';
 import '../../services/xp_service.dart';
 // ❌ REMOVED: import '../../utils/notification_helpers.dart'; - no longer needed
 import '../../screens/races/create_race/race_summary_screen.dart';
@@ -841,6 +842,70 @@ class CreateRaceController extends GetxController {
         finalRaceStoppingTime = 'No limit'; // Marathon has no time limit
       }
 
+      // ✅ CRITICAL FIX: Capture baseline for race creator at race creation time
+      // This ensures organizer has a baseline even if they're offline when race auto-starts
+      print('📊 [CREATE_RACE] Capturing baseline for race creator...');
+
+      // Get health service for baseline capture
+      int baselineSteps = 0;
+      double baselineDistance = 0.0;
+      int baselineCalories = 0;
+      DateTime baselineTimestamp = DateTime.now();
+      bool baselineCaptured = false;
+
+      try {
+        if (Get.isRegistered<HealthSyncService>()) {
+          final healthService = Get.find<HealthSyncService>();
+
+          // Retry up to 3 times with 2-second delays to avoid zero baseline
+          for (int attempt = 1; attempt <= 3 && !baselineCaptured; attempt++) {
+            print('📊 [CREATE_RACE] Baseline capture attempt $attempt/3...');
+
+            // Try to get current health data for baseline
+            final now = DateTime.now();
+            final todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+            final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+            final healthData = await healthService.getHealthDataForDateRange(todayStart, todayEnd);
+
+            if (healthData != null) {
+              final steps = healthData['steps'] ?? 0;
+              final distance = (healthData['distance'] ?? 0.0).toDouble();
+              final calories = healthData['calories'] ?? 0;
+
+              // ✅ VALIDATION: Only accept non-zero baseline
+              // Zero baseline causes drift where ALL future steps get added to race
+              if (steps > 0 || distance > 0 || calories > 0) {
+                baselineSteps = steps;
+                baselineDistance = distance;
+                baselineCalories = calories;
+                baselineCaptured = true;
+                print('✅ [CREATE_RACE] Creator baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
+                break;
+              } else {
+                print('⚠️ [CREATE_RACE] Attempt $attempt: Health data is all zeros - retrying...');
+                if (attempt < 3) {
+                  await Future.delayed(Duration(seconds: 2));
+                }
+              }
+            } else {
+              print('⚠️ [CREATE_RACE] Attempt $attempt: Health data not available - retrying...');
+              if (attempt < 3) {
+                await Future.delayed(Duration(seconds: 2));
+              }
+            }
+          }
+
+          if (!baselineCaptured) {
+            print('⚠️ [CREATE_RACE] Could not capture valid baseline after 3 attempts');
+            print('   This race will have zero baseline - baseline will be captured when user starts race manually');
+            print('   OR when user opens app after auto-start and periodic sync runs');
+          }
+        }
+      } catch (e) {
+        print('⚠️ [CREATE_RACE] Could not capture creator baseline: $e');
+        // Continue without baseline - will be captured on race start or first sync
+      }
+
       // Create participant for the race creator using new model
       final creatorParticipant = Participant(
         userId: currentUser.uid,
@@ -857,6 +922,10 @@ class CreateRaceController extends GetxController {
         calories: 0,
         avgSpeed: 0.0,
         isCompleted: false,
+        baselineSteps: baselineSteps,
+        baselineDistance: baselineDistance,
+        baselineCalories: baselineCalories,
+        baselineTimestamp: baselineTimestamp,
       );
 
       // Convert schedule time to proper format for database

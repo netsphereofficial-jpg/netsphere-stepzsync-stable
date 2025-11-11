@@ -32,17 +32,13 @@ class FirebasePushNotificationService {
         _setupTokenRefreshHandler();
 
         _isInitialized = true;
-        print('✅ Firebase Push Notification Service initialized successfully');
       } else {
-        print('❌ FCM permissions not granted');
       }
     } catch (e) {
-      print('❌ Error initializing Firebase Push Notification Service: $e');
     }
   }
 
   static Future<NotificationSettings> _requestPermissions() async {
-    print('🔥 Requesting FCM permissions...');
 
     try {
       final settings = await _messaging.requestPermission(
@@ -56,7 +52,6 @@ class FirebasePushNotificationService {
       ).timeout(
         Duration(seconds: 20),
         onTimeout: () {
-          print('⏰ FCM permission request timed out');
           return NotificationSettings(
             authorizationStatus: AuthorizationStatus.denied,
             alert: AppleNotificationSetting.disabled,
@@ -74,10 +69,8 @@ class FirebasePushNotificationService {
         },
       );
 
-      print('🔥 FCM Permission settings: ${settings.authorizationStatus}');
       return settings;
     } catch (e) {
-      print('❌ Error requesting FCM permissions: $e');
       return NotificationSettings(
         authorizationStatus: AuthorizationStatus.denied,
         alert: AppleNotificationSetting.disabled,
@@ -100,13 +93,11 @@ class FirebasePushNotificationService {
       _fcmToken = await _messaging.getToken().timeout(
         Duration(seconds: 15),
         onTimeout: () {
-          print('⏰ FCM token request timed out');
           return null;
         },
       );
 
       if (_fcmToken != null && _fcmToken!.isNotEmpty) {
-        print('🔥 FCM Token obtained: ${_fcmToken!.substring(0, 20)}...');
 
         // Save token to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -115,37 +106,27 @@ class FirebasePushNotificationService {
         // Save token to Firestore user_profile collection
         await _saveTokenToFirestore(_fcmToken!);
       } else {
-        print('❌ Failed to get FCM token (likely running on simulator)');
       }
     } catch (e) {
-      print('❌ Error getting FCM token: $e');
       if (e.toString().contains('apns-token-not-set')) {
-        print('ℹ️  APNS token not available - this is normal on iOS Simulator');
-        print('ℹ️  FCM tokens will work on real iOS devices');
-      }
+         }
     }
   }
 
   /// Save FCM token to Firestore user_profile collection
   static Future<void> _saveTokenToFirestore(String token) async {
     try {
-      print('💾 Saving FCM token to Firestore...');
       final result = await ProfileService.updateFCMToken(token);
 
       if (result.success) {
-        print('✅ FCM token saved to Firestore successfully');
       } else {
-        print('⚠️ Failed to save FCM token to Firestore: ${result.error}');
       }
     } catch (e) {
-      print('❌ Error saving FCM token to Firestore: $e');
       // Don't throw - we don't want FCM initialization to fail if Firestore save fails
     }
   }
 
   static Future<void> _setupMessageHandlers() async {
-    print('🔥 Setting up FCM message handlers...');
-
     try {
       // Handle messages when app is in foreground (show notification only, no navigation)
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -153,14 +134,11 @@ class FirebasePushNotificationService {
       // Deep linking disabled - notification taps will not trigger navigation
       // onMessageOpenedApp and getInitialMessage handlers removed
 
-      print('✅ FCM message handlers setup completed');
     } catch (e) {
-      print('❌ Error setting up FCM message handlers: $e');
     }
   }
 
   static void _setupTokenRefreshHandler() {
-    print('🔥 Setting up FCM token refresh handler...');
 
     _messaging.onTokenRefresh
         .listen((fcmToken) async {

@@ -70,28 +70,22 @@ class RaceInviteModel {
   }
 
   factory RaceInviteModel.fromFirestore(DocumentSnapshot doc) {
-    debugPrint('📄 Parsing invite document: ${doc.id}');
 
     final data = doc.data() as Map<String, dynamic>?;
     if (data == null) {
-      debugPrint('❌ Document ${doc.id} has null data');
       throw Exception('Document data is null');
     }
 
-    debugPrint('📋 Document ${doc.id} raw data: $data');
 
     // Handle createdAt field safely
     DateTime createdAt;
     try {
       if (data['createdAt'] is Timestamp) {
         createdAt = (data['createdAt'] as Timestamp).toDate();
-        debugPrint('⏰ Parsed createdAt as Timestamp: $createdAt');
       } else if (data['createdAt'] is String) {
         createdAt = DateTime.parse(data['createdAt']);
-        debugPrint('⏰ Parsed createdAt as String: $createdAt');
       } else {
         createdAt = DateTime.now(); // Fallback
-        debugPrint('⚠️ Used fallback createdAt: $createdAt');
       }
     } catch (e) {
       createdAt = DateTime.now(); // Fallback if parsing fails
