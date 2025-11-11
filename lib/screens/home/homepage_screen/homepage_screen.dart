@@ -230,17 +230,7 @@ class _HomepageScreenState extends State<HomepageScreen> {
     _listeners.add(
       ever(stepTrackingService.syncSuccess, (bool success) {
         if (!_isDisposed && success) {
-          Get.snackbar(
-            'Sync Complete',
-            'Your health data has been synced successfully',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green.withValues(alpha: 0.9),
-            colorText: Colors.white,
-            duration: const Duration(seconds: 2),
-            margin: const EdgeInsets.all(16),
-            borderRadius: 12,
-            icon: const Icon(Icons.check_circle, color: Colors.white),
-          );
+
         }
       })
     );
