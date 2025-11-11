@@ -18,6 +18,7 @@ import '../../services/health_sync_coordinator.dart';
 import '../../services/health_sync_service.dart';
 import '../../services/places_service.dart';
 import '../../services/preferences_service.dart';
+import '../../services/pedometer_service.dart';
 import '../../services/step_tracking_service.dart';
 import '../../screens/races/quick_race/quick_race_waiting_room_screen.dart';
 
@@ -630,56 +631,30 @@ class QuickRaceController extends GetxController {
     }
   }
 
-  /// Capture baseline health data at race join time with multi-source fallback
-  /// Returns map with baseline data or null if all sources fail
+  /// Capture baseline pedometer data at race join time with retries
+  /// Returns map with baseline data or null if pedometer unavailable
   ///
-  /// 🛡️ CRITICAL: Never accepts zero baselines - uses fallback sources
-  /// Fallback hierarchy: HealthKit → Coordinator → Firebase → StepService → SQLite
+  /// 🛡️ CRITICAL: Never accepts zero baselines - uses retry mechanism
+  /// Uses PEDOMETER as single source of truth for race tracking
   Future<Map<String, dynamic>?> _captureBaseline(String raceId, String userId, {int maxRetries = 3}) async {
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      log('📊 [QUICK_RACE] Baseline capture attempt $attempt/$maxRetries');
+      log('📊 [QUICK_RACE] Pedometer baseline capture attempt $attempt/$maxRetries');
 
-      // Try multiple data sources in priority order
-
-      // 1. PRIMARY: Health Connect/HealthKit
-      final healthData = await _tryHealthSource();
-      if (healthData != null && healthData['steps'] > 0) {
-        return _createBaselineData(healthData, raceId, userId);
-      }
-
-      // 2. FALLBACK 1: HealthSyncCoordinator cache
-      final coordinatorData = await _tryCoordinatorSource();
-      if (coordinatorData != null && coordinatorData['steps'] > 0) {
-        return _createBaselineData(coordinatorData, raceId, userId);
-      }
-
-      // 3. FALLBACK 2: Firebase daily_steps
-      final firebaseData = await _tryFirebaseSource();
-      if (firebaseData != null && firebaseData['steps'] > 0) {
-        return _createBaselineData(firebaseData, raceId, userId);
-      }
-
-      // 4. FALLBACK 3: StepTrackingService memory
-      final stepServiceData = await _tryStepServiceSource();
-      if (stepServiceData != null && stepServiceData['steps'] > 0) {
-        return _createBaselineData(stepServiceData, raceId, userId);
-      }
-
-      // 5. FALLBACK 4: Local SQLite cache
-      final sqliteData = await _trySqliteSource();
-      if (sqliteData != null && sqliteData['steps'] > 0) {
-        return _createBaselineData(sqliteData, raceId, userId);
+      // Try to get pedometer baseline
+      final pedometerData = await _tryPedometerSource();
+      if (pedometerData != null && pedometerData['steps'] > 0) {
+        return _createBaselineData(pedometerData, raceId, userId);
       }
 
       // Wait before retry
       if (attempt < maxRetries) {
-        log('⏳ [QUICK_RACE] All sources returned 0, waiting 2s before retry...');
+        log('⏳ [QUICK_RACE] Pedometer returned 0 steps, waiting 2s before retry...');
         await Future.delayed(Duration(seconds: 2));
       }
     }
 
     // All retries exhausted
-    log('❌ [QUICK_RACE] All fallback sources failed after $maxRetries attempts');
+    log('❌ [QUICK_RACE] Pedometer baseline capture failed after $maxRetries attempts');
     return null;
   }
 
@@ -732,136 +707,43 @@ class QuickRaceController extends GetxController {
     return baselineData;
   }
 
-  /// Try to get health data from Health Connect/HealthKit
-  Future<Map<String, dynamic>?> _tryHealthSource() async {
+  /// Try to get baseline data from Pedometer
+  Future<Map<String, dynamic>?> _tryPedometerSource() async {
     try {
-      if (!Get.isRegistered<HealthSyncService>()) {
+      if (!Get.isRegistered<PedometerService>()) {
+        log('⚠️ [QUICK_RACE] PedometerService not registered');
         return null;
       }
 
-      final healthService = Get.find<HealthSyncService>();
-      final healthData = await healthService.fetchTodaySteps();
+      final pedometerService = Get.find<PedometerService>();
 
-      if (healthData != null && healthData['steps'] > 0) {
-        log('✅ [QUICK_RACE] Using Health Connect/HealthKit: ${healthData['steps']} steps');
-        return {...healthData, 'source': 'healthkit'};
-      }
-    } catch (e) {
-      log('⚠️ [QUICK_RACE] Health source failed: $e');
-    }
-    return null;
-  }
-
-  /// Try to get health data from HealthSyncCoordinator cache
-  Future<Map<String, dynamic>?> _tryCoordinatorSource() async {
-    try {
-      if (!Get.isRegistered<HealthSyncCoordinator>()) {
+      // Check if pedometer is available and initialized
+      if (!pedometerService.isAvailable.value) {
+        log('⚠️ [QUICK_RACE] Pedometer not available');
         return null;
       }
 
-      final coordinator = Get.find<HealthSyncCoordinator>();
-      final debugInfo = coordinator.getDebugInfo();
+      // Get current pedometer cumulative steps
+      final steps = pedometerService.currentStepCount.value;
 
-      final steps = debugInfo['lastProcessedSteps'] as int;
-      final distance = debugInfo['lastProcessedDistance'] as double;
-      final calories = debugInfo['lastProcessedCalories'] as int;
-      final date = debugInfo['lastProcessedDate'] as String?;
+      if (steps > 0) {
+        // Calculate distance and calories using formulas
+        const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
+        final distance = steps * stepsToKm;
+        final calories = (steps * 0.04).round(); // 1 step ≈ 0.04 cal
 
-      // Check if data is from today
-      final now = DateTime.now();
-      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-
-      if (date == today && steps > 0) {
-        log('✅ [QUICK_RACE] Using HealthSyncCoordinator cache: $steps steps (from $date)');
+        log('✅ [QUICK_RACE] Using Pedometer: $steps steps, ${distance.toStringAsFixed(2)} km, $calories cal');
         return {
           'steps': steps,
           'distance': distance,
           'calories': calories,
-          'source': 'coordinator_cache',
+          'source': 'pedometer',
         };
+      } else {
+        log('⚠️ [QUICK_RACE] Pedometer has 0 steps');
       }
     } catch (e) {
-      log('⚠️ [QUICK_RACE] Coordinator source failed: $e');
-    }
-    return null;
-  }
-
-  /// Try to get health data from Firebase daily_steps
-  Future<Map<String, dynamic>?> _tryFirebaseSource() async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) return null;
-
-      final today = DateTime.now();
-      final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('daily_steps')
-          .doc(dateKey)
-          .get();
-
-      final firebaseData = doc.exists ? doc.data() : null;
-
-      if (firebaseData != null && (firebaseData['steps'] ?? 0) > 0) {
-        log('✅ [QUICK_RACE] Using Firebase daily_steps: ${firebaseData['steps']} steps');
-        return {
-          'steps': firebaseData['steps'] ?? 0,
-          'distance': firebaseData['distance'] ?? 0.0,
-          'calories': firebaseData['calories'] ?? 0,
-          'source': 'firebase_daily_steps',
-        };
-      }
-    } catch (e) {
-      log('⚠️ [QUICK_RACE] Firebase source failed: $e');
-    }
-    return null;
-  }
-
-  /// Try to get health data from StepTrackingService in-memory state
-  Future<Map<String, dynamic>?> _tryStepServiceSource() async {
-    try {
-      if (!Get.isRegistered<StepTrackingService>()) {
-        return null;
-      }
-
-      final stepService = Get.find<StepTrackingService>();
-      final steps = stepService.todaySteps.value;
-
-      if (steps > 0) {
-        log('✅ [QUICK_RACE] Using StepTrackingService: $steps steps');
-        return {
-          'steps': steps,
-          'distance': stepService.todayDistance.value,
-          'calories': stepService.todayCalories.value,
-          'source': 'step_service_memory',
-        };
-      }
-    } catch (e) {
-      log('⚠️ [QUICK_RACE] StepService source failed: $e');
-    }
-    return null;
-  }
-
-  /// Try to get health data from local SQLite cache
-  Future<Map<String, dynamic>?> _trySqliteSource() async {
-    try {
-      final db = StepDatabase.instance;
-      final today = DailyStepData.getTodayDate();
-      final localData = await db.getDailyData(today);
-
-      if (localData != null && localData.steps > 0) {
-        log('✅ [QUICK_RACE] Using SQLite cache: ${localData.steps} steps');
-        return {
-          'steps': localData.steps,
-          'distance': localData.distance,
-          'calories': localData.calories,
-          'source': 'sqlite_cache',
-        };
-      }
-    } catch (e) {
-      log('⚠️ [QUICK_RACE] SQLite source failed: $e');
+      log('⚠️ [QUICK_RACE] Pedometer source failed: $e');
     }
     return null;
   }

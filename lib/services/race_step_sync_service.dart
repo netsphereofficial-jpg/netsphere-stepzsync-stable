@@ -13,24 +13,24 @@ import 'race_service.dart';
 import 'health_sync_service.dart';
 import '../utils/race_validation_utils.dart';
 
-/// Race Baseline - Dual-layer tracking for robust race step synchronization
+/// Race Baseline - Pedometer-based race step synchronization
 ///
-/// This model uses a two-layer approach:
-/// 1. **Server State** (persistent): Last known steps/distance/calories on Firestore (source of truth)
-/// 2. **Session State** (volatile): Steps/distance/calories accumulated in this race during current app session
+/// This model tracks race progress using pedometer sensor:
+/// 1. **Baseline Steps** (at join): Pedometer steps when user joined race (anchor point)
+/// 2. **Current Steps**: Current pedometer cumulative steps
+/// 3. **Delta**: Current - Baseline = Race Progress
 ///
 /// Formula:
-/// - totalRaceSteps = serverSteps + sessionRaceSteps
-/// - totalRaceDistance = serverDistance + sessionRaceDistance
-/// - totalRaceCalories = serverCalories + sessionRaceCalories
+/// - raceSteps = currentPedometerSteps - baselinePedometerSteps
+/// - raceDistance = raceSteps * 0.000762 km
+/// - raceCalories = raceSteps * 0.04 cal
 ///
 /// This ensures:
-/// - Races survive app restarts (server state persists)
-/// - Real-time tracking within session (session metrics accumulate)
-/// - Multi-day races work correctly
-/// - Independent tracking for multiple simultaneous races
-/// - Survives pedometer resets (session metrics track independently)
-/// - Consistent distance/calories with home screen (uses HealthKit data)
+/// - Realtime step updates (triggered on every pedometer event)
+/// - Single source of truth (pedometer sensor)
+/// - Simple and reliable calculation
+/// - Device reboot recovery using snapshots
+/// - Gap filling when app was closed
 class RaceBaseline {
   final String raceId;
   final String raceTitle;
@@ -147,18 +147,21 @@ class RaceBaseline {
   }
 }
 
-/// Race Step Sync Service (SIMPLIFIED)
+/// Race Step Sync Service (PEDOMETER-ONLY)
 ///
-/// Syncs pedometer incremental steps to active races in real-time
-/// Uses ONLY pedometer data - no HealthKit dependency for race tracking
+/// Syncs pedometer steps to active races in real-time
+/// Uses ONLY pedometer sensor data - no Health API dependency for race tracking
 ///
 /// Features:
-/// - Per-race baseline tracking using pedometer incremental steps
+/// - Per-race baseline tracking using pedometer cumulative steps
+/// - Realtime updates triggered on every pedometer step event
 /// - Persists baselines across app restarts via SharedPreferences
 /// - Auto-detects user's active races (statusId 3 or 6)
-/// - Syncs race-specific step deltas every 5 seconds
+/// - Syncs race progress every 1 second (realtime)
 /// - Handles multiple simultaneous races
-/// - Simple and reliable - no HealthKit conflicts
+/// - Device reboot detection and recovery using snapshots
+/// - Gap filling when app was closed using 10-second snapshots
+/// - Simple and reliable - single source of truth (pedometer)
 class RaceStepSyncService extends GetxService {
   // ================== DEPENDENCIES ==================
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -1082,58 +1085,43 @@ class RaceStepSyncService extends GetxService {
           int raceCalories;
 
           if (baseline.useTimeBasedBaseline) {
-            // ✅ NEW SIMPLE DELTA CALCULATION: current - baseline
-            // Uses baseline captured at join time (stored locally + Firebase)
-            dev.log('📊 [RACE_SYNC] Using simple delta calculation for race: ${baseline.raceTitle}');
+            // ✅ PEDOMETER-BASED DELTA CALCULATION: current - baseline
+            // Uses pedometer baseline captured at join time (stored locally + Firebase)
+            dev.log('📊 [RACE_SYNC] Using pedometer-based delta calculation for race: ${baseline.raceTitle}');
 
-            // Get current Health Connect data (today's total)
-            int currentTotalSteps = 0;
-            double currentTotalDistance = 0.0;
-            int currentTotalCalories = 0;
+            // Get current pedometer cumulative steps
+            final currentPedometerSteps = _pedometerService.currentStepCount.value;
 
-            try {
-              if (Get.isRegistered<StepTrackingService>()) {
-                final stepTrackingService = Get.find<StepTrackingService>();
-                currentTotalSteps = stepTrackingService.todaySteps.value;
-                currentTotalDistance = stepTrackingService.todayDistance.value;
-                currentTotalCalories = stepTrackingService.todayCalories.value;
-
-                dev.log('   📱 Current Health Connect total:');
-                dev.log('      Steps: $currentTotalSteps');
-                dev.log('      Distance: ${currentTotalDistance.toStringAsFixed(2)} km');
-                dev.log('      Calories: $currentTotalCalories');
-              }
-            } catch (e) {
-              dev.log('   ⚠️ Error fetching current health data: $e');
-            }
+            dev.log('   🚶 Current Pedometer reading:');
+            dev.log('      Steps: $currentPedometerSteps');
 
             // ✅ SIMPLE DELTA FORMULA: delta = current - baseline
             // This gives us steps SINCE user joined the race
-            final deltaSteps = currentTotalSteps - (baseline.healthKitStepsAtStart ?? 0);
-            final deltaDistance = currentTotalDistance - (baseline.healthKitDistanceAtStart ?? 0.0);
-            final deltaCalories = currentTotalCalories - (baseline.healthKitCaloriesAtStart ?? 0);
+            final deltaSteps = currentPedometerSteps - (baseline.healthKitStepsAtStart ?? 0);
 
-            // For Android: If distance is estimated (not from Health Connect exercise sessions),
-            // recalculate from delta steps to ensure consistency
-            if (deltaDistance == 0.0 && deltaSteps > 0) {
+            // Check for negative delta (device reboot or pedometer reset)
+            if (deltaSteps < 0) {
+              dev.log('   ⚠️ Negative delta detected ($deltaSteps) - device may have rebooted');
+              dev.log('   Using server state as fallback');
+
+              // Use server state (last known good value)
+              totalRaceSteps = baseline.serverSteps;
+              raceDistance = baseline.serverDistance;
+              raceCalories = baseline.serverCalories;
+            } else {
+              // Calculate distance and calories from pedometer steps using formulas
               const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
               totalRaceSteps = deltaSteps;
               raceDistance = deltaSteps * stepsToKm;
               raceCalories = (deltaSteps * 0.04).round(); // 1 step ≈ 0.04 cal
 
-              dev.log('   📱 [ANDROID FALLBACK] Distance estimated from delta steps:');
-              dev.log('      Delta Steps: $deltaSteps → Distance: ${raceDistance.toStringAsFixed(2)} km');
-            } else {
-              totalRaceSteps = deltaSteps;
-              raceDistance = deltaDistance;
-              raceCalories = deltaCalories;
-
-              dev.log('   ✅ Using Health Connect distance data: ${deltaDistance.toStringAsFixed(2)} km');
+              dev.log('   ✅ Pedometer delta calculation:');
+              dev.log('      Delta Steps: $deltaSteps → Distance: ${raceDistance.toStringAsFixed(2)} km, Calories: $raceCalories');
             }
 
-            dev.log('   ✅ Delta calculation:');
-            dev.log('      Baseline: ${baseline.healthKitStepsAtStart} steps, ${baseline.healthKitDistanceAtStart?.toStringAsFixed(2)} km');
-            dev.log('      Current: $currentTotalSteps steps, ${currentTotalDistance.toStringAsFixed(2)} km');
+            dev.log('   📊 Race progress summary:');
+            dev.log('      Baseline (at join): ${baseline.healthKitStepsAtStart} steps');
+            dev.log('      Current (pedometer): $currentPedometerSteps steps');
             dev.log('      Delta (race progress): $totalRaceSteps steps, ${raceDistance.toStringAsFixed(2)} km, $raceCalories cal');
           } else {
             // LEGACY: Use pedometer-based dual-layer formula
@@ -1152,42 +1140,14 @@ class RaceStepSyncService extends GetxService {
               continue;
             }
 
-            // Calculate distance and calories using HealthKit baseline approach
-            double currentHealthKitDistance = 0.0;
-            int currentHealthKitCalories = 0;
+            // Calculate distance and calories using pedometer-based formulas
+            const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
+            raceDistance = totalRaceSteps * stepsToKm;
+            raceCalories = (totalRaceSteps * 0.04).round(); // 1 step ≈ 0.04 cal
 
-            try {
-              if (Get.isRegistered<StepTrackingService>()) {
-                final stepTrackingService = Get.find<StepTrackingService>();
-                currentHealthKitDistance = stepTrackingService.todayDistance.value;
-                currentHealthKitCalories = stepTrackingService.todayCalories.value;
-              }
-            } catch (e) {
-              dev.log('⚠️ [RACE_SYNC] Error fetching HealthKit data: $e');
-            }
-
-            // Calculate distance delta since race started (or last health sync)
-            final healthKitDistanceDelta = currentHealthKitDistance - baseline.healthKitBaselineDistance;
-            final healthKitCaloriesDelta = currentHealthKitCalories - baseline.healthKitBaselineCalories;
-
-            // Total distance/calories formula
-            raceDistance = baseline.serverDistance + baseline.sessionRaceDistance + healthKitDistanceDelta;
-            raceCalories = baseline.serverCalories + baseline.sessionRaceCalories + healthKitCaloriesDelta;
-
-            // ✅ ANDROID FALLBACK: If distance is 0 but we have steps, estimate from steps
-            if (raceDistance == 0.0 && totalRaceSteps > 0) {
-              const stepsToKm = 0.000762; // 1 step ≈ 0.762 meters
-              raceDistance = totalRaceSteps * stepsToKm;
-              raceCalories = (totalRaceSteps * 0.04).round(); // 1 step ≈ 0.04 cal
-
-              dev.log('   📱 [ANDROID FALLBACK - LEGACY] Distance estimated from total steps:');
-              dev.log('      Total Steps: $totalRaceSteps → Distance: ${raceDistance.toStringAsFixed(2)} km');
-            }
-
-            dev.log('   📊 Legacy calculation:');
+            dev.log('   📊 Legacy calculation (pedometer-only):');
             dev.log('      Server: ${baseline.serverSteps} steps, ${baseline.serverDistance.toStringAsFixed(2)} km, ${baseline.serverCalories} cal');
-            dev.log('      Session: ${baseline.sessionRaceSteps} steps, ${baseline.sessionRaceDistance.toStringAsFixed(2)} km, ${baseline.sessionRaceCalories} cal');
-            dev.log('      HealthKit delta: +${healthKitDistanceDelta.toStringAsFixed(2)} km, +$healthKitCaloriesDelta cal');
+            dev.log('      Session: ${baseline.sessionRaceSteps} steps');
             dev.log('      Total: $totalRaceSteps steps, ${raceDistance.toStringAsFixed(2)} km, $raceCalories cal');
           }
 

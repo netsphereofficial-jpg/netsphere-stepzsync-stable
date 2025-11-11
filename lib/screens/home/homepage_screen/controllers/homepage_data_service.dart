@@ -679,39 +679,35 @@ class HomepageDataService extends GetxController {
   }
 
   Future<void> _initializeRaceStepSyncService() async {
-    // ❌ DISABLED: Old client-side race step sync - now using Cloud Functions
-    // The Cloud Function (syncHealthDataToRaces) handles ALL step distribution server-side
-    // This eliminates baseline bugs, day rollover issues, and race conditions
-    // See: lib/services/race_step_reconciliation_service.dart for new implementation
-    print('ℹ️ HomepageDataService: RaceStepSyncService disabled - using Cloud Functions');
-    return;
+    // ✅ ENABLED: Client-side race step sync using pedometer
+    // Uses PedometerService for realtime step tracking and syncing to Firebase
+    // Provides instant feedback and gap filling when app is closed
+    print('🏁 HomepageDataService: Initializing RaceStepSyncService...');
 
-    // try {
-    //   print('🏁 HomepageDataService: Initializing RaceStepSyncService...');
-    //
-    //   // Get or create the permanent race step sync service instance
-    //   if (Get.isRegistered<RaceStepSyncService>()) {
-    //     _raceStepSyncService = Get.find<RaceStepSyncService>();
-    //     print('✅ Found existing RaceStepSyncService instance');
-    //   } else {
-    //     _raceStepSyncService = Get.put(RaceStepSyncService(), permanent: true);
-    //     print('✅ Created new RaceStepSyncService instance');
-    //   }
-    //
-    //   // Initialize the service
-    //   if (_raceStepSyncService != null) {
-    //     await _raceStepSyncService!.initialize();
-    //     print('✅ RaceStepSyncService initialized');
-    //
-    //     // Start syncing if service is initialized
-    //     await _raceStepSyncService!.startSyncing();
-    //     print('✅ RaceStepSyncService started syncing to active races');
-    //   }
-    // } catch (e, stackTrace) {
-    //   print('❌ Error initializing race step sync service: $e');
-    //   print('📍 Stack trace: $stackTrace');
-    //   // Don't rethrow - allow app to continue with partial functionality
-    // }
+    try {
+      // Get or create the permanent race step sync service instance
+      if (Get.isRegistered<RaceStepSyncService>()) {
+        _raceStepSyncService = Get.find<RaceStepSyncService>();
+        print('✅ Found existing RaceStepSyncService instance');
+      } else {
+        _raceStepSyncService = Get.put(RaceStepSyncService(), permanent: true);
+        print('✅ Created new RaceStepSyncService instance');
+      }
+
+      // Initialize the service
+      if (_raceStepSyncService != null) {
+        await _raceStepSyncService!.initialize();
+        print('✅ RaceStepSyncService initialized');
+
+        // Start syncing if service is initialized
+        await _raceStepSyncService!.startSyncing();
+        print('✅ RaceStepSyncService started syncing to active races');
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error initializing race step sync service: $e');
+      print('📍 Stack trace: $stackTrace');
+      // Don't rethrow - allow app to continue with partial functionality
+    }
   }
 
   void updateStepCount(int steps) {

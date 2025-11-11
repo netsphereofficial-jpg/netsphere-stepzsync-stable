@@ -56,6 +56,20 @@ class StepDatabase {
       )
     ''');
 
+    // Create step snapshots table for race gap filling
+    await db.execute('''
+      CREATE TABLE step_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        cumulativeSteps INTEGER NOT NULL,
+        incrementalSteps INTEGER NOT NULL,
+        sessionStartSteps INTEGER,
+        source TEXT NOT NULL DEFAULT 'pedometer',
+        deviceBootTime INTEGER,
+        createdAt INTEGER NOT NULL
+      )
+    ''');
+
     // Create index on date for faster queries
     await db.execute('''
       CREATE INDEX idx_date ON ${StepConstants.dailyStepsTableName}(date)
@@ -66,6 +80,11 @@ class StepDatabase {
       CREATE INDEX idx_synced ON ${StepConstants.dailyStepsTableName}(isSynced)
     ''');
 
+    // Create index on timestamp for step snapshots
+    await db.execute('''
+      CREATE INDEX idx_snapshot_timestamp ON step_snapshots(timestamp)
+    ''');
+
     print('✅ Step tracking database created successfully');
   }
 
@@ -73,9 +92,39 @@ class StepDatabase {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     print('🔄 Upgrading database from version $oldVersion to $newVersion');
 
-    // Always recreate table for any version upgrade to ensure clean schema
+    // Handle version 4 upgrade: Add step_snapshots table
+    if (oldVersion < 4 && newVersion >= 4) {
+      try {
+        print('🔄 Adding step_snapshots table for version 4...');
+
+        // Create step snapshots table
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS step_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            cumulativeSteps INTEGER NOT NULL,
+            incrementalSteps INTEGER NOT NULL,
+            sessionStartSteps INTEGER,
+            source TEXT NOT NULL DEFAULT 'pedometer',
+            deviceBootTime INTEGER,
+            createdAt INTEGER NOT NULL
+          )
+        ''');
+
+        // Create index on timestamp for step snapshots
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_snapshot_timestamp ON step_snapshots(timestamp)
+        ''');
+
+        print('✅ step_snapshots table created successfully');
+      } catch (e) {
+        print('❌ Error creating step_snapshots table: $e');
+      }
+    }
+
+    // Always recreate daily_steps table for any version upgrade to ensure clean schema
     try {
-      print('🔄 Recreating table with new schema...');
+      print('🔄 Recreating daily_steps table with new schema...');
 
       // Step 1: Rename old table to backup
       await db.execute(
@@ -144,6 +193,7 @@ class StepDatabase {
       print('🔄 Attempting complete recreation...');
       await db.execute('DROP TABLE IF EXISTS ${StepConstants.dailyStepsTableName}');
       await db.execute('DROP TABLE IF EXISTS ${StepConstants.dailyStepsTableName}_old');
+      await db.execute('DROP TABLE IF EXISTS step_snapshots');
       await _onCreate(db, newVersion);
     }
   }
@@ -313,5 +363,105 @@ class StepDatabase {
 
     await batch.commit(noResult: true);
     print('✅ Batch upserted ${dataList.length} records');
+  }
+
+  // ========== STEP SNAPSHOT METHODS (for race gap filling) ==========
+
+  /// Insert a step snapshot
+  Future<int> insertSnapshot({
+    required int timestamp,
+    required int cumulativeSteps,
+    required int incrementalSteps,
+    int? sessionStartSteps,
+    String source = 'pedometer',
+    int? deviceBootTime,
+  }) async {
+    final db = await database;
+    final id = await db.insert(
+      'step_snapshots',
+      {
+        'timestamp': timestamp,
+        'cumulativeSteps': cumulativeSteps,
+        'incrementalSteps': incrementalSteps,
+        'sessionStartSteps': sessionStartSteps,
+        'source': source,
+        'deviceBootTime': deviceBootTime,
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    return id;
+  }
+
+  /// Get the latest snapshot
+  Future<Map<String, dynamic>?> getLatestSnapshot() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'step_snapshots',
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return maps.first;
+  }
+
+  /// Get snapshots within a time range
+  Future<List<Map<String, dynamic>>> getSnapshotsInRange(
+    int startTimestamp,
+    int endTimestamp,
+  ) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'step_snapshots',
+      where: 'timestamp >= ? AND timestamp <= ?',
+      whereArgs: [startTimestamp, endTimestamp],
+      orderBy: 'timestamp ASC',
+    );
+    return maps;
+  }
+
+  /// Get snapshot closest to a specific timestamp
+  Future<Map<String, dynamic>?> getSnapshotNearTime(int timestamp) async {
+    final db = await database;
+
+    // Get snapshot just before the timestamp
+    final List<Map<String, dynamic>> maps = await db.query(
+      'step_snapshots',
+      where: 'timestamp <= ?',
+      whereArgs: [timestamp],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return maps.first;
+  }
+
+  /// Delete old snapshots (keep only recent 7 days for performance)
+  Future<void> deleteOldSnapshots(int beforeTimestamp) async {
+    final db = await database;
+    final count = await db.delete(
+      'step_snapshots',
+      where: 'timestamp < ?',
+      whereArgs: [beforeTimestamp],
+    );
+    print('🗑️ Deleted $count old step snapshots');
+  }
+
+  /// Get snapshot count
+  Future<int> getSnapshotCount() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM step_snapshots'
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Delete all snapshots (for testing/reset)
+  Future<void> deleteAllSnapshots() async {
+    final db = await database;
+    await db.delete('step_snapshots');
+    print('🗑️ Deleted all step snapshots');
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:synchronized/synchronized.dart';
 import 'dart:io' show Platform;
 import 'pedometer_permission_monitor.dart';
+import '../database/step_database.dart';
 
 /// Service for real-time pedometer tracking
 /// Provides incremental step counts since app start
@@ -25,6 +26,11 @@ class PedometerService extends GetxService {
   int _incrementalSteps = 0;
   DateTime? _sessionStartTime;
   bool _hasPermission = false;
+
+  // Snapshot tracking for race gap filling
+  Timer? _snapshotTimer;
+  final _stepDatabase = StepDatabase.instance;
+  int? _deviceBootTime;
 
   // Initialization signaling - use Completer instead of polling/delays
   final Completer<bool> _initCompleter = Completer<bool>();
@@ -99,8 +105,17 @@ class PedometerService extends GetxService {
 
       _hasPermission = true;
 
+      // Estimate device boot time (for reboot detection)
+      await _estimateDeviceBootTime();
+
+      // Restore session from last snapshot if available
+      await _restoreFromLastSnapshot();
+
       // Start pedometer streams
       await _startPedometerStreams();
+
+      // Start periodic snapshot saving (every 10 seconds)
+      _startSnapshotTimer();
 
       print('✅ PedometerService: Initialized successfully');
       isInitialized.value = true;
@@ -321,12 +336,168 @@ class PedometerService extends GetxService {
       'incrementalSteps': _incrementalSteps,
       'pedestrianStatus': pedestrianStatus.value,
       'errorMessage': errorMessage.value,
+      'deviceBootTime': _deviceBootTime,
     };
+  }
+
+  // ========== SNAPSHOT METHODS (for race gap filling) ==========
+
+  /// Estimate device boot time for reboot detection
+  Future<void> _estimateDeviceBootTime() async {
+    try {
+      // Device boot time = current time - uptime
+      final uptime = DateTime.now().millisecondsSinceEpoch;
+      _deviceBootTime = uptime;
+      print('📱 Estimated device boot time: $_deviceBootTime');
+    } catch (e) {
+      print('❌ Error estimating boot time: $e');
+      _deviceBootTime = DateTime.now().millisecondsSinceEpoch;
+    }
+  }
+
+  /// Restore session from last snapshot
+  Future<void> _restoreFromLastSnapshot() async {
+    try {
+      final lastSnapshot = await _stepDatabase.getLatestSnapshot();
+
+      if (lastSnapshot != null) {
+        print('📊 Found last snapshot: ${lastSnapshot['cumulativeSteps']} steps at ${DateTime.fromMillisecondsSinceEpoch(lastSnapshot['timestamp'])}');
+
+        // Check if this is after a device reboot
+        final snapshotBootTime = lastSnapshot['deviceBootTime'] as int?;
+        if (snapshotBootTime != null && snapshotBootTime != _deviceBootTime) {
+          print('⚠️ Device rebooted detected - starting fresh session');
+          // Don't restore, start fresh
+          return;
+        }
+
+        // Calculate time since last snapshot
+        final timeSinceSnapshot = DateTime.now().millisecondsSinceEpoch - (lastSnapshot['timestamp'] as int);
+        final minutesSinceSnapshot = timeSinceSnapshot / 60000;
+
+        print('⏱️ Time since last snapshot: ${minutesSinceSnapshot.toStringAsFixed(1)} minutes');
+
+        // If snapshot is recent (< 30 minutes), try to use it
+        if (minutesSinceSnapshot < 30) {
+          print('✅ Snapshot is recent, will use it for gap filling if needed');
+        } else {
+          print('⚠️ Snapshot is old (${minutesSinceSnapshot.toStringAsFixed(1)} min), starting fresh');
+        }
+      } else {
+        print('📊 No previous snapshot found - first time tracking');
+      }
+    } catch (e) {
+      print('❌ Error restoring from snapshot: $e');
+    }
+  }
+
+  /// Start periodic snapshot timer (saves every 10 seconds)
+  void _startSnapshotTimer() {
+    _snapshotTimer?.cancel();
+
+    _snapshotTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      await _saveSnapshot();
+    });
+
+    print('⏰ Started snapshot timer (10 second intervals)');
+  }
+
+  /// Save current pedometer state as snapshot
+  Future<void> _saveSnapshot() async {
+    try {
+      // Only save if we have valid data
+      if (_sessionStartSteps == null || !isAvailable.value) {
+        return;
+      }
+
+      await _stepDatabase.insertSnapshot(
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        cumulativeSteps: currentStepCount.value,
+        incrementalSteps: _incrementalSteps,
+        sessionStartSteps: _sessionStartSteps,
+        source: 'pedometer',
+        deviceBootTime: _deviceBootTime,
+      );
+
+      // Cleanup old snapshots (keep only last 7 days)
+      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch;
+      await _stepDatabase.deleteOldSnapshots(sevenDaysAgo);
+
+    } catch (e) {
+      print('❌ Error saving snapshot: $e');
+    }
+  }
+
+  /// Get steps at a specific timestamp (for race baseline)
+  Future<int?> getStepsAtTime(DateTime timestamp) async {
+    try {
+      final snapshot = await _stepDatabase.getSnapshotNearTime(
+        timestamp.millisecondsSinceEpoch,
+      );
+
+      if (snapshot != null) {
+        return snapshot['cumulativeSteps'] as int;
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Error getting steps at time: $e');
+      return null;
+    }
+  }
+
+  /// Get steps in a time range (for gap filling)
+  Future<Map<String, dynamic>> getStepsInRange(
+    DateTime startTime,
+    DateTime endTime,
+  ) async {
+    try {
+      final snapshots = await _stepDatabase.getSnapshotsInRange(
+        startTime.millisecondsSinceEpoch,
+        endTime.millisecondsSinceEpoch,
+      );
+
+      if (snapshots.isEmpty) {
+        return {
+          'success': false,
+          'message': 'No snapshots found in range',
+        };
+      }
+
+      final firstSnapshot = snapshots.first;
+      final lastSnapshot = snapshots.last;
+
+      final stepsDelta = (lastSnapshot['cumulativeSteps'] as int) -
+                         (firstSnapshot['cumulativeSteps'] as int);
+
+      return {
+        'success': true,
+        'stepsDelta': stepsDelta,
+        'startSteps': firstSnapshot['cumulativeSteps'],
+        'endSteps': lastSnapshot['cumulativeSteps'],
+        'snapshotCount': snapshots.length,
+        'startTime': DateTime.fromMillisecondsSinceEpoch(firstSnapshot['timestamp'] as int),
+        'endTime': DateTime.fromMillisecondsSinceEpoch(lastSnapshot['timestamp'] as int),
+      };
+    } catch (e) {
+      print('❌ Error getting steps in range: $e');
+      return {
+        'success': false,
+        'message': 'Error: $e',
+      };
+    }
+  }
+
+  /// Check if device rebooted (pedometer count dropped significantly)
+  bool detectReboot(int previousSteps, int currentSteps) {
+    // If current steps < previous steps, device likely rebooted
+    return currentSteps < previousSteps && (previousSteps - currentSteps) > 1000;
   }
 
   @override
   void onClose() {
     print('👋 PedometerService: Disposing...');
+    _snapshotTimer?.cancel();
     stopTracking();
     super.onClose();
   }

@@ -22,6 +22,7 @@ import '../../services/firebase_service.dart';
 import '../../services/xp_service.dart';
 import '../../services/local_notification_service.dart';
 import '../../services/step_tracking_service.dart';
+import '../../services/pedometer_service.dart';
 import '../../services/race_bot_service.dart';
 import '../../services/race_step_sync_service.dart';
 import '../../services/preferences_service.dart';
@@ -2031,13 +2032,13 @@ class MapController extends GetxController with WidgetsBindingObserver {
   }
 
   /// ✅ NEW: Start listening to live pedometer updates for real-time race display
-  /// This provides instant UI feedback while Cloud Functions handle server-side sync
+  /// This provides instant UI feedback while RaceStepSyncService handles Firebase sync
   void _startLivePedometerListener(String raceId) {
     try {
       // Cancel any existing listener
       _stepTrackingSubscription?.cancel();
 
-      final stepService = Get.find<StepTrackingService>();
+      final pedometerService = Get.find<PedometerService>();
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
       if (currentUserId == null) {
@@ -2047,9 +2048,9 @@ class MapController extends GetxController with WidgetsBindingObserver {
 
       print('🎧 Starting live pedometer listener for race $raceId');
 
-      // Listen to todaySteps stream from StepTrackingService
-      _stepTrackingSubscription = stepService.todaySteps.listen((totalSteps) {
-        _updateCurrentUserLocalSteps(raceId, currentUserId, totalSteps);
+      // Listen to currentStepCount stream from PedometerService
+      _stepTrackingSubscription = pedometerService.currentStepCount.listen((cumulativeSteps) {
+        _updateCurrentUserLocalSteps(raceId, currentUserId, cumulativeSteps);
       });
 
       print('✅ Live pedometer listener started successfully');

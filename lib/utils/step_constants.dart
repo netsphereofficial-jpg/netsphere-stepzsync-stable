@@ -14,7 +14,7 @@ class StepConstants {
 
   // Database Settings
   static const String sqliteDatabaseName = 'step_tracking.db';
-  static const int sqliteDatabaseVersion = 3;
+  static const int sqliteDatabaseVersion = 4; // Updated for step_snapshots table
   static const String dailyStepsTableName = 'daily_steps';
 
   // Step Calculation Constants
