@@ -464,8 +464,8 @@ class RaceStepSyncService extends GetxService {
 
       // ✅ NEW: Detect scheduled races that have started (need baseline re-capture)
       // This ensures only post-start steps count for scheduled races
-      // Check ALL active races (not just new ones) to handle app reopening after race start
-      for (final raceId in _activeRaceIds) {
+      // Check ALL active races (including newly discovered ones) to handle app reopening after race start
+      for (final raceId in newActiveRaceIds) {
         try {
           final baseline = _raceBaselines[raceId];
           if (baseline == null) continue;
