@@ -43,6 +43,26 @@
 -keep class io.sentry.** { *; }
 -dontwarn io.sentry.**
 
+## Health Connect / androidx.health
+-keep public class androidx.health.** {
+    public protected private *;
+}
+-dontwarn androidx.health.**
+
+# Critical: Keep HealthDataSdkService (required for Health Connect permission callbacks)
+-keep class androidx.health.platform.client.impl.sdkservice.HealthDataSdkService { *; }
+
+# Keep Health Connect service interfaces
+-keep interface androidx.health.platform.client.** { *; }
+
+# Keep lifecycle classes (required for permission callbacks)
+-keep class androidx.lifecycle.** { *; }
+-dontwarn androidx.lifecycle.**
+
+# Keep activity result contracts (used by health package for permissions)
+-keep class androidx.activity.result.** { *; }
+-dontwarn androidx.activity.result.**
+
 ## General Android
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
