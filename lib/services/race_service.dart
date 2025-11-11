@@ -15,6 +15,7 @@ import 'health_sync_coordinator.dart';
 import 'health_sync_service.dart';
 import 'race_step_reconciliation_service.dart';
 import 'preferences_service.dart';
+import 'pedometer_service.dart';
 import '../widgets/race/race_completion_celebration_dialog.dart';
 import '../controllers/race/completed_races_controller.dart';
 import '../core/utils/snackbar_utils.dart';
@@ -1411,35 +1412,42 @@ class RaceService {
       print('📊 [RACE_SERVICE] Baseline capture attempt $attempt/$maxRetries');
 
       // Try multiple data sources in priority order
-      // Source 1: Health Connect/HealthKit (primary)
+      // Source 1: PedometerService (PRIMARY - same source used for race tracking!)
+      final pedometerData = await _tryPedometerSource();
+      if (pedometerData != null && pedometerData['steps'] > 0) {
+        print('✅ [RACE_SERVICE] Baseline from PedometerService (primary tracking source)');
+        return _createBaselineData(pedometerData, raceId, userId);
+      }
+
+      // Source 2: Health Connect/HealthKit (fallback)
       final healthData = await _tryHealthSource();
       if (healthData != null && healthData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from HealthKit/Health Connect');
         return _createBaselineData(healthData, raceId, userId);
       }
 
-      // Source 2: HealthSyncCoordinator cache
+      // Source 3: HealthSyncCoordinator cache
       final coordinatorData = await _tryCoordinatorSource();
       if (coordinatorData != null && coordinatorData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from HealthSyncCoordinator cache');
         return _createBaselineData(coordinatorData, raceId, userId);
       }
 
-      // Source 3: Firebase daily_steps collection
+      // Source 4: Firebase daily_steps collection
       final firebaseData = await _tryFirebaseSource(userId);
       if (firebaseData != null && firebaseData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from Firebase daily_steps');
         return _createBaselineData(firebaseData, raceId, userId);
       }
 
-      // Source 4: StepTrackingService in-memory state
+      // Source 5: StepTrackingService in-memory state
       final stepServiceData = await _tryStepServiceSource();
       if (stepServiceData != null && stepServiceData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from StepTrackingService');
         return _createBaselineData(stepServiceData, raceId, userId);
       }
 
-      // Source 5: Local SQLite cache (last resort)
+      // Source 6: Local SQLite cache (last resort)
       final sqliteData = await _trySqliteSource();
       if (sqliteData != null && sqliteData['steps'] > 0) {
         print('✅ [RACE_SERVICE] Baseline from SQLite cache');
@@ -1455,6 +1463,50 @@ class RaceService {
 
     // All retries exhausted
     print('❌ [RACE_SERVICE] Baseline capture failed after $maxRetries attempts');
+    return null;
+  }
+
+  /// Try to get data from PedometerService (PRIMARY - same source as race tracking)
+  /// This ensures baseline and tracking use the same data source for consistency
+  static Future<Map<String, dynamic>?> _tryPedometerSource() async {
+    try {
+      if (!Get.isRegistered<PedometerService>()) {
+        print('⚠️ [RACE_SERVICE] PedometerService not registered');
+        return null;
+      }
+
+      final pedometerService = Get.find<PedometerService>();
+
+      // Wait for initialization if needed
+      if (!pedometerService.isInitialized.value) {
+        print('⏳ [RACE_SERVICE] Waiting for PedometerService to initialize...');
+        await pedometerService.initializationComplete.timeout(
+          Duration(seconds: 5),
+          onTimeout: () {
+            print('⚠️ [RACE_SERVICE] PedometerService initialization timeout');
+            return false;
+          },
+        );
+      }
+
+      final steps = pedometerService.currentStepCount.value;
+
+      if (steps > 0) {
+        // Calculate approximate distance and calories from steps
+        // Using standard conversion: 1 step ≈ 0.000762 km, 1 step ≈ 0.04 cal
+        final distance = steps * 0.000762;
+        final calories = (steps * 0.04).round();
+
+        print('✅ [RACE_SERVICE] PedometerService data: $steps steps, ${distance.toStringAsFixed(2)} km, $calories cal');
+        return {
+          'steps': steps,
+          'distance': distance,
+          'calories': calories,
+        };
+      }
+    } catch (e) {
+      print('⚠️ [RACE_SERVICE] Pedometer source failed: $e');
+    }
     return null;
   }
 
