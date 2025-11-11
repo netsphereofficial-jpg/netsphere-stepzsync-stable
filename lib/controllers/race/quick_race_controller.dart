@@ -471,14 +471,27 @@ class QuickRaceController extends GetxController {
         log('Could not get end address: $e');
       }
 
+      // ✅ CRITICAL: Fetch user name from Firestore (consistent with join logic)
+      final userDoc = await _firebaseService.firestore
+          .collection('user_profiles')
+          .doc(currentUser.uid)
+          .get();
+      final userData = userDoc.data() ?? {};
+      final userName = userData['fullName'] ??
+          userData['firstName'] ??
+          userData['displayName'] ??
+          currentUser.displayName ??
+          currentUser.email?.split('@')[0] ??
+          'User';
+
+      log('👤 Creator name: $userName');
+
       // ✅ CRITICAL: Capture baseline BEFORE creating participant
       // We need raceId first, so we'll capture baseline after race creation
       // For now, create participant with placeholder baseline (will update after race created)
       final creatorParticipant = Participant(
         userId: currentUser.uid,
-        userName: currentUser.displayName ??
-            currentUser.email?.split('@')[0] ??
-            'User',
+        userName: userName,
         distance: 0.0,
         remainingDistance: selectedDistance.value,
         rank: 1,
@@ -514,9 +527,7 @@ class QuickRaceController extends GetxController {
         durationMins: durationMinutes,
         genderPreferenceId: 0, // Any gender
         organizerUserId: currentUser.uid,
-        organizerName: currentUser.displayName ??
-            currentUser.email?.split('@')[0] ??
-            'User',
+        organizerName: userName,
         totalDistance: selectedDistance.value,
         statusId: 3, // Active - race starts immediately
         status: 'active',
