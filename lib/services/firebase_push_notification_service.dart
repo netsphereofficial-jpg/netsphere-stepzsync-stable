@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'local_notification_service.dart';
 import 'profile/profile_service.dart';
+import 'race_step_sync_service.dart';
 
 class FirebasePushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -164,8 +165,59 @@ class FirebasePushNotificationService {
     print('🔥 Body: ${message.notification?.body}');
     print('🔥 Data: ${message.data}');
 
+    // Handle race_started notification (triggers baseline re-capture)
+    final messageType = message.data['type'];
+    if (messageType == 'race_started') {
+      print('🏁 Race started notification received, triggering baseline re-capture...');
+      await _handleRaceStartedNotification(message);
+    }
+
     // Show local notification when app is in foreground
     await _showLocalNotificationFromFCM(message);
+  }
+
+  /// Handle race_started notification - triggers immediate race sync
+  /// This ensures baseline is re-captured when scheduled race starts
+  static Future<void> _handleRaceStartedNotification(RemoteMessage message) async {
+    try {
+      final raceId = message.data['raceId'];
+      final raceTitle = message.data['raceTitle'] ?? 'Unknown Race';
+
+      if (raceId == null || raceId.isEmpty) {
+        print('⚠️ No raceId in race_started notification');
+        return;
+      }
+
+      print('🏁 Processing race_started notification for race: $raceTitle (ID: $raceId)');
+
+      // Trigger immediate race refresh to detect newly started race
+      // This will trigger baseline re-capture in RaceStepSyncService._refreshActiveRaces()
+      try {
+        // Check if RaceStepSyncService is registered
+        if (Get.isRegistered<RaceStepSyncService>()) {
+          final raceStepSyncService = Get.find<RaceStepSyncService>();
+
+          // Trigger refresh (will detect autoStarted flag and re-capture baseline)
+          print('   🔄 Triggering race list refresh...');
+          // Note: _refreshActiveRaces is private, but startSyncing calls it
+          // If service is already running, just wait for next refresh cycle
+          if (!raceStepSyncService.isRunning.value) {
+            await raceStepSyncService.startSyncing();
+          } else {
+            print('   ℹ️ Race sync service already running, will detect on next refresh cycle');
+          }
+
+          print('   ✅ Race sync service notified of race start');
+        } else {
+          print('   ⚠️ RaceStepSyncService not registered yet');
+        }
+      } catch (e) {
+        print('   ❌ Error triggering race sync: $e');
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error handling race_started notification: $e');
+      print('   Stack trace: $stackTrace');
+    }
   }
 
   // Deep linking disabled - notification taps will not trigger navigation

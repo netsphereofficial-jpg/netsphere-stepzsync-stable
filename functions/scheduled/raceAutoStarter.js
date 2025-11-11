@@ -171,6 +171,57 @@ exports.autoStartScheduledRaces = functions.pubsub
               });
 
               console.log(`👥 [Auto-Starter] Updated ${participantsSnapshot.size} participants to active status`);
+
+              // Send FCM notifications to all participants
+              console.log(`📲 [Auto-Starter] Sending FCM notifications to ${participantsSnapshot.size} participants...`);
+
+              const notificationPromises = participantsSnapshot.docs.map(async (participantDoc) => {
+                try {
+                  const participantData = participantDoc.data();
+                  const fcmToken = participantData.fcmToken;
+
+                  if (fcmToken) {
+                    const message = {
+                      token: fcmToken,
+                      notification: {
+                        title: `🏁 Race Started!`,
+                        body: `Your race "${raceTitle}" has started! Open the app to begin tracking your steps.`,
+                      },
+                      data: {
+                        type: 'race_started',
+                        raceId: raceId,
+                        raceTitle: raceTitle,
+                        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                      },
+                      android: {
+                        priority: 'high',
+                        notification: {
+                          sound: 'default',
+                          channelId: 'race_updates',
+                        },
+                      },
+                      apns: {
+                        payload: {
+                          aps: {
+                            sound: 'default',
+                            badge: 1,
+                          },
+                        },
+                      },
+                    };
+
+                    await admin.messaging().send(message);
+                    console.log(`   ✅ Notification sent to user ${participantDoc.id}`);
+                  } else {
+                    console.log(`   ⚠️ No FCM token for user ${participantDoc.id}`);
+                  }
+                } catch (notifError) {
+                  console.error(`   ❌ Failed to send notification to ${participantDoc.id}:`, notifError);
+                }
+              });
+
+              await Promise.all(notificationPromises);
+              console.log(`✅ [Auto-Starter] FCM notifications sent to all participants`);
             });
 
             // Note: onRaceStatusChanged trigger will automatically send notifications

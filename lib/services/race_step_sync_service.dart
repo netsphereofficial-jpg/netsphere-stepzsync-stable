@@ -34,7 +34,7 @@ import '../utils/race_validation_utils.dart';
 class RaceBaseline {
   final String raceId;
   final String raceTitle;
-  final DateTime startTime;              // When race originally started
+  DateTime startTime;                    // When race started (can be updated on re-capture)
 
   // Persistent state (survives app restarts)
   int serverSteps;                       // Last known steps on server (SOURCE OF TRUTH)
@@ -64,6 +64,11 @@ class RaceBaseline {
   int maxStepsEverSeen;                  // Highest step count ever recorded (monotonic increasing)
   DateTime? lastServerSync;              // When we last fetched fresh data from server
 
+  // Baseline re-capture tracking (for scheduled races)
+  bool wasRecaptured;                    // Whether baseline was re-captured at race start
+  DateTime? originalBaselineTime;        // When original baseline was captured (at creation/join)
+  int? originalBaselineSteps;            // Original baseline steps (before re-capture)
+
   RaceBaseline({
     required this.raceId,
     required this.raceTitle,
@@ -84,6 +89,9 @@ class RaceBaseline {
     this.completedAt,
     int? maxStepsEverSeen,
     this.lastServerSync,
+    this.wasRecaptured = false,
+    this.originalBaselineTime,
+    this.originalBaselineSteps,
   }) : maxStepsEverSeen = maxStepsEverSeen ?? serverSteps;
 
   // JSON serialization for persistence
@@ -108,6 +116,9 @@ class RaceBaseline {
       'completedAt': completedAt?.toIso8601String(),
       'maxStepsEverSeen': maxStepsEverSeen,
       'lastServerSync': lastServerSync?.toIso8601String(),
+      'wasRecaptured': wasRecaptured,
+      'originalBaselineTime': originalBaselineTime?.toIso8601String(),
+      'originalBaselineSteps': originalBaselineSteps,
     };
   }
 
@@ -138,6 +149,10 @@ class RaceBaseline {
       // Load data integrity tracking
       maxStepsEverSeen: json['maxStepsEverSeen'] as int?,
       lastServerSync: json['lastServerSync'] != null ? DateTime.tryParse(json['lastServerSync'] as String) : null,
+      // Load baseline re-capture tracking (backwards compatible - defaults to false)
+      wasRecaptured: json['wasRecaptured'] as bool? ?? false,
+      originalBaselineTime: json['originalBaselineTime'] != null ? DateTime.tryParse(json['originalBaselineTime'] as String) : null,
+      originalBaselineSteps: json['originalBaselineSteps'] as int?,
     );
   }
 
@@ -447,6 +462,50 @@ class RaceStepSyncService extends GetxService {
         }
       }
 
+      // ✅ NEW: Detect scheduled races that have started (need baseline re-capture)
+      // This ensures only post-start steps count for scheduled races
+      for (final raceId in newActiveRaceIds) {
+        try {
+          final baseline = _raceBaselines[raceId];
+          if (baseline == null) continue;
+
+          // Skip if already re-captured
+          if (baseline.wasRecaptured) continue;
+
+          // Fetch race document to check for auto-start
+          final raceDoc = await _firestore.collection('races').doc(raceId).get();
+          if (!raceDoc.exists) continue;
+
+          final raceData = raceDoc.data();
+          if (raceData == null) continue;
+
+          // Check if race was auto-started (scheduled race that transitioned to active)
+          final autoStarted = raceData['autoStarted'] as bool? ?? false;
+          final actualStartTimeField = raceData['actualStartTime'];
+
+          if (autoStarted && actualStartTimeField != null) {
+            final actualStartTime = (actualStartTimeField as Timestamp).toDate();
+
+            // Check if baseline was captured BEFORE race started (stale baseline)
+            // Compare baseline capture time vs race actual start time
+            final baselineTime = baseline.originalBaselineTime ?? baseline.startTime;
+
+            if (baselineTime.isBefore(actualStartTime)) {
+              dev.log('🔍 [RACE_SYNC] Detected scheduled race that started: "${baseline.raceTitle}"');
+              dev.log('   Baseline time: ${baselineTime.toIso8601String()}');
+              dev.log('   Race start: ${actualStartTime.toIso8601String()}');
+              dev.log('   Triggering baseline re-capture...');
+
+              // Re-capture baseline at actual race start time
+              await _recaptureBaselineForStartedRace(raceId, actualStartTime);
+            }
+          }
+        } catch (e) {
+          dev.log('⚠️ [RACE_SYNC] Error checking race $raceId for baseline re-capture: $e');
+          // Continue processing other races
+        }
+      }
+
       // Detect COMPLETED races (clean up baselines)
       final completedRaces = _activeRaceIds.difference(newActiveRaceIds);
       for (final raceId in completedRaces) {
@@ -671,6 +730,134 @@ class RaceStepSyncService extends GetxService {
       }
     } catch (e) {
       dev.log('❌ [RACE_SYNC] Error setting baseline for race $raceId: $e');
+    }
+  }
+
+  /// Re-capture baseline for scheduled race that has started
+  /// This ensures only steps AFTER race starts are counted, not pre-race steps
+  Future<void> _recaptureBaselineForStartedRace(String raceId, DateTime actualStartTime) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        dev.log('❌ [RACE_SYNC] No authenticated user for baseline re-capture');
+        return;
+      }
+
+      final baseline = _raceBaselines[raceId];
+      if (baseline == null) {
+        dev.log('⚠️ [RACE_SYNC] No baseline found for race $raceId, cannot re-capture');
+        return;
+      }
+
+      // Check if already re-captured (idempotency)
+      if (baseline.wasRecaptured) {
+        dev.log('⏭️ [RACE_SYNC] Baseline already re-captured for "${baseline.raceTitle}", skipping');
+        return;
+      }
+
+      dev.log('🔧 [RACE_SYNC] Re-capturing baseline for scheduled race: "${baseline.raceTitle}"');
+      dev.log('   Original baseline: ${baseline.healthKitStepsAtStart} steps (captured at ${baseline.originalBaselineTime ?? baseline.startTime})');
+      dev.log('   Race actual start: ${actualStartTime.toIso8601String()}');
+
+      // Retry mechanism for baseline capture (3 attempts with 2-second delays)
+      int maxRetries = 3;
+      int retryDelay = 2000; // milliseconds
+      int newBaselineSteps = 0;
+
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        // Get current pedometer reading
+        final currentPedometerSteps = _pedometerService.currentStepCount.value;
+
+        if (currentPedometerSteps > 0) {
+          newBaselineSteps = currentPedometerSteps;
+          dev.log('   ✅ Captured fresh baseline: $newBaselineSteps steps (attempt $attempt)');
+          break;
+        } else {
+          dev.log('   ⚠️ Pedometer not ready (attempt $attempt/$maxRetries): $currentPedometerSteps steps');
+          if (attempt < maxRetries) {
+            await Future.delayed(Duration(milliseconds: retryDelay));
+          }
+        }
+      }
+
+      // Validation: Ensure new baseline is valid
+      if (newBaselineSteps <= 0) {
+        dev.log('   ❌ Failed to capture valid baseline after $maxRetries attempts');
+        dev.log('   Keeping original baseline as fallback');
+        return;
+      }
+
+      // Store original baseline (for debugging/analytics)
+      baseline.originalBaselineTime = baseline.startTime;
+      baseline.originalBaselineSteps = baseline.healthKitStepsAtStart;
+
+      // Update baseline to fresh reading
+      baseline.healthKitStepsAtStart = newBaselineSteps;
+      baseline.startTime = actualStartTime; // Update to actual race start time
+      baseline.wasRecaptured = true;
+
+      // Reset progress counters (discard pre-race steps)
+      baseline.serverSteps = 0;
+      baseline.sessionRaceSteps = 0;
+      baseline.sessionRaceDistance = 0.0;
+      baseline.sessionRaceCalories = 0;
+      baseline.maxStepsEverSeen = 0;
+
+      dev.log('   ✅ Baseline re-captured successfully:');
+      dev.log('      New baseline: $newBaselineSteps steps');
+      dev.log('      Original baseline: ${baseline.originalBaselineSteps} steps (preserved for reference)');
+      dev.log('      Progress reset: 0 steps, 0.00 km, 0 cal');
+      dev.log('      Pre-race steps discarded (fair play)');
+
+      // Save updated baseline to local storage
+      try {
+        final prefsService = Get.find<PreferencesService>();
+        final baselineData = {
+          'raceId': raceId,
+          'userId': userId,
+          'baselineSteps': newBaselineSteps,
+          'baselineDistance': baseline.healthKitDistanceAtStart ?? 0.0,
+          'baselineCalories': baseline.healthKitCaloriesAtStart ?? 0,
+          'baselineTimestamp': actualStartTime.toIso8601String(),
+          'raceStartTime': actualStartTime.toIso8601String(),
+          'wasRecaptured': true,
+          'originalBaselineSteps': baseline.originalBaselineSteps,
+          'originalBaselineTime': baseline.originalBaselineTime?.toIso8601String(),
+        };
+        await prefsService.saveRaceBaseline(raceId, userId, baselineData);
+        dev.log('   💾 Updated baseline saved to local storage');
+      } catch (e) {
+        dev.log('   ⚠️ Could not save updated baseline to local storage: $e');
+      }
+
+      // Also update in Firebase participant document for backup
+      try {
+        await _firestore
+            .collection('races')
+            .doc(raceId)
+            .collection('participants')
+            .doc(userId)
+            .set({
+          'baselineSteps': newBaselineSteps,
+          'baselineRecapturedAt': FieldValue.serverTimestamp(),
+          'originalBaselineSteps': baseline.originalBaselineSteps,
+          'steps': 0, // Reset progress
+          'distance': 0.0,
+          'calories': 0,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        dev.log('   ☁️ Updated baseline saved to Firebase');
+      } catch (e) {
+        dev.log('   ⚠️ Could not update Firebase participant document: $e');
+      }
+
+      // Save baseline object to local storage (batched)
+      _scheduleBatchSave();
+
+      dev.log('✅ [RACE_SYNC] Baseline re-capture complete for "${baseline.raceTitle}"');
+    } catch (e, stackTrace) {
+      dev.log('❌ [RACE_SYNC] Error re-capturing baseline for race $raceId: $e');
+      dev.log('   Stack trace: $stackTrace');
     }
   }
 
