@@ -465,24 +465,41 @@ class RaceStepSyncService extends GetxService {
       // ✅ NEW: Detect scheduled races that have started (need baseline re-capture)
       // This ensures only post-start steps count for scheduled races
       // Check ALL active races (including newly discovered ones) to handle app reopening after race start
+      dev.log('🔍 [RACE_SYNC] Checking ${newActiveRaceIds.length} races for baseline re-capture...');
       for (final raceId in newActiveRaceIds) {
         try {
           final baseline = _raceBaselines[raceId];
-          if (baseline == null) continue;
+          if (baseline == null) {
+            dev.log('   ⏭️ Race $raceId: No baseline in memory, skipping');
+            continue;
+          }
 
           // Skip if already re-captured
-          if (baseline.wasRecaptured) continue;
+          if (baseline.wasRecaptured) {
+            dev.log('   ✅ Race "${baseline.raceTitle}": Already re-captured, skipping');
+            continue;
+          }
+
+          dev.log('   🔍 Checking race "${baseline.raceTitle}" (ID: $raceId) for re-capture...');
 
           // Fetch race document to check for auto-start
           final raceDoc = await _firestore.collection('races').doc(raceId).get();
-          if (!raceDoc.exists) continue;
+          if (!raceDoc.exists) {
+            dev.log('   ⚠️ Race document not found, skipping');
+            continue;
+          }
 
           final raceData = raceDoc.data();
-          if (raceData == null) continue;
+          if (raceData == null) {
+            dev.log('   ⚠️ Race data is null, skipping');
+            continue;
+          }
 
           // Check if race was auto-started (scheduled race that transitioned to active)
           final autoStarted = raceData['autoStarted'] as bool? ?? false;
           final actualStartTimeField = raceData['actualStartTime'];
+
+          dev.log('   📊 Race flags: autoStarted=$autoStarted, hasActualStartTime=${actualStartTimeField != null}');
 
           if (autoStarted && actualStartTimeField != null) {
             final actualStartTime = (actualStartTimeField as Timestamp).toDate();
@@ -491,21 +508,31 @@ class RaceStepSyncService extends GetxService {
             // Compare baseline capture time vs race actual start time
             final baselineTime = baseline.originalBaselineTime ?? baseline.startTime;
 
+            dev.log('   ⏰ Baseline captured at: ${baselineTime.toIso8601String()}');
+            dev.log('   ⏰ Race started at:      ${actualStartTime.toIso8601String()}');
+            dev.log('   📊 Baseline is stale? ${baselineTime.isBefore(actualStartTime)}');
+
             if (baselineTime.isBefore(actualStartTime)) {
-              dev.log('🔍 [RACE_SYNC] Detected scheduled race that started: "${baseline.raceTitle}"');
+              dev.log('🔍 [RACE_SYNC] ✅ Detected scheduled race that started: "${baseline.raceTitle}"');
               dev.log('   Baseline time: ${baselineTime.toIso8601String()}');
               dev.log('   Race start: ${actualStartTime.toIso8601String()}');
               dev.log('   Triggering baseline re-capture...');
 
               // Re-capture baseline at actual race start time
               await _recaptureBaselineForStartedRace(raceId, actualStartTime);
+            } else {
+              dev.log('   ✅ Baseline is fresh (captured after race start), no re-capture needed');
             }
+          } else {
+            dev.log('   ⏭️ Not an auto-started race, skipping re-capture check');
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
           dev.log('⚠️ [RACE_SYNC] Error checking race $raceId for baseline re-capture: $e');
+          dev.log('   Stack trace: $stackTrace');
           // Continue processing other races
         }
       }
+      dev.log('✅ [RACE_SYNC] Baseline re-capture check completed');
 
       // Detect COMPLETED races (clean up baselines)
       final completedRaces = _activeRaceIds.difference(newActiveRaceIds);
@@ -619,6 +646,21 @@ class RaceStepSyncService extends GetxService {
             baselineDistance = (participantData['baselineDistance'] ?? 0.0).toDouble();
             baselineCalories = participantData['baselineCalories'] ?? 0;
 
+            // ✅ CRITICAL FIX: Load baseline capture timestamp from Firebase
+            final baselineTimestampField = participantData['baselineTimestamp'];
+            if (baselineTimestampField is Timestamp) {
+              raceStartTime = baselineTimestampField.toDate();
+              dev.log('✅ [RACE_SYNC] Loaded baseline capture time from Firebase: ${raceStartTime.toIso8601String()}');
+            } else if (baselineTimestampField is String) {
+              try {
+                raceStartTime = DateTime.parse(baselineTimestampField);
+                dev.log('✅ [RACE_SYNC] Parsed baseline capture time from string: ${raceStartTime.toIso8601String()}');
+              } catch (e) {
+                dev.log('⚠️ [RACE_SYNC] Could not parse baseline timestamp string: $baselineTimestampField');
+                // Will use race start time as fallback below
+              }
+            }
+
             // ✅ VALIDATION: Ensure Firebase baseline is also non-zero
             if (baselineSteps > 0) {
               foundLocalBaseline = true; // Mark as found so we proceed
@@ -632,7 +674,7 @@ class RaceStepSyncService extends GetxService {
                   'baselineSteps': baselineSteps,
                   'baselineDistance': baselineDistance,
                   'baselineCalories': baselineCalories,
-                  'baselineTimestamp': DateTime.now().toIso8601String(),
+                  'baselineTimestamp': raceStartTime.toIso8601String(),
                   'raceStartTime': raceStartTime.toIso8601String(),
                 };
                 await prefsService.saveRaceBaseline(raceId, userId, baselineData);
@@ -643,6 +685,7 @@ class RaceStepSyncService extends GetxService {
 
               dev.log('✅ [RACE_SYNC] Loaded VALID baseline from Firebase:');
               dev.log('   Baseline: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories cal');
+              dev.log('   Baseline captured at: ${raceStartTime.toIso8601String()}');
             } else {
               dev.log('❌ [RACE_SYNC] Firebase baseline is INVALID (steps = 0)!');
               dev.log('   ⚠️ This race may have been created without proper baseline capture');
@@ -659,20 +702,20 @@ class RaceStepSyncService extends GetxService {
         }
       }
 
-      // Fetch race document to get actual start time
-      final raceDoc = await _firestore.collection('races').doc(raceId).get();
-      final raceData = raceDoc.data();
+      // ✅ FALLBACK: If baseline timestamp wasn't found, try to get race actual start time
+      // This handles races created before baseline timestamp was added
+      if (!foundLocalBaseline) {
+        final raceDoc = await _firestore.collection('races').doc(raceId).get();
+        final raceData = raceDoc.data();
 
-      // Get actual race start time from Firebase
-      final actualStartTimeField = raceData?['actualStartTime'];
-
-      if (actualStartTimeField is Timestamp) {
-        raceStartTime = actualStartTimeField.toDate();
-        dev.log('✅ [RACE_SYNC] Using actual race start time: ${raceStartTime.toIso8601String()}');
-      } else if (!foundLocalBaseline) {
-        // Only use current time if we don't have local baseline
-        raceStartTime = DateTime.now();
-        dev.log('⚠️ [RACE_SYNC] No actualStartTime found for race $raceId, using current time');
+        final actualStartTimeField = raceData?['actualStartTime'];
+        if (actualStartTimeField is Timestamp) {
+          raceStartTime = actualStartTimeField.toDate();
+          dev.log('✅ [RACE_SYNC] Using race actual start time as fallback: ${raceStartTime.toIso8601String()}');
+        } else {
+          raceStartTime = DateTime.now();
+          dev.log('⚠️ [RACE_SYNC] No actualStartTime found for race $raceId, using current time');
+        }
       }
 
       // Fetch participant data including completion status (source of truth)
