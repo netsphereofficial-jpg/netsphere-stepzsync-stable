@@ -288,6 +288,15 @@ class StepTrackingService extends GetxService {
       final localData = await _repository.getDailyData(today);
 
       if (localData != null) {
+        // ✅ DEFENSIVE FIX: Only use local data if it's newer than in-memory baseline
+        // This prevents reverting to old data after a successful manual sync
+        if (_healthKitBaselineSteps > 0 && localData.steps < _healthKitBaselineSteps) {
+          print('⚠️ Local data (${localData.steps} steps) is older than current baseline ($_healthKitBaselineSteps steps)');
+          print('   → Keeping current baseline instead of reverting to stale local data');
+          // Don't update baseline - keep current in-memory value
+          return;
+        }
+
         _healthKitBaselineSteps = localData.steps;
         _healthKitBaselineDistance = localData.distance;
         _healthKitBaselineCalories = localData.calories;
@@ -688,8 +697,8 @@ class StepTrackingService extends GetxService {
   }
 
   /// Sync current data to Firebase
-  /// NEW APPROACH: Write to HealthKit first, then read back and sync to Firebase
-  /// This ensures HealthKit is ALWAYS the source of truth
+  /// APPROACH: Write pedometer increments to HealthKit, then sync current baseline to Firebase
+  /// Uses in-memory baseline (updated by manual sync/startup) - no re-fetching to avoid stale data
   /// Uses lock to prevent concurrent sync operations
   Future<void> syncToFirebase() async {
     // Early check without lock for performance
@@ -712,11 +721,15 @@ class StepTrackingService extends GetxService {
         // STEP 1: Write pedometer incremental steps to HealthKit first
         await _writePedometerStepsToHealth();
 
-        // STEP 2: Re-fetch from HealthKit to get authoritative value
-        // This ensures any pedometer steps we just wrote are included
-        await _fetchHealthKitBaseline();
+        // STEP 2: Use current in-memory baseline (already correct from manual sync/startup)
+        // ✅ FIX: Don't re-fetch here - it can fall back to stale local data and cause reversion
+        // The baseline is correctly updated by:
+        // - Manual sync (_healthSyncService.syncHealthData)
+        // - App startup/initialization (_fetchHealthKitBaseline)
+        // - Midnight rollover (resets properly)
+        // Re-fetching here was causing the bug where 881 steps reverted to 653 steps
 
-        // STEP 3: Now sync the authoritative HealthKit value to Firebase
+        // STEP 3: Now sync the current authoritative value to Firebase
         final todayData = DailyStepData(
           date: currentDate.value,
           steps: todaySteps.value, // This now reflects HealthKit authoritative value
