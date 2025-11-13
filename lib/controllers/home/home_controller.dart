@@ -56,8 +56,9 @@ class HomeController extends GetxController with GetSingleTickerProviderStateMix
       // Start monitoring all notifications from Firebase (friends, chat, etc.)
       await UnifiedNotificationService.startMonitoring();
 
-      // Check for any unread notifications on startup
-      await UnifiedNotificationService.checkForUnreadNotifications();
+      // ❌ DISABLED: checkForUnreadNotifications() removed to prevent duplicate notifications
+      // The real-time listener in startMonitoring() will handle all new notifications
+      // await UnifiedNotificationService.checkForUnreadNotifications();
     } catch (e) {
     }
   }

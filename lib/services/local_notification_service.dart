@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import '../models/notification_model.dart';
 import '../controllers/notification_controller.dart';
@@ -10,6 +11,10 @@ class LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
   static final NotificationRepository _notificationRepository = NotificationRepository();
+
+  // Additional duplicate prevention tracking
+  static const String _localPushHistoryKey = 'local_push_notification_history';
+  static const int _pushExpiryMinutes = 30; // Track push notifications for 30 minutes
 
   static Future<void> initialize() async {
 
@@ -31,8 +36,8 @@ class LocalNotificationService {
 
     final initialized = await _notificationsPlugin.initialize(
       initializationSettings,
-      // Deep linking disabled - users should not navigate from notifications
-      onDidReceiveNotificationResponse: null,
+      // Deep linking enabled - navigate to relevant screens from notifications
+      onDidReceiveNotificationResponse: _handleNotificationTap,
     );
 
 
@@ -44,8 +49,179 @@ class LocalNotificationService {
     print('🔔 Notification permissions granted: $permissionGranted');
   }
 
-  // Deep linking disabled - notification taps will not trigger navigation
-  // Users must manually navigate to relevant screens
+  /// Handle notification tap - navigate to relevant screen based on notification type
+  static void _handleNotificationTap(NotificationResponse response) {
+    try {
+      print('🔔 Notification tapped: ${response.payload}');
+
+      if (response.payload == null || response.payload!.isEmpty) {
+        print('⚠️ No payload in notification tap');
+        return;
+      }
+
+      // Parse payload (format: "key1=value1&key2=value2")
+      final Map<String, String> payloadData = {};
+      final pairs = response.payload!.split('&');
+      for (final pair in pairs) {
+        final parts = pair.split('=');
+        if (parts.length == 2) {
+          payloadData[parts[0]] = parts[1];
+        }
+      }
+
+      final notificationType = payloadData['type'];
+      final raceId = payloadData['raceId'];
+
+      if (notificationType == null) {
+        print('⚠️ No notification type in payload');
+        return;
+      }
+
+      print('📍 Navigating based on type: $notificationType');
+
+      // Route to appropriate screen based on notification type
+      _navigateToScreen(notificationType, raceId: raceId);
+
+    } catch (e) {
+      print('❌ Error handling notification tap: $e');
+    }
+  }
+
+  /// Navigate to appropriate screen based on notification type
+  static void _navigateToScreen(String notificationType, {String? raceId}) {
+    print('🔍 Navigating for notification type: $notificationType');
+
+    switch (notificationType) {
+      // ===== RACE INVITATIONS =====
+      case 'InviteRace':
+        // Navigate to race invitation/details screen
+        if (raceId != null) {
+          Get.toNamed('/race', arguments: {'raceId': raceId});
+        }
+        break;
+
+      // ===== ACTIVE RACE NOTIFICATIONS =====
+      case 'RaceBegin':
+      case 'RaceDeadlineAlert':
+      case 'RaceCountdownTimer':
+      case 'RaceProximityAlert':
+        // Navigate to active race screen
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== RACE RESULTS/COMPLETION =====
+      case 'RaceCompleted':
+      case 'RaceWon':
+      case 'RaceFirstFinisher':
+        // Navigate to race results/completion screen
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId, 'showResults': true});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== RACE LEADERBOARD UPDATES =====
+      case 'RaceOvertaking':
+      case 'RaceOvertaken':
+      case 'RaceOvertakingGeneral':
+      case 'RaceLeaderChange':
+      case 'OvertakingParticipant': // Legacy name
+        // Navigate to race leaderboard
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId, 'tab': 'leaderboard'});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== RACE DETAILS/PARTICIPANTS =====
+      case 'InviteAccepted':
+      case 'InviteDeclined':
+      case 'RaceParticipantJoined':
+      case 'RaceParticipant': // Legacy name
+        // Navigate to race details/participants
+        if (raceId != null) {
+          Get.toNamed('/race', arguments: {'raceId': raceId});
+        }
+        break;
+
+      // ===== RACE CANCELLED =====
+      case 'RaceCancelled':
+        // Navigate to home screen (root)
+        Get.offAllNamed('/');
+        break;
+
+      // ===== FRIEND NOTIFICATIONS =====
+      case 'FriendRequest':
+        // Navigate to friend requests screen
+        Get.toNamed('/friends', arguments: {'tab': 'requests'});
+        break;
+
+      case 'FriendAccepted':
+        // Navigate to friends list
+        Get.toNamed('/friends');
+        break;
+
+      case 'FriendRemoved':
+      case 'FriendDeclined':
+        // Navigate to friends list
+        Get.toNamed('/friends');
+        break;
+
+      // ===== CHAT NOTIFICATIONS =====
+      case 'ChatMessage':
+        // Navigate to friends/chat screen
+        Get.toNamed('/friends', arguments: {'tab': 'messages'});
+        break;
+
+      case 'RaceChatMessage':
+        // Navigate to the race (chat can be opened from there)
+        if (raceId != null) {
+          Get.toNamed('/race', arguments: {'raceId': raceId, 'openChat': true});
+        }
+        break;
+
+      // ===== MARATHON =====
+      case 'Marathon':
+      case 'ActiveMarathon':
+        // Navigate to marathon screen
+        Get.toNamed('/marathon');
+        break;
+
+      // ===== ACHIEVEMENTS =====
+      case 'HallOfFame':
+        // Navigate to hall of fame
+        Get.toNamed('/hall-of-fame');
+        break;
+
+      // ===== LEGACY/OTHER =====
+      case 'RaceOver':
+      case 'RaceWinnerCrossing':
+      case 'EndTimer':
+        // Legacy notification types - navigate to active races
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== TEST/GENERAL =====
+      case 'General':
+      case 'TestNotification':
+      case 'Test':
+      case 'FCMTest':
+      default:
+        // For general notifications, stay on current screen
+        print('ℹ️ General notification ($notificationType) - no navigation');
+        break;
+    }
+  }
 
   /// Main method to send local notification and store in both local list and Firebase
   static Future<void> sendNotificationAndStore({
@@ -122,6 +298,13 @@ class LocalNotificationService {
     try {
       print('📱 Sending local notification: ID=$id, Title=$title');
 
+      // Check for duplicate push notification
+      final isDuplicate = await _hasLocalPushBeenSent(title, message, notificationType);
+      if (isDuplicate) {
+        print('⏭️ Duplicate local push detected, skipping: $title');
+        return;
+      }
+
       // Check if we have permission to show notifications
       final hasPermission = await _checkNotificationPermissions();
       if (!hasPermission) {
@@ -129,8 +312,12 @@ class LocalNotificationService {
         return;
       }
 
-      // Payload is not used for navigation (deep linking disabled)
-      String payload = notificationType;
+      // Create payload with notification metadata for deep linking
+      final Map<String, dynamic> payloadData = {
+        'type': notificationType,
+        if (raceId != null) 'raceId': raceId,
+      };
+      String payload = payloadData.entries.map((e) => '${e.key}=${e.value}').join('&');
 
     // Determine channel based on notification type
     String channelId = 'stepzsync_channel';
@@ -175,6 +362,9 @@ class LocalNotificationService {
       notificationDetails,
       payload: payload,
     );
+
+    // Mark this push notification as sent
+    await _markLocalPushAsSent(title, message, notificationType);
 
     print('✅ Local notification sent successfully with ID: $id');
     print('📱 Notification details: $title - $message');
@@ -623,6 +813,113 @@ class LocalNotificationService {
         'error': e.toString(),
         'details': 'Failed to send test notification'
       };
+    }
+  }
+
+  /// Check if a local push notification has already been sent (duplicate prevention)
+  static Future<bool> _hasLocalPushBeenSent(
+    String title,
+    String message,
+    String notificationType,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pushHistory = prefs.getStringList(_localPushHistoryKey) ?? [];
+
+      // Create unique key for this notification
+      final notificationKey = '$notificationType:$title:$message';
+
+      // Format: "key:timestamp"
+      for (final entry in pushHistory) {
+        final parts = entry.split('|||'); // Use ||| as delimiter to avoid conflicts
+        if (parts.length == 2 && parts[0] == notificationKey) {
+          // Check if notification is still within expiry window
+          final timestamp = int.tryParse(parts[1]);
+          if (timestamp != null) {
+            final sentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+            final now = DateTime.now();
+            final difference = now.difference(sentTime);
+
+            if (difference.inMinutes < _pushExpiryMinutes) {
+              return true; // Still within expiry window, consider it duplicate
+            }
+          }
+        }
+      }
+
+      return false;
+    } catch (e) {
+      print('❌ Error checking local push history: $e');
+      return false; // On error, allow notification to be sent
+    }
+  }
+
+  /// Mark a local push notification as sent
+  static Future<void> _markLocalPushAsSent(
+    String title,
+    String message,
+    String notificationType,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var pushHistory = prefs.getStringList(_localPushHistoryKey) ?? [];
+
+      // Create unique key for this notification
+      final notificationKey = '$notificationType:$title:$message';
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      // Add new entry
+      pushHistory.add('$notificationKey|||$now');
+
+      // Clean up expired entries
+      pushHistory = _cleanupExpiredPushHistory(pushHistory);
+
+      // Limit history size to prevent excessive storage (keep last 100)
+      if (pushHistory.length > 100) {
+        pushHistory = pushHistory.sublist(pushHistory.length - 100);
+      }
+
+      // Save back to preferences
+      await prefs.setStringList(_localPushHistoryKey, pushHistory);
+
+      print('✅ Marked local push as sent: $notificationType - $title');
+    } catch (e) {
+      print('❌ Error marking local push as sent: $e');
+    }
+  }
+
+  /// Clean up expired local push history entries
+  static List<String> _cleanupExpiredPushHistory(List<String> history) {
+    final now = DateTime.now();
+    final validEntries = <String>[];
+
+    for (final entry in history) {
+      final parts = entry.split('|||');
+      if (parts.length == 2) {
+        final timestamp = int.tryParse(parts[1]);
+        if (timestamp != null) {
+          final sentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+          final difference = now.difference(sentTime);
+
+          // Keep only entries within expiry window
+          if (difference.inMinutes < _pushExpiryMinutes) {
+            validEntries.add(entry);
+          }
+        }
+      }
+    }
+
+    return validEntries;
+  }
+
+  /// Clear local push notification history (for debugging)
+  static Future<void> clearLocalPushHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_localPushHistoryKey);
+      print('✅ Cleared local push notification history');
+    } catch (e) {
+      print('❌ Error clearing local push history: $e');
     }
   }
 

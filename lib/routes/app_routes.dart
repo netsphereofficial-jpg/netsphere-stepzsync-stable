@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../controllers/notification_controller.dart';
 import '../screens/achievements/achievements_screen.dart';
 import '../screens/active_races/active_races_screen.dart';
+import '../screens/friends/friends_screen.dart';
 import '../screens/hall_of_fame/hall_of_fame_screen.dart';
 import '../screens/marathon/marathon_screen.dart';
 import '../screens/notifications/notification_list_screen.dart';
@@ -13,6 +14,7 @@ import '../screens/race_map/race_map_screen.dart';
 import '../screens/races/marathon_races_screen.dart';
 import '../screens/races/quick_race/quick_race_selection_screen.dart';
 import '../screens/subscription/subscription_screen.dart';
+import '../screens/notification_test_screen.dart';
 
 class AppRoutes {
   static const String onboarding = '/onboarding';
@@ -24,10 +26,12 @@ class AppRoutes {
   static const String marathon = '/marathon';
   static const String marathonRaces = '/marathon-races';
   static const String raceInvites = '/race-invites';
+  static const String friends = '/friends';
   static const String hallOfFame = '/hall-of-fame';
   static const String achievements = '/achievements';
   static const String raceDetails = '/race-details';
   static const String notifications = '/notifications';
+  static const String notificationTest = '/notification-test';
   static const String adminLogin = '/admin-login';
   static const String adminDashboard = '/admin-dashboard';
   static const String subscription = '/subscription';
@@ -82,6 +86,12 @@ class AppRoutes {
       transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
+      name: friends,
+      page: () => const FriendsScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
       name: hallOfFame,
       page: () => const HallOfFameScreen(),
       transition: Transition.rightToLeft,
@@ -106,6 +116,12 @@ class AppRoutes {
     GetPage(
       name: subscription,
       page: () =>  SubscriptionScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: notificationTest,
+      page: () => const NotificationTestScreen(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),

@@ -132,10 +132,22 @@ class FirebasePushNotificationService {
       // Handle messages when app is in foreground (show notification only, no navigation)
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-      // Deep linking disabled - notification taps will not trigger navigation
-      // onMessageOpenedApp and getInitialMessage handlers removed
+      // Deep linking enabled - handle notification taps
+      // Handle notification tap when app is in background
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+
+      // Handle notification tap when app was terminated (cold start)
+      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        print('🔥 App opened from terminated state via notification');
+        // Delay navigation to ensure app is fully initialized
+        Future.delayed(Duration(milliseconds: 500), () {
+          _handleNotificationTap(initialMessage);
+        });
+      }
 
     } catch (e) {
+      print('❌ Error setting up FCM message handlers: $e');
     }
   }
 
@@ -220,7 +232,166 @@ class FirebasePushNotificationService {
     }
   }
 
-  // Deep linking disabled - notification taps will not trigger navigation
+  /// Handle notification tap - navigate to relevant screen
+  static void _handleNotificationTap(RemoteMessage message) {
+    try {
+      print('🔥 FCM notification tapped: ${message.messageId}');
+      print('🔥 Data: ${message.data}');
+
+      final notificationType = message.data['type'];
+      final raceId = message.data['raceId'];
+
+      if (notificationType == null) {
+        print('⚠️ No notification type in FCM message data');
+        return;
+      }
+
+      print('📍 Navigating based on FCM type: $notificationType');
+
+      // Route to appropriate screen using LocalNotificationService navigation
+      _navigateToScreen(notificationType, raceId: raceId);
+
+    } catch (e) {
+      print('❌ Error handling FCM notification tap: $e');
+    }
+  }
+
+  /// Navigate to appropriate screen based on notification type
+  static void _navigateToScreen(String notificationType, {String? raceId}) {
+    print('🔍 FCM Navigating for notification type: $notificationType');
+
+    switch (notificationType) {
+      // ===== RACE INVITATIONS =====
+      case 'InviteRace':
+        // Navigate to race invitation/details screen
+        if (raceId != null) {
+          Get.toNamed('/race', arguments: {'raceId': raceId});
+        }
+        break;
+
+      // ===== ACTIVE RACE NOTIFICATIONS =====
+      case 'RaceBegin':
+      case 'RaceDeadlineAlert':
+      case 'RaceCountdownTimer':
+      case 'RaceProximityAlert':
+      case 'race_started': // Server-side notification type
+        // Navigate to active race screen
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== RACE RESULTS/COMPLETION =====
+      case 'RaceCompleted':
+      case 'RaceWon':
+      case 'RaceFirstFinisher':
+        // Navigate to race results/completion screen
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId, 'showResults': true});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== RACE LEADERBOARD UPDATES =====
+      case 'RaceOvertaking':
+      case 'RaceOvertaken':
+      case 'RaceOvertakingGeneral':
+      case 'RaceLeaderChange':
+      case 'OvertakingParticipant': // Legacy name
+        // Navigate to race leaderboard
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId, 'tab': 'leaderboard'});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== RACE DETAILS/PARTICIPANTS =====
+      case 'InviteAccepted':
+      case 'InviteDeclined':
+      case 'RaceParticipantJoined':
+      case 'RaceParticipant': // Legacy name
+        // Navigate to race details/participants
+        if (raceId != null) {
+          Get.toNamed('/race', arguments: {'raceId': raceId});
+        }
+        break;
+
+      // ===== RACE CANCELLED =====
+      case 'RaceCancelled':
+        // Navigate to home screen (root)
+        Get.offAllNamed('/');
+        break;
+
+      // ===== FRIEND NOTIFICATIONS =====
+      case 'FriendRequest':
+        // Navigate to friend requests screen
+        Get.toNamed('/friends', arguments: {'tab': 'requests'});
+        break;
+
+      case 'FriendAccepted':
+        // Navigate to friends list
+        Get.toNamed('/friends');
+        break;
+
+      case 'FriendRemoved':
+      case 'FriendDeclined':
+        // Navigate to friends list
+        Get.toNamed('/friends');
+        break;
+
+      // ===== CHAT NOTIFICATIONS =====
+      case 'ChatMessage':
+        // Navigate to friends/chat screen
+        Get.toNamed('/friends', arguments: {'tab': 'messages'});
+        break;
+
+      case 'RaceChatMessage':
+        // Navigate to the race (chat can be opened from there)
+        if (raceId != null) {
+          Get.toNamed('/race', arguments: {'raceId': raceId, 'openChat': true});
+        }
+        break;
+
+      // ===== MARATHON =====
+      case 'Marathon':
+      case 'ActiveMarathon':
+        // Navigate to marathon screen
+        Get.toNamed('/marathon');
+        break;
+
+      // ===== ACHIEVEMENTS =====
+      case 'HallOfFame':
+        // Navigate to hall of fame
+        Get.toNamed('/hall-of-fame');
+        break;
+
+      // ===== LEGACY/OTHER =====
+      case 'RaceOver':
+      case 'RaceWinnerCrossing':
+      case 'EndTimer':
+        // Legacy notification types - navigate to active races
+        if (raceId != null) {
+          Get.toNamed('/active-races', arguments: {'raceId': raceId});
+        } else {
+          Get.toNamed('/active-races');
+        }
+        break;
+
+      // ===== TEST/GENERAL =====
+      case 'General':
+      case 'TestNotification':
+      case 'Test':
+      case 'FCMTest':
+      default:
+        // For general notifications, stay on current screen
+        print('ℹ️ General FCM notification ($notificationType) - no navigation');
+        break;
+    }
+  }
 
   static Future<void> _showLocalNotificationFromFCM(
     RemoteMessage message,
@@ -250,8 +421,6 @@ class FirebasePushNotificationService {
       );
     }
   }
-
-  // Deep linking disabled - all navigation methods removed
 
   // Background message handler (must be top-level function)
   static Future<void> handleBackgroundMessage(RemoteMessage message) async {

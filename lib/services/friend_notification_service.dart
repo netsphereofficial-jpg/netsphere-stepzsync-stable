@@ -2,12 +2,17 @@ import 'dart:async';
 import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'local_notification_service.dart';
 
 class UnifiedNotificationService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static StreamSubscription<QuerySnapshot>? _notificationSubscription;
+
+  // Track sent notifications to prevent duplicates
+  static const String _sentNotificationsKey = 'sent_notification_ids';
+  static const int _notificationExpiryHours = 24;
 
   /// Start monitoring all notifications (friends, chat, etc.) from Firebase
   static Future<void> startMonitoring() async {
@@ -81,6 +86,15 @@ class UnifiedNotificationService {
         return;
       }
 
+      // Check if this notification has already been sent
+      final notificationId = doc.id;
+      final alreadySent = await _hasNotificationBeenSent(notificationId);
+
+      if (alreadySent) {
+        log('⏭️ Notification already sent, skipping: $type - $title (ID: $notificationId)');
+        return;
+      }
+
       log('🔔 Processing notification: $type - $title');
 
       // Show local notification and update controller
@@ -95,31 +109,43 @@ class UnifiedNotificationService {
         storeInFirebase: false, // Don't duplicate in Firebase (already exists)
       );
 
+      // Mark this notification as sent
+      await _markNotificationAsSent(notificationId);
+
       // Don't mark as read immediately - keep it unread so it shows in the notification bell
 
-    } catch (e) {}
+    } catch (e) {
+      log('❌ Error processing notification: $e');
+    }
   }
 
   /// Manually check for unread notifications
+  /// DISABLED - This method was causing duplicate notifications on app restart
+  /// Now we rely ONLY on real-time listener (startMonitoring) to prevent replays
   static Future<void> checkForUnreadNotifications() async {
-    try {
-      final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) return;
+    log('ℹ️ checkForUnreadNotifications() disabled - using real-time listener only');
+    // Do nothing - real-time listener will handle all new notifications
+    return;
 
-      final query = await _firestore
-          .collection('user_notifications')
-          .where('userId', isEqualTo: currentUserId)
-          .where('isRead', isEqualTo: false)
-          .get();
-
-      log('📋 Found ${query.docs.length} unread notifications');
-
-      for (var doc in query.docs) {
-        await _processNewNotification(doc);
-      }
-    } catch (e) {
-      log('❌ Error checking for unread notifications: $e');
-    }
+    // OLD CODE (DISABLED):
+    // try {
+    //   final currentUserId = _auth.currentUser?.uid;
+    //   if (currentUserId == null) return;
+    //
+    //   final query = await _firestore
+    //       .collection('user_notifications')
+    //       .where('userId', isEqualTo: currentUserId)
+    //       .where('isRead', isEqualTo: false)
+    //       .get();
+    //
+    //   log('📋 Found ${query.docs.length} unread notifications');
+    //
+    //   for (var doc in query.docs) {
+    //     await _processNewNotification(doc);
+    //   }
+    // } catch (e) {
+    //   log('❌ Error checking for unread notifications: $e');
+    // }
   }
 
   /// Clear all notifications for current user
@@ -141,6 +167,94 @@ class UnifiedNotificationService {
       await batch.commit();
     } catch (e) {
       log('❌ Error clearing friend notifications: $e');
+    }
+  }
+
+  /// Check if a notification has already been sent (duplicate detection)
+  static Future<bool> _hasNotificationBeenSent(String notificationId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sentNotifications = prefs.getStringList(_sentNotificationsKey) ?? [];
+
+      // Format: "notificationId:timestamp"
+      for (final entry in sentNotifications) {
+        final parts = entry.split(':');
+        if (parts.length == 2 && parts[0] == notificationId) {
+          // Check if notification is still within expiry window
+          final timestamp = int.tryParse(parts[1]);
+          if (timestamp != null) {
+            final sentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+            final now = DateTime.now();
+            final difference = now.difference(sentTime);
+
+            if (difference.inHours < _notificationExpiryHours) {
+              return true; // Still within expiry window, consider it sent
+            }
+          }
+        }
+      }
+
+      return false;
+    } catch (e) {
+      log('❌ Error checking sent notifications: $e');
+      return false; // On error, allow notification to be sent
+    }
+  }
+
+  /// Mark a notification as sent to prevent duplicates
+  static Future<void> _markNotificationAsSent(String notificationId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var sentNotifications = prefs.getStringList(_sentNotificationsKey) ?? [];
+
+      // Add new notification with current timestamp
+      final now = DateTime.now().millisecondsSinceEpoch;
+      sentNotifications.add('$notificationId:$now');
+
+      // Clean up expired entries
+      sentNotifications = _cleanupExpiredNotifications(sentNotifications);
+
+      // Save back to preferences
+      await prefs.setStringList(_sentNotificationsKey, sentNotifications);
+
+      log('✅ Marked notification as sent: $notificationId');
+    } catch (e) {
+      log('❌ Error marking notification as sent: $e');
+    }
+  }
+
+  /// Clean up expired notification entries (older than 24 hours)
+  static List<String> _cleanupExpiredNotifications(List<String> notifications) {
+    final now = DateTime.now();
+    final validNotifications = <String>[];
+
+    for (final entry in notifications) {
+      final parts = entry.split(':');
+      if (parts.length == 2) {
+        final timestamp = int.tryParse(parts[1]);
+        if (timestamp != null) {
+          final sentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+          final difference = now.difference(sentTime);
+
+          // Keep only notifications within expiry window
+          if (difference.inHours < _notificationExpiryHours) {
+            validNotifications.add(entry);
+          }
+        }
+      }
+    }
+
+    return validNotifications;
+  }
+
+  /// Clear all sent notification tracking (useful for debugging)
+  static Future<void> clearSentNotificationTracking() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sentNotificationsKey);
+      log('✅ Cleared sent notification tracking');
+    } catch (e) {
+      log('❌ Error clearing sent notification tracking: $e');
     }
   }
 }
