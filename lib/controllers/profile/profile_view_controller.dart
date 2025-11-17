@@ -146,7 +146,8 @@ class ProfileViewController extends GetxController {
   }
 
   void _populateFromProfile(UserProfile profile) {
-    name.value = profile.fullName;
+    // Use username if available (same as homepage), otherwise fallback to fullName or displayName
+    name.value = profile.username ?? profile.fullName;
     email.value = profile.email;
     location.value = profile.location;
     profilePic.value = profile.profilePicture ?? '';
