@@ -208,6 +208,9 @@ class RaceStateMachine {
           'status': STATUS_STR_COMPLETED,
           'actualEndTime': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
+          // ✅ FIX: Stop all scheduled notifications for this race
+          'notificationsActive': false,
+          'countdownNotificationSent': true,
         });
 
         print('✅ Race $raceId transitioned to COMPLETED via transaction');
@@ -239,6 +242,9 @@ class RaceStateMachine {
         'cancellationReason': reason,
         'cancelledAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        // ✅ FIX: Stop all scheduled notifications for this race
+        'notificationsActive': false,
+        'countdownNotificationSent': true,
       });
 
       print('✅ Race $raceId transitioned to CANCELLED: $reason');

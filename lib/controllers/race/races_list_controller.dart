@@ -50,6 +50,7 @@ class RacesListController extends GetxController {
   final RxString selectedDistance = 'All'.obs;
   final RxString selectedGender = 'All'.obs;
   final RxBool showInactiveRaces = true.obs;
+  final RxBool showFilterOptions = false.obs; // Toggle filter chips visibility
 
   // Filter counts
   final RxInt allCount = 0.obs;
@@ -382,6 +383,11 @@ class RacesListController extends GetxController {
     selectedDistance.value = 'All';
     selectedGender.value = 'All';
     showInactiveRaces.value = true;
+  }
+
+  /// Toggle filter options visibility
+  void toggleFilterOptions() {
+    showFilterOptions.value = !showFilterOptions.value;
   }
 
   /// Refresh races manually

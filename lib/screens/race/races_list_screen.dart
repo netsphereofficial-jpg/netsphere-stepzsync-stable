@@ -328,49 +328,82 @@ class _RacesListScreenState extends State<RacesListScreen>
         horizontal: AppConstants.defaultPadding,
         vertical: 8,
       ),
-      height: 60,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Filter label
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-             color: Color(0xff2759FF
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset(
-                  IconPaths.filterIcon,
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                ),
-                SizedBox(width: 6),
-                Text(
-                  'Filter',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+          // Filter button (always visible, clickable)
+          GestureDetector(
+            onTap: () => controller.toggleFilterOptions(),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Color(0xff2759FF),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0xff2759FF).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      SvgPicture.asset(
+                        IconPaths.filterIcon,
+                        width: 16,
+                        height: 16,
+                        colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Filter',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Chevron icon (rotates based on state)
+                  Obx(() => AnimatedRotation(
+                    turns: controller.showFilterOptions.value ? 0.5 : 0,
+                    duration: Duration(milliseconds: 300),
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  )),
+                ],
+              ),
             ),
           ),
 
-          SizedBox(width: 12),
-
-          // Filter chips
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: BouncingScrollPhysics(),
-              child: Obx(() => Row(children: [..._buildFilterChips()])),
-            ),
-          ),
+          // Filter chips (conditionally visible with animation)
+          Obx(() => AnimatedSize(
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: controller.showFilterOptions.value
+                ? Container(
+                    margin: EdgeInsets.only(top: 12),
+                    child: Column(
+                      children: [
+                        // Race Type Chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: BouncingScrollPhysics(),
+                          child: Row(children: [..._buildFilterChips()]),
+                        ),
+                      ],
+                    ),
+                  )
+                : SizedBox.shrink(),
+          )),
         ],
       ),
     );

@@ -62,12 +62,31 @@ exports.checkRaceCountdowns = functions.pubsub
         const deadline = raceData.raceDeadline?.toDate ? raceData.raceDeadline.toDate() : new Date(raceData.raceDeadline);
         const minutesLeft = Math.ceil((deadline - now) / 60000);
 
+        // ✅ VALIDATE: Re-check race status in real-time to ensure it hasn't transitioned to COMPLETED or CANCELLED
+        const freshRaceDoc = await raceDoc.ref.get();
+        const currentStatus = freshRaceDoc.data()?.statusId;
+
+        if (currentStatus !== 6) {
+          console.log(`⏭️ Skipping race ${raceId} - status changed from ENDING to ${currentStatus}`);
+          continue;
+        }
+
         // Check if we've already sent a countdown notification for this race
         const countdownNotificationSent = raceData.countdownNotificationSent || false;
 
         if (countdownNotificationSent) {
           console.log(`⏭️ Skipping race ${raceId} - countdown notification already sent`);
           continue;
+        }
+
+        // ✅ VALIDATE: Check if all participants have finished
+        const participantsSnapshot = await raceDoc.ref.collection('participants').get();
+        if (!participantsSnapshot.empty) {
+          const allFinished = participantsSnapshot.docs.every(doc => doc.data().isCompleted === true);
+          if (allFinished) {
+            console.log(`⏭️ Skipping race ${raceId} - all participants have finished`);
+            continue;
+          }
         }
 
         // Only send if exactly 5 minutes left (with 1-minute tolerance)

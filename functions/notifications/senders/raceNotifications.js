@@ -23,13 +23,91 @@ const { sendNotificationToUser, sendNotificationToUsers } = require('../core/fcm
 const admin = require('firebase-admin');
 const db = admin.firestore();
 
+// Race Status Constants
+const STATUS_CREATED = 0;
+const STATUS_SCHEDULED = 1;
+const STATUS_ACTIVE = 3;
+const STATUS_COMPLETED = 4;
+const STATUS_ENDING = 6;
+const STATUS_CANCELLED = 7;
+
+/**
+ * Helper function to validate if a race is still active/ongoing
+ * Returns true only if race is ACTIVE (3) or ENDING (6)
+ * Returns false for COMPLETED (4), CANCELLED (7), or other statuses
+ */
+async function isRaceActive(raceId) {
+  try {
+    const raceDoc = await db.collection('races').doc(raceId).get();
+
+    if (!raceDoc.exists) {
+      console.log(`⚠️ Race ${raceId} not found`);
+      return false;
+    }
+
+    const raceData = raceDoc.data();
+    const statusId = raceData.statusId;
+
+    // Only ACTIVE (3) and ENDING (6) are considered "active" for notifications
+    const active = statusId === STATUS_ACTIVE || statusId === STATUS_ENDING;
+
+    if (!active) {
+      console.log(`⏹️ Race ${raceId} is not active (statusId: ${statusId})`);
+    }
+
+    return active;
+  } catch (error) {
+    console.error(`❌ Error checking race status for ${raceId}: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Helper function to check if a race is joinable (CREATED or SCHEDULED)
+ * Returns true only if race is CREATED (0) or SCHEDULED (1)
+ * Returns false for other statuses
+ */
+async function isRaceJoinable(raceId) {
+  try {
+    const raceDoc = await db.collection('races').doc(raceId).get();
+
+    if (!raceDoc.exists) {
+      console.log(`⚠️ Race ${raceId} not found`);
+      return false;
+    }
+
+    const raceData = raceDoc.data();
+    const statusId = raceData.statusId;
+
+    // Only CREATED (0) and SCHEDULED (1) are joinable
+    const joinable = statusId === STATUS_CREATED || statusId === STATUS_SCHEDULED;
+
+    if (!joinable) {
+      console.log(`⏹️ Race ${raceId} is not joinable (statusId: ${statusId})`);
+    }
+
+    return joinable;
+  } catch (error) {
+    console.error(`❌ Error checking race joinability for ${raceId}: ${error}`);
+    return false;
+  }
+}
+
 /**
  * 1. Send race invitation notification
  * Triggered when: User is invited to join a race
+ * ✅ UPDATED: Validates race is joinable before sending
  */
 async function sendRaceInvitation(userId, raceData, inviterData) {
   try {
     console.log(`📤 Sending race invitation to user: ${userId}`);
+
+    // ✅ VALIDATE: Check if race is joinable (not completed/cancelled/started)
+    const joinable = await isRaceJoinable(raceData.id);
+    if (!joinable) {
+      console.log(`⏭️ Skipping race invitation - race ${raceData.id} is not joinable`);
+      return { success: true, message: 'Race is not joinable' };
+    }
 
     const notification = {
       title: 'Race Invitation 🏃‍♂️',
@@ -187,10 +265,18 @@ async function sendRaceCompleted(userId, raceData, participantData) {
 /**
  * 7. Send invite accepted notification
  * Triggered when: User accepts race invitation
+ * ✅ UPDATED: Validates race still exists and is joinable before sending
  */
 async function sendInviteAccepted(userId, raceData, accepterData) {
   try {
     console.log(`📤 Sending invite accepted notification to user: ${userId}`);
+
+    // ✅ VALIDATE: Check if race is joinable (not completed/cancelled/started)
+    const joinable = await isRaceJoinable(raceData.id);
+    if (!joinable) {
+      console.log(`⏭️ Skipping invite accepted notification - race ${raceData.id} is not joinable`);
+      return { success: true, message: 'Race is not joinable' };
+    }
 
     const notification = {
       title: 'Race Invite Accepted 🎉',
@@ -232,10 +318,18 @@ async function sendInviteAccepted(userId, raceData, accepterData) {
 /**
  * 9. Send invite declined notification
  * Triggered when: User declines race invitation
+ * ✅ UPDATED: Validates race still exists before sending
  */
 async function sendInviteDeclined(userId, raceData, declinerData) {
   try {
     console.log(`📤 Sending invite declined notification to user: ${userId}`);
+
+    // ✅ VALIDATE: Check if race is joinable (not completed/cancelled/started)
+    const joinable = await isRaceJoinable(raceData.id);
+    if (!joinable) {
+      console.log(`⏭️ Skipping invite declined notification - race ${raceData.id} is not joinable`);
+      return { success: true, message: 'Race is not joinable' };
+    }
 
     const notification = {
       title: 'Race Invite Declined',
@@ -467,10 +561,18 @@ function getOrdinal(number) {
 /**
  * 13. Send participant joined notification to race organizer
  * Triggered when: Someone joins a race
+ * ✅ UPDATED: Validates race is joinable before sending
  */
 async function sendParticipantJoinedNotification(organizerUserId, raceData, participantData) {
   try {
     console.log(`📤 Sending participant joined notification to organizer: ${organizerUserId}`);
+
+    // ✅ VALIDATE: Check if race is joinable (not completed/cancelled)
+    const joinable = await isRaceJoinable(raceData.id);
+    if (!joinable) {
+      console.log(`⏭️ Skipping participant joined notification - race ${raceData.id} is not joinable`);
+      return { success: true, message: 'Race is not joinable' };
+    }
 
     const notification = {
       title: 'Someone Joined Your Race! 🎉',
@@ -507,6 +609,7 @@ async function sendParticipantJoinedNotification(organizerUserId, raceData, part
  * 14. Send overtaking notifications (to overtaker, overtaken, and others)
  * Triggered when: User improves rank by overtaking another participant
  * ✅ UPDATED: Only sends for PRIVATE races (raceTypeId === 2)
+ * ✅ UPDATED: Validates race is still active before sending
  */
 async function sendOvertakingNotifications(raceId, raceTitle, overtakerUserId, overtakerName, newRank, oldRank, allParticipantsDocs, raceTypeId) {
   try {
@@ -514,6 +617,13 @@ async function sendOvertakingNotifications(raceId, raceTitle, overtakerUserId, o
     if (raceTypeId !== 2) {
       console.log(`⏭️ Skipping overtaking notifications for race ${raceId} - not a private race (raceTypeId: ${raceTypeId})`);
       return { success: true, message: 'Overtaking notifications only for private races' };
+    }
+
+    // ✅ VALIDATE: Check if race is still active
+    const active = await isRaceActive(raceId);
+    if (!active) {
+      console.log(`⏭️ Skipping overtaking notifications - race ${raceId} is no longer active`);
+      return { success: true, message: 'Race is not active' };
     }
 
     console.log(`📤 Sending overtaking notifications for PRIVATE race: ${raceId}`);
@@ -625,6 +735,7 @@ async function sendOvertakingNotifications(raceId, raceTitle, overtakerUserId, o
  * 15. Send leader change notification to all participants
  * Triggered when: Someone takes 1st place
  * ✅ UPDATED: Only sends for PUBLIC races (raceTypeId === 3)
+ * ✅ UPDATED: Validates race is still active before sending
  */
 async function sendLeaderChangeNotification(raceId, raceTitle, newLeaderUserId, newLeaderName, allParticipantsDocs, raceTypeId) {
   try {
@@ -632,6 +743,13 @@ async function sendLeaderChangeNotification(raceId, raceTitle, newLeaderUserId, 
     if (raceTypeId !== 3) {
       console.log(`⏭️ Skipping leader change notifications for race ${raceId} - not a public race (raceTypeId: ${raceTypeId})`);
       return { success: true, message: 'Leader change notifications only for public races' };
+    }
+
+    // ✅ VALIDATE: Check if race is still active
+    const active = await isRaceActive(raceId);
+    if (!active) {
+      console.log(`⏭️ Skipping leader change notification - race ${raceId} is no longer active`);
+      return { success: true, message: 'Race is not active' };
     }
 
     console.log(`📤 Sending leader change notification for PUBLIC race: ${raceId}`);
@@ -725,6 +843,7 @@ async function sendFirstFinisherNotification(userId, raceData) {
  * 17. Send deadline alert notification to all active participants
  * Triggered when: First participant finishes and deadline is set (statusId → 6)
  * ✅ UPDATED: Only sends for PUBLIC races (raceTypeId === 3)
+ * ✅ UPDATED: Validates race is still active before sending
  */
 async function sendDeadlineAlertNotification(raceId, raceData, firstFinisherName, deadlineMinutes, raceTypeId) {
   try {
@@ -732,6 +851,13 @@ async function sendDeadlineAlertNotification(raceId, raceData, firstFinisherName
     if (raceTypeId !== 3) {
       console.log(`⏭️ Skipping deadline alert for race ${raceId} - not a public race (raceTypeId: ${raceTypeId})`);
       return { success: true, message: 'Deadline alerts only for public races' };
+    }
+
+    // ✅ VALIDATE: Check if race is still active
+    const active = await isRaceActive(raceId);
+    if (!active) {
+      console.log(`⏭️ Skipping deadline alert - race ${raceId} is no longer active`);
+      return { success: true, message: 'Race is not active' };
     }
 
     console.log(`📤 Sending deadline alert notifications for PUBLIC race: ${raceId}`);
@@ -909,10 +1035,18 @@ async function sendProximityAlertNotification(
 /**
  * 22. Send countdown timer notification to all active participants
  * Triggered when: Race deadline is approaching (5 minutes remaining)
+ * ✅ UPDATED: Validates race is still active before sending
  */
 async function sendCountdownTimerNotification(raceId, raceData, minutesLeft) {
   try {
     console.log(`📤 Sending countdown timer notifications for race: ${raceId} (${minutesLeft} minutes left)`);
+
+    // ✅ VALIDATE: Check if race is still active
+    const active = await isRaceActive(raceId);
+    if (!active) {
+      console.log(`⏭️ Skipping countdown notification - race ${raceId} is no longer active`);
+      return { success: true, message: 'Race is not active' };
+    }
 
     // Get all participants
     const participantsSnapshot = await db.collection('races').doc(raceId).collection('participants').get();
@@ -967,6 +1101,10 @@ async function sendCountdownTimerNotification(raceId, raceData, minutesLeft) {
 }
 
 module.exports = {
+  // Helper functions
+  isRaceActive,
+  isRaceJoinable,
+  // Notification functions
   sendRaceInvitation,
   sendRaceStarted,
   sendRaceCompleted,

@@ -1369,6 +1369,18 @@ class RaceService {
           final allFinished = await RaceStateMachine.areAllParticipantsFinished(raceId);
           if (allFinished) {
             print('🏆 ALL participants finished! Transitioning to COMPLETED');
+
+            // ✅ FIX: Explicitly stop countdown notifications before completing race
+            try {
+              await _racesCollection.doc(raceId).update({
+                'countdownNotificationSent': true,
+                'notificationsActive': false,
+              });
+              print('✅ Notification flags updated to stop scheduled notifications');
+            } catch (e) {
+              print('⚠️ Failed to update notification flags: $e');
+            }
+
             await RaceStateMachine.transitionToCompleted(raceId);
           }
         }
