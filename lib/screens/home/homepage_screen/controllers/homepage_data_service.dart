@@ -214,17 +214,37 @@ class HomepageDataService extends GetxController {
   }
 
   Future<void> loadUserProfile() async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId != null) {
-        final userBasicInfo = await UserProfileService.getUserBasicInfo(userId);
-        if (userBasicInfo['profilePicture'] != null) {
-          profileImageUrl.value = userBasicInfo['profilePicture']!;
+    int retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          final userBasicInfo = await UserProfileService.getUserBasicInfo(userId);
+          if (userBasicInfo['profilePicture'] != null) {
+            final profilePic = userBasicInfo['profilePicture']!;
+            // Add cache-busting if URL doesn't already have it
+            if (!profilePic.contains('?t=')) {
+              profileImageUrl.value = '$profilePic?t=${DateTime.now().millisecondsSinceEpoch}';
+            } else {
+              profileImageUrl.value = profilePic;
+            }
+          }
+        }
+        // Success - break the retry loop
+        break;
+      } catch (e) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          // All retries failed
+          profileImageUrl.value = '';
+          print('Failed to load profile image after $maxRetries attempts: $e');
+        } else {
+          // Wait before retrying (exponential backoff)
+          await Future.delayed(Duration(milliseconds: 500 * retryCount));
         }
       }
-    } catch (e) {
-      // Handle error silently in production
-      profileImageUrl.value = '';
     }
   }
 

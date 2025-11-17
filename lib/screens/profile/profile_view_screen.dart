@@ -79,11 +79,40 @@ class ProfileViewScreen extends StatelessWidget {
                       ],
                     ),
                     child: Obx(() {
-                      return ProfileImageWidget(
-                        imageUrl: controller.profilePic.value,
-                        size: 100,
-                        borderColor: Colors.white,
-                        borderWidth: 4,
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          ProfileImageWidget(
+                            imageUrl: controller.profilePic.value,
+                            imageFile: controller.localImageFile.value, // Show local file immediately
+                            size: 100,
+                            borderColor: Colors.white,
+                            borderWidth: 4,
+                          ),
+                          // Upload progress overlay (subtle, small indicator)
+                          if (controller.uploadProgress.value > 0 && controller.uploadProgress.value < 1)
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.black.withOpacity(0.7),
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.all(6),
+                                  child: CircularProgressIndicator(
+                                    value: controller.uploadProgress.value,
+                                    strokeWidth: 3,
+                                    backgroundColor: Colors.white.withOpacity(0.3),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.neonYellow),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       );
                     }),
                   ),
@@ -168,6 +197,64 @@ class ProfileViewScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: 8),
+            // Upload status message (retry/network waiting indicator)
+            Obx(() {
+              if (controller.uploadStatusMessage.value.isNotEmpty &&
+                  (controller.isRetrying.value || controller.uploadProgress.value > 0)) {
+                return Container(
+                  margin: EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: controller.isRetrying.value
+                        ? Colors.orange.withOpacity(0.1)
+                        : AppColors.appColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: controller.isRetrying.value
+                          ? Colors.orange.withOpacity(0.3)
+                          : AppColors.appColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (controller.isRetrying.value)
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.cloud_upload,
+                          size: 14,
+                          color: AppColors.appColor,
+                        ),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          controller.uploadStatusMessage.value,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: controller.isRetrying.value
+                                ? Colors.orange.shade800
+                                : AppColors.appColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.2, end: 0);
+              }
+              return SizedBox.shrink();
+            }),
+            SizedBox(height: 4),
             _buildProfileDetails(controller),
             SizedBox(height: 12),
             // Quick Actions Grid

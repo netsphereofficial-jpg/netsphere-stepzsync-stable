@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/common_methods.dart';
@@ -43,6 +44,7 @@ class ProfileController extends GetxController {
   var selectedProfileImage = Rxn<File>();
   var profileImageUrl = RxnString();
   var isUploadingImage = false.obs;
+  var uploadProgress = 0.0.obs;
   final ImagePicker _imagePicker = ImagePicker();
 
   // Height related
@@ -459,15 +461,23 @@ class ProfileController extends GetxController {
 
     try {
       isUploadingImage.value = true;
+      uploadProgress.value = 0.0;
 
       final result = await FirebaseStorageService.updateProfileImage(
         selectedProfileImage.value!,
         profileImageUrl.value,
+        onProgress: (progress) {
+          uploadProgress.value = progress;
+        },
       );
 
       if (result.success) {
         final newImageUrl = result.data as String;
         profileImageUrl.value = newImageUrl;
+
+        // Clear cached network image for immediate update
+        await _clearImageCache(newImageUrl);
+
         // Clear the local file as it's now uploaded
         selectedProfileImage.value = null;
         return newImageUrl;
@@ -480,6 +490,18 @@ class ProfileController extends GetxController {
       return null;
     } finally {
       isUploadingImage.value = false;
+      uploadProgress.value = 0.0;
+    }
+  }
+
+  /// Clear cached image to force refresh
+  Future<void> _clearImageCache(String imageUrl) async {
+    try {
+      // Import cached_network_image package's cache manager
+      final cacheManager = DefaultCacheManager();
+      await cacheManager.removeFile(imageUrl);
+    } catch (e) {
+      print('Failed to clear image cache: $e');
     }
   }
 

@@ -1,22 +1,80 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import '../models/auth_models.dart';
 
 class FirebaseStorageService {
   static final FirebaseStorage _storage = FirebaseStorage.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// Upload profile image to Firebase Storage
-  static Future<AuthResult> uploadProfileImage(File imageFile) async {
+  /// Compress image before upload
+  static Future<File?> _compressImage(File imageFile) async {
+    try {
+      // Get file size
+      final fileSizeInBytes = await imageFile.length();
+      final fileSizeInMB = fileSizeInBytes / (1024 * 1024);
+
+      // If file is larger than 5MB, reject it
+      if (fileSizeInMB > 5) {
+        throw Exception('Image size must be less than 5MB. Current size: ${fileSizeInMB.toStringAsFixed(2)}MB');
+      }
+
+      // Get temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final targetPath = path.join(
+        tempDir.path,
+        'compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+
+      // Compress image
+      final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+        imageFile.absolute.path,
+        targetPath,
+        quality: 75,
+        minWidth: 512,
+        minHeight: 512,
+        format: CompressFormat.jpeg,
+      );
+
+      if (compressedFile == null) {
+        return null;
+      }
+
+      return File(compressedFile.path);
+    } catch (e) {
+      print('Image compression error: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload profile image to Firebase Storage with progress callback
+  static Future<AuthResult> uploadProfileImage(
+    File imageFile, {
+    Function(double)? onProgress,
+  }) async {
     try {
       final user = _auth.currentUser;
       if (user == null) {
         return AuthResult.failure(error: 'User not authenticated');
       }
 
-      // Create a unique file name
-      final String fileName = 'profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      // Report compression progress
+      onProgress?.call(0.1); // 10% - Starting compression
+
+      // Compress image before upload
+      final File? compressedImage = await _compressImage(imageFile);
+      if (compressedImage == null) {
+        return AuthResult.failure(error: 'Failed to compress image');
+      }
+
+      onProgress?.call(0.2); // 20% - Compression complete
+
+      // Add timestamp to URL for cache-busting
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final String fileName = 'profile_${user.uid}_$timestamp.jpg';
 
       // Reference to the storage location
       final Reference ref = _storage
@@ -25,11 +83,12 @@ class FirebaseStorageService {
           .child(user.uid)
           .child(fileName);
 
-      // Upload the file
+      // Upload the compressed file
       final UploadTask uploadTask = ref.putFile(
-        imageFile,
+        compressedImage,
         SettableMetadata(
           contentType: 'image/jpeg',
+          cacheControl: 'public, max-age=3600',
           customMetadata: {
             'userId': user.uid,
             'uploadTime': DateTime.now().toIso8601String(),
@@ -37,11 +96,31 @@ class FirebaseStorageService {
         ),
       );
 
+      // Listen to upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+        // Map 20%-90% to upload progress
+        final mappedProgress = 0.2 + (progress * 0.7);
+        onProgress?.call(mappedProgress);
+      });
+
       // Wait for upload to complete
       final TaskSnapshot snapshot = await uploadTask;
 
-      // Get download URL
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
+      onProgress?.call(0.95); // 95% - Upload complete, getting URL
+
+      // Get download URL with cache-busting timestamp
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+      downloadUrl = '$downloadUrl?t=$timestamp';
+
+      onProgress?.call(1.0); // 100% - Complete
+
+      // Clean up compressed file
+      try {
+        await compressedImage.delete();
+      } catch (e) {
+        print('Failed to delete temporary file: $e');
+      }
 
       return AuthResult.success(
         message: 'Profile image uploaded successfully',
@@ -86,16 +165,29 @@ class FirebaseStorageService {
     }
   }
 
-  /// Update profile image (delete old and upload new)
-  static Future<AuthResult> updateProfileImage(File newImageFile, String? oldImageUrl) async {
+  /// Update profile image (upload new, skip deletion for speed)
+  static Future<AuthResult> updateProfileImage(
+    File newImageFile,
+    String? oldImageUrl, {
+    Function(double)? onProgress,
+  }) async {
     try {
-      // Delete old image if exists
-      if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
-        await deleteProfileImage(oldImageUrl);
+      // Upload new image with progress tracking
+      // Skip deletion for speed - cleanup will happen later
+      final uploadResult = await uploadProfileImage(
+        newImageFile,
+        onProgress: onProgress,
+      );
+
+      // Schedule old image deletion in background (non-blocking)
+      if (uploadResult.success && oldImageUrl != null && oldImageUrl.isNotEmpty) {
+        // Delete old image asynchronously without waiting
+        deleteProfileImage(oldImageUrl).catchError((e) {
+          print('Background deletion failed: $e');
+          return AuthResult.failure(error: e.toString());
+        });
       }
 
-      // Upload new image
-      final uploadResult = await uploadProfileImage(newImageFile);
       return uploadResult;
     } catch (e) {
       return AuthResult.failure(

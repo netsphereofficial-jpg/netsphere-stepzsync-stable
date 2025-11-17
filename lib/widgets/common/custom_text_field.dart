@@ -51,8 +51,8 @@ class RoundedTextField extends StatelessWidget {
         ],
       ),
       child: TextField(
-        // Disable spell check to prevent double yellow underlines
-        spellCheckConfiguration: SpellCheckConfiguration(spellCheckService: null),
+        // Disable spell check to prevent errors on unsupported platforms
+        spellCheckConfiguration: const SpellCheckConfiguration.disabled(),
         enableSuggestions: false,
         autocorrect: false,
         controller: controller,

@@ -1,17 +1,20 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../models/profile_models.dart';
 import '../../services/profile/profile_service.dart';
+import '../../services/profile/profile_image_upload_queue.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../screens/login_screen.dart';
 import '../../config/app_colors.dart';
+import '../../screens/home/homepage_screen/controllers/homepage_data_service.dart';
 
 class ProfileViewController extends GetxController {
   // Observable variables
@@ -24,14 +27,91 @@ class ProfileViewController extends GetxController {
   var racesWon = 0.obs;
   var xp = 0.obs;
   var isLoading = false.obs;
+  var uploadProgress = 0.0.obs;
+  var localImageFile = Rxn<File>(); // For showing image immediately
+  var uploadStatusMessage = ''.obs; // Status message for user feedback
+  var isRetrying = false.obs; // Flag for retry state
 
   final ImagePicker _picker = ImagePicker();
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ProfileImageUploadQueue _uploadQueue = ProfileImageUploadQueue();
+  StreamSubscription<UploadState>? _uploadStateSubscription;
 
   @override
   void onInit() {
     super.onInit();
     setUserDetails();
+    _initializeUploadQueue();
+  }
+
+  @override
+  void onClose() {
+    _uploadStateSubscription?.cancel();
+    super.onClose();
+  }
+
+  /// Initialize upload queue and listen to state changes
+  void _initializeUploadQueue() {
+    _uploadQueue.initialize();
+
+    // Listen to upload state changes
+    _uploadStateSubscription = _uploadQueue.uploadStateStream.listen((state) {
+      _handleUploadStateChange(state);
+    });
+
+    // Check if there's a pending upload to resume
+    final currentState = _uploadQueue.currentUploadState;
+    if (currentState != null) {
+      _handleUploadStateChange(currentState);
+    }
+  }
+
+  /// Handle upload state changes
+  void _handleUploadStateChange(UploadState state) {
+    uploadProgress.value = state.progress;
+    uploadStatusMessage.value = state.statusMessage;
+
+    switch (state.status) {
+      case UploadStatus.uploading:
+        isRetrying.value = false;
+        break;
+      case UploadStatus.retrying:
+        isRetrying.value = true;
+        break;
+      case UploadStatus.networkError:
+        isRetrying.value = false;
+        // Show subtle notification that we're waiting for network
+        if (uploadStatusMessage.value.isNotEmpty) {
+          _showNetworkWaitingSnackbar();
+        }
+        break;
+      case UploadStatus.success:
+        isRetrying.value = false;
+        uploadProgress.value = 0.0;
+        uploadStatusMessage.value = '';
+        break;
+      case UploadStatus.failed:
+      case UploadStatus.cancelled:
+        isRetrying.value = false;
+        uploadProgress.value = 0.0;
+        break;
+    }
+  }
+
+  /// Show network waiting snackbar (only once)
+  bool _networkSnackbarShown = false;
+  void _showNetworkWaitingSnackbar() {
+    if (_networkSnackbarShown) return;
+    _networkSnackbarShown = true;
+
+    SnackbarUtils.showInfo(
+      'Network Issue',
+      'Upload paused. Will resume automatically when connected.',
+    );
+
+    // Reset flag after 10 seconds
+    Future.delayed(Duration(seconds: 10), () {
+      _networkSnackbarShown = false;
+    });
   }
 
   /// Set user details from profile
@@ -130,45 +210,76 @@ class ProfileViewController extends GetxController {
     }
   }
 
-  /// Upload image to Firebase Storage
+  /// Upload image to Firebase Storage with robust error handling and retry logic
   Future<void> uploadImage(File imageFile) async {
     try {
-      isLoading.value = true;
+      // OPTIMISTIC UI: Show image immediately from local file
+      localImageFile.value = imageFile;
+      uploadProgress.value = 0.01; // Show a tiny progress to indicate upload started
 
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         SnackbarUtils.showError('Error', 'User not authenticated');
+        localImageFile.value = null;
         return;
       }
 
-      // Create a reference to the storage location
-      final ref = _storage.ref().child('profile_pictures/${user.uid}.jpg');
+      // Queue upload with retry logic and network recovery
+      await _uploadQueue.queueUpload(
+        imageFile: imageFile,
+        oldImageUrl: profilePic.value.isNotEmpty ? profilePic.value : null,
+        onProgress: (progress) {
+          uploadProgress.value = progress;
+        },
+        onSuccess: (downloadUrl) async {
+          // Clear cache to force fresh image load
+          try {
+            final cacheManager = DefaultCacheManager();
+            await cacheManager.removeFile(downloadUrl);
+          } catch (e) {
+            print('Cache clear error: $e');
+          }
 
-      // Upload the file
-      final uploadTask = ref.putFile(imageFile);
-      final snapshot = await uploadTask;
+          // Update network URL (switch from local to network image)
+          profilePic.value = downloadUrl;
+          localImageFile.value = null; // Clear local file now that we have network URL
 
-      // Get download URL
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+          // Update homepage data service to refresh image there too
+          try {
+            final homepageService = Get.find<HomepageDataService>();
+            await homepageService.loadUserProfile();
+          } catch (e) {
+            print('Homepage refresh error: $e');
+          }
 
-      // Update profile picture in Firestore
-      final result = await ProfileService.updateProfileField('profilePicture', downloadUrl);
-
-      if (result.success) {
-        profilePic.value = downloadUrl;
-
-        // Also update Firebase Auth profile
-        await user.updatePhotoURL(downloadUrl);
-
-        SnackbarUtils.showSuccess('Success', 'Profile picture updated successfully');
-      } else {
-        SnackbarUtils.showError('Error', result.error ?? 'Failed to update profile picture');
-      }
+          // Success! Show subtle success indication
+          uploadStatusMessage.value = '';
+        },
+        onError: (error) {
+          // Only revert optimistic update if it's an unrecoverable error
+          if (!error.contains('retry') && !error.contains('network')) {
+            localImageFile.value = null;
+            uploadProgress.value = 0.0;
+            SnackbarUtils.showError('Upload Failed', error);
+          }
+          // For recoverable errors (network issues, retries), keep showing the local image
+        },
+      );
     } catch (e) {
-      SnackbarUtils.showError('Error', 'Failed to upload image: ${e.toString()}');
-    } finally {
-      isLoading.value = false;
+      // Unexpected error - revert optimistic update
+      localImageFile.value = null;
+      uploadProgress.value = 0.0;
+      SnackbarUtils.showError('Error', 'Failed to start upload: ${e.toString()}');
     }
+  }
+
+  /// Cancel ongoing upload
+  Future<void> cancelUpload() async {
+    await _uploadQueue.cancelUpload();
+    localImageFile.value = null;
+    uploadProgress.value = 0.0;
+    uploadStatusMessage.value = '';
+    SnackbarUtils.showInfo('Upload Cancelled', 'Image upload has been cancelled');
   }
 
   /// Get app version

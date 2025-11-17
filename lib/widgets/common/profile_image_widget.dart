@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 
 class ProfileImageWidget extends StatelessWidget {
@@ -93,20 +94,19 @@ class ProfileImageWidget extends StatelessWidget {
       );
     }
 
-    // Show network image
+    // Show cached network image
     if (imageUrl?.isNotEmpty ?? false) {
-      return Image.network(
-        imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: imageUrl!,
         fit: BoxFit.cover,
         width: size,
         height: size,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return _buildLoadingPlaceholder();
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholderAvatar();
-        },
+        placeholder: (context, url) => _buildLoadingPlaceholder(),
+        errorWidget: (context, url, error) => _buildPlaceholderAvatar(),
+        memCacheWidth: (size * 2).toInt(), // 2x for retina displays
+        memCacheHeight: (size * 2).toInt(),
+        maxWidthDiskCache: 512,
+        maxHeightDiskCache: 512,
       );
     }
 
@@ -193,14 +193,21 @@ class ProfileAvatarWidget extends StatelessWidget {
 
   Widget _buildContent() {
     if (imageUrl?.isNotEmpty ?? false) {
-      return Image.network(
-        imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: imageUrl!,
         fit: BoxFit.cover,
         width: size,
         height: size,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildInitialsAvatar();
-        },
+        placeholder: (context, url) => Container(
+          width: size,
+          height: size,
+          color: AppColors.appColor.withOpacity(0.1),
+        ),
+        errorWidget: (context, url, error) => _buildInitialsAvatar(),
+        memCacheWidth: (size * 2).toInt(),
+        memCacheHeight: (size * 2).toInt(),
+        maxWidthDiskCache: 256,
+        maxHeightDiskCache: 256,
       );
     }
 
