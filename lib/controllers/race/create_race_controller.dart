@@ -490,6 +490,32 @@ class CreateRaceController extends GetxController {
     return completed / total;
   }
 
+  /// Check if the form is valid and ready to proceed
+  bool get isFormValid {
+    // Title must not be empty
+    if (titleController.text.trim().isEmpty) return false;
+
+    // Start address must be set
+    if (startAddress.value.isEmpty) return false;
+
+    // End address must be set
+    if (endAddress.value.isEmpty) return false;
+
+    // Distance must be greater than 0 (start and end cannot be the same)
+    final distance = double.tryParse(routeDistance.value) ?? 0.0;
+    if (distance <= 0) return false;
+
+    // Race type must be selected
+    if (raceType.value.isEmpty) return false;
+
+    // Schedule time is only required for non-Solo and non-Marathon races
+    if (raceType.value != 'Solo' && raceType.value != 'Marathon') {
+      if (scheduleTimeController.text.isEmpty) return false;
+    }
+
+    return true;
+  }
+
   String getCompletionMessage() {
     final progress = getCompletionProgress();
     if (progress == 1.0) {
@@ -701,7 +727,7 @@ class CreateRaceController extends GetxController {
     genderPref.value = 'No preference';
     selectedDateTime.value = DateTime.now().add(Duration(minutes: 30));
 
-    // Reset coordinates to Delhi
+    // Reset coordinates to Delhi (will be updated by current location)
     startLat?.value = 28.6139;
     startLng?.value = 77.2090;
     endLat?.value = 28.6139;
@@ -710,16 +736,8 @@ class CreateRaceController extends GetxController {
     // Reinitialize schedule time
     _initializeScheduleTime();
 
-    // Show encouraging feedback
-    Get.snackbar(
-      'Ready for Next Race!',
-      'Form cleared and ready for your next awesome race!',
-      backgroundColor: Colors.blue.withOpacity(0.1),
-      colorText: Colors.blue[800],
-      borderRadius: 12,
-      margin: EdgeInsets.all(16),
-      duration: Duration(seconds: 2),
-    );
+    // Reload current location as start point
+    _loadCurrentLocationAsStart();
   }
 
   Future<void> pickDate(BuildContext context) async {
@@ -1099,6 +1117,16 @@ class CreateRaceController extends GetxController {
       return false;
     }
 
+    // Validate that start and end locations are different (distance > 0)
+    final distance = double.tryParse(routeDistance.value) ?? 0.0;
+    if (distance <= 0) {
+      SnackbarUtils.showError(
+        'Validation Error',
+        'Start and end locations cannot be the same. Please select different locations.',
+      );
+      return false;
+    }
+
     if (raceType.value.isEmpty) {
       SnackbarUtils.showError('Validation Error', 'Please choose race type');
       return false;
@@ -1119,8 +1147,6 @@ class CreateRaceController extends GetxController {
       }
     }
 
-    // Distance validation removed - allow any distance for races
-
     return true;
   }
 
@@ -1128,6 +1154,9 @@ class CreateRaceController extends GetxController {
   void _handleDirectNavigation(RaceData race, String raceId) {
     // Notify homepage to update active race count immediately
     _notifyHomepageOfRaceCreation();
+
+    // Reset the form for creating another race
+    _resetFormForNewRace();
 
     // Close RaceSummaryScreen first (if it's open)
     // Then navigate to ActiveRacesScreen
@@ -1271,6 +1300,13 @@ class CreateRaceController extends GetxController {
     final c = 2 * dart_math.atan2(dart_math.sqrt(a), dart_math.sqrt(1 - a));
 
     return earthRadius * c;
+  }
+
+  /// Check if two locations are the same or too close (less than 100 meters)
+  bool areLocationsSame(double lat1, double lng1, double lat2, double lng2) {
+    final distance = _calculateDistance(lat1, lng1, lat2, lng2);
+    // Consider locations the same if they're within 100 meters (0.1 km)
+    return distance < 0.1;
   }
 
   /// Capture baseline pedometer data at race creation time with retries

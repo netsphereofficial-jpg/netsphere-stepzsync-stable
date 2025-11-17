@@ -488,9 +488,9 @@ class ProfileController extends GetxController {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        SnackbarUtils.showError(
-          'Location Error',
-          'Location services are disabled',
+        SnackbarUtils.showWarning(
+          'Location Services Disabled',
+          'Please enable location services or enter your location manually',
         );
         return;
       }
@@ -499,21 +499,24 @@ class ProfileController extends GetxController {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          SnackbarUtils.showError(
-            'Location Error',
-            'Location permissions are denied',
+          SnackbarUtils.showWarning(
+            'Permission Denied',
+            'Location permission denied. You can still enter your location manually',
           );
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        SnackbarUtils.showError(
-          'Location Error',
-          'Location permissions are permanently denied',
+        SnackbarUtils.showWarning(
+          'Permission Required',
+          'Please enable location permission in Settings or enter your location manually',
         );
         return;
       }
+
+      // Show loading state
+      locationCtr.text = 'Getting your location...';
 
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -532,11 +535,23 @@ class ProfileController extends GetxController {
         Placemark place = placemarks[0];
         locationCtr.text =
             '${place.locality}, ${place.administrativeArea}, ${place.country}';
+
+        SnackbarUtils.showSuccess(
+          'Location Found',
+          'Your location has been set automatically',
+        );
+      } else {
+        locationCtr.text = '';
+        SnackbarUtils.showWarning(
+          'Location Not Found',
+          'Please enter your location manually',
+        );
       }
     } catch (e) {
-      SnackbarUtils.showError(
-        'Location Error',
-        'Failed to get current location',
+      locationCtr.text = '';
+      SnackbarUtils.showWarning(
+        'Unable to Get Location',
+        'Please enter your location manually',
       );
     }
   }

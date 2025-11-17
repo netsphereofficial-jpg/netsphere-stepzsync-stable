@@ -9,6 +9,7 @@ class AuthButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool isLoading;
   final bool isSecondary;
+  final bool isDisabled;
   final IconData? icon;
   final Color? backgroundColor;
   final Color? textColor;
@@ -19,6 +20,7 @@ class AuthButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.isSecondary = false,
+    this.isDisabled = false,
     this.icon,
     this.backgroundColor,
     this.textColor,
@@ -26,13 +28,16 @@ class AuthButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = backgroundColor ?? 
-        (isSecondary ? Colors.white : AppColors.appColor);
-    final tColor = textColor ?? 
-        (isSecondary ? AppColors.appColor : Colors.white);
+    // Determine colors based on state
+    final bgColor = isDisabled
+        ? Colors.grey[300]!
+        : (backgroundColor ?? (isSecondary ? Colors.white : AppColors.appColor));
+    final tColor = isDisabled
+        ? Colors.grey[500]!
+        : (textColor ?? (isSecondary ? AppColors.appColor : Colors.white));
 
     return GestureDetector(
-      onTap: isLoading ? null : () {
+      onTap: (isLoading || isDisabled) ? null : () {
         HapticFeedback.lightImpact();
         onPressed();
       },
@@ -41,7 +46,7 @@ class AuthButton extends StatelessWidget {
         width: double.infinity,
         height: AppConstants.buttonHeight,
         decoration: BoxDecoration(
-          gradient: isSecondary ? null : LinearGradient(
+          gradient: (isSecondary || isDisabled) ? null : LinearGradient(
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
             colors: [
@@ -49,13 +54,13 @@ class AuthButton extends StatelessWidget {
               bgColor.withOpacity(0.8),
             ],
           ),
-          color: isSecondary ? bgColor : null,
+          color: (isSecondary || isDisabled) ? bgColor : null,
           borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
           border: isSecondary ? Border.all(
             color: AppColors.appColor.withOpacity(0.3),
             width: 1.5,
           ) : null,
-          boxShadow: isSecondary ? null : [
+          boxShadow: (isSecondary || isDisabled) ? null : [
             BoxShadow(
               color: AppColors.appColor.withOpacity(0.3),
               blurRadius: 15,

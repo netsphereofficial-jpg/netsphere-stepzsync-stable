@@ -415,36 +415,46 @@ class ProfileScreen extends StatelessWidget {
           style: AppTextStyles.fieldLabel,
         ),
         SizedBox(height: AppSpacing.labelFieldGap),
-        GestureDetector(
-          onTap: controller.getCurrentLocation,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppDesignColors.fieldBackground,
-              borderRadius: BorderRadius.circular(AppRadius.textField),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller.locationCtr,
-                    enabled: false,
-                    style: AppTextStyles.fieldInput,
-                    decoration: InputDecoration(
-                      hintText: 'Tap to get current location',
-                      hintStyle: AppTextStyles.fieldHint,
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppDesignColors.fieldBackground,
+            borderRadius: BorderRadius.circular(AppRadius.textField),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller.locationCtr,
+                  style: AppTextStyles.fieldInput,
+                  keyboardType: TextInputType.text,
+                  maxLength: 100,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your location or tap GPS icon',
+                    hintStyle: AppTextStyles.fieldHint,
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    counterText: '',
                   ),
                 ),
-                Icon(
-                  Icons.my_location_rounded,
-                  color: AppDesignColors.label,
-                  size: 20,
+              ),
+              SizedBox(width: 12),
+              GestureDetector(
+                onTap: controller.getCurrentLocation,
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppDesignColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.my_location_rounded,
+                    color: AppDesignColors.primary,
+                    size: 20,
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],

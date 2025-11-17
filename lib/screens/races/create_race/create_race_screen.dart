@@ -399,16 +399,20 @@ class CreateRaceScreen extends StatelessWidget {
                     margin: EdgeInsets.only(right: 8),
                     padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.appColor : Colors.grey[100],
+                      color: isSelected ? AppColors.blueLight : Colors.white,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected ? AppColors.appColor : Colors.grey[300]!,
+                        width: isSelected ? 2 : 1,
+                      ),
                     ),
                     child: Text(
                       type,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? AppColors.appColor : Colors.black54,
                       ),
                     ),
                   ),
@@ -427,16 +431,20 @@ class CreateRaceScreen extends StatelessWidget {
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.appColor : Colors.grey[100],
+                      color: isSelected ? AppColors.blueLight : Colors.white,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected ? AppColors.appColor : Colors.grey[300]!,
+                        width: isSelected ? 2 : 1,
+                      ),
                     ),
                     child: Text(
                       type,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? AppColors.appColor : Colors.black54,
                       ),
                     ),
                   ),
@@ -608,16 +616,20 @@ class CreateRaceScreen extends StatelessWidget {
                 margin: EdgeInsets.only(right: type != 'Any' ? 8 : 0),
                 padding: EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.appColor : Colors.grey[100],
+                  color: isSelected ? AppColors.blueLight : Colors.white,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected ? AppColors.appColor : Colors.grey[300]!,
+                    width: isSelected ? 2 : 1,
+                  ),
                 ),
                 child: Text(
                   type,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? AppColors.appColor : Colors.black54,
                   ),
                 ),
               ),
