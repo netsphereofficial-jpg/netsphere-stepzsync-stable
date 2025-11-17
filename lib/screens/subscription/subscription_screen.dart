@@ -17,422 +17,377 @@ class SubscriptionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.appColor.withOpacity(0.1),
-              Colors.white,
-              AppColors.appColor.withOpacity(0.05),
-            ],
-            stops: [0.0, 0.6, 1.0],
-          ),
+      backgroundColor: Color(0xFF0A0E27),
+      appBar: CustomAppBar(
+        title: "Choose Plan",
+        isBack: true,
+        circularBackButton: true,
+        backButtonCircleColor: Colors.white.withOpacity(0.1),
+        backButtonIconColor: Colors.white,
+        backgroundColor: Color(0xFF0A0E27),
+        titleColor: Colors.white,
+        showGradient: false,
+        titleStyle: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: CustomAppBar(
-            title: "Upgrade Plan",
-            isBack: true,
-            onBackClick: () => Get.back(),
-            actions: [
-              if (Platform.isIOS)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Obx(() => IconButton(
-                    onPressed: controller.isRestoring.value
-                        ? null
-                        : controller.restorePurchases,
-                    icon: controller.isRestoring.value
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.appColor,
-                            ),
-                          )
-                        : Icon(
-                            Icons.restore,
-                            color: AppColors.appColor,
-                          ),
-                  )),
-                ),
-            ],
-          ),
-          body: Obx(() {
-            if (controller.isInitializing.value) {
-              return _buildLoadingState();
-            }
-
-            return SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    _buildHeroSection(),
-                    const SizedBox(height: 16),
-                    _buildCurrentPlanCard(),
-                    const SizedBox(height: 16),
-                    _buildCompactPlanCards(),
-                    const SizedBox(height: 12),
-                    _buildFeatureHighlights(),
-                    const SizedBox(height: 12),
-                    _buildFeaturesComparison(),
-                    const SizedBox(height: 12),
-                    _buildBottomInfo(),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ),
+        actions: [
+          if (Platform.isIOS)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Obx(() => TextButton(
+                onPressed: controller.isRestoring.value
+                    ? null
+                    : controller.restorePurchases,
+                child: controller.isRestoring.value
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white70,
+                        ),
+                      )
+                    : Text(
+                        'Restore',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+              )),
+            ),
+        ],
       ),
+      body: Obx(() {
+        if (controller.isInitializing.value) {
+          return Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFF6C5CE7),
+              strokeWidth: 2.5,
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          physics: BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _buildCurrentPlan(),
+                const SizedBox(height: 28),
+                _buildCompactPlans(),
+                const SizedBox(height: 20),
+                _buildFooter(),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      }),
     );
   }
 
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: AppColors.appColor),
-          const SizedBox(height: 16),
-          Text(
-            'Loading plans...',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: AppColors.greyColor2,
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn();
-  }
-
-  Widget _buildHeroSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.appColor,
-            AppColors.primary,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.appColor.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.rocket_launch_rounded,
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        Text(
+          'Upgrade to Premium',
+          style: GoogleFonts.inter(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
             color: Colors.white,
-            size: 36,
+            letterSpacing: -0.5,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Unlock Premium Features',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Unlock unlimited races and exclusive features',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.6),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Join thousands of runners worldwide',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: Colors.white.withOpacity(0.9),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     ).animate()
-      .fadeIn(duration: 600.ms)
-      .slideY(begin: -0.3, end: 0, duration: 600.ms);
+      .fadeIn(duration: 400.ms)
+      .slideY(begin: -0.1, end: 0, duration: 400.ms);
   }
 
-  Widget _buildCurrentPlanCard() {
+  Widget _buildCurrentPlan() {
     return Obx(() {
       final currentSub = controller.currentSubscription.value;
       final planName = controller.currentPlanDisplayName;
+      final isPremium = currentSub.isPremium;
 
       return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isPremium
+                ? [Color(0xFF6C5CE7).withOpacity(0.2), Color(0xFF0984E3).withOpacity(0.15)]
+                : [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.02)],
+          ),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: currentSub.isPremium ? AppColors.neonGreen : AppColors.appColor.withOpacity(0.3),
-            width: 2,
+            color: isPremium
+                ? Color(0xFF6C5CE7).withOpacity(0.4)
+                : Colors.white.withOpacity(0.1),
+            width: 1.5,
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: (currentSub.isPremium ? AppColors.neonGreen : AppColors.appColor).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                currentSub.isPremium ? Icons.star : Icons.person_outline,
-                color: currentSub.isPremium ? AppColors.neonGreen : AppColors.appColor,
-                size: 20,
+            Icon(
+              isPremium ? Icons.verified : Icons.person_outline,
+              color: isPremium ? Color(0xFF6C5CE7) : Colors.white60,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Current: $planName',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withOpacity(0.85),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Current Plan',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: AppColors.greyColor2,
-                    ),
-                  ),
-                  Text(
-                    planName,
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (currentSub.isPremium)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.neonGreen,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'ACTIVE',
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
           ],
         ),
       );
     }).animate()
-      .fadeIn(duration: 400.ms, delay: 200.ms)
-      .slideX(begin: 0.3, end: 0, duration: 400.ms, delay: 200.ms);
+      .fadeIn(duration: 300.ms, delay: 150.ms)
+      .scale(begin: const Offset(0.95, 0.95), duration: 300.ms, delay: 150.ms);
   }
 
-  Widget _buildCompactPlanCards() {
-    final plans = SubscriptionPlan.getAllPlans();
+  Widget _buildCompactPlans() {
+    final plans = SubscriptionPlan.getAllPlans()
+        .where((plan) => plan.type != SubscriptionPlanType.free)
+        .toList();
 
     return Column(
-      children: plans.map((plan) {
-        final delay = plan.type.index * 100;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: _buildCompactPlanCard(plan),
+      children: plans.asMap().entries.map((entry) {
+        final index = entry.key;
+        final plan = entry.value;
+        return Padding(
+          padding: EdgeInsets.only(bottom: index < plans.length - 1 ? 14 : 0),
+          child: _buildPlanCard(plan, index),
         ).animate()
-          .fadeIn(duration: 500.ms, delay: Duration(milliseconds: 300 + delay))
-          .slideX(begin: 0.4, end: 0, duration: 500.ms, delay: Duration(milliseconds: 300 + delay));
+          .fadeIn(duration: 400.ms, delay: Duration(milliseconds: 250 + (index * 80)))
+          .slideX(begin: 0.1, end: 0, duration: 400.ms, delay: Duration(milliseconds: 250 + (index * 80)));
       }).toList(),
     );
   }
 
-  Widget _buildCompactPlanCard(SubscriptionPlan plan) {
+  Widget _buildPlanCard(SubscriptionPlan plan, int index) {
     final isCurrentPlan = controller.isPlanActive(plan.type);
-    final isFree = plan.type == SubscriptionPlanType.free;
+    final isPurchasing = controller.isPurchasing.value &&
+                        controller.selectedPlan.value?.type == plan.type;
+    final isPopular = plan.isPopular;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        gradient: isPopular
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF6C5CE7),
+                  Color(0xFF0984E3),
+                ],
+              )
+            : null,
+        color: isPopular ? null : Color(0xFF151B3D),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: plan.isPopular
-              ? AppColors.neonGreen
-              : (isCurrentPlan ? AppColors.appColor : Colors.grey.withOpacity(0.2)),
-          width: plan.isPopular || isCurrentPlan ? 2 : 1,
+          color: isPopular
+              ? Colors.transparent
+              : (isCurrentPlan ? Color(0xFF6C5CE7).withOpacity(0.5) : Colors.white.withOpacity(0.08)),
+          width: isCurrentPlan ? 2 : 1.5,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isPopular
+            ? [
+                BoxShadow(
+                  color: Color(0xFF6C5CE7).withOpacity(0.4),
+                  blurRadius: 20,
+                  offset: Offset(0, 8),
+                ),
+              ]
+            : [],
       ),
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Plan Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            plan.emoji,
-                            style: const TextStyle(fontSize: 24),
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
                             children: [
                               Text(
                                 plan.name,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
+                                style: GoogleFonts.inter(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.3,
                                 ),
                               ),
-                              Text(
-                                plan.subtitle,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.greyColor2,
+                              if (isPopular) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.25),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'BEST',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            plan.subtitle,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.65),
+                            ),
                           ),
                         ],
                       ),
-
-                      if (!isFree) ...[
-                        const SizedBox(height: 8),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (plan.originalPrice != null)
+                          Text(
+                            plan.originalPrice!,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withOpacity(0.4),
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            if (plan.originalPrice != null) ...[
-                              Text(
-                                plan.originalPrice!,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: AppColors.greyColor2,
-                                  decoration: TextDecoration.lineThrough,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
                             Text(
-                              plan.price ?? '',
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
+                              plan.price ?? '\$0',
+                              style: GoogleFonts.inter(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1,
+                                letterSpacing: -1,
                               ),
                             ),
                             if (plan.billingPeriod != null)
-                              Text(
-                                plan.billingPeriod!,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.greyColor2,
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4, left: 2),
+                                child: Text(
+                                  plan.billingPeriod!,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withOpacity(0.6),
+                                  ),
                                 ),
                               ),
                           ],
                         ),
                       ],
-
-                      const SizedBox(height: 6),
-                      // Key Features (max 3)
-                      ...plan.features.take(3).map((feature) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 1),
-                        child: Row(
-                          children: [
-                            Icon(
-                              feature.isAvailable ? Icons.check_circle : Icons.cancel,
-                              color: feature.isAvailable ? AppColors.greenColor : Colors.red,
-                              size: 12,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                feature.title,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10,
-                                  color: feature.isAvailable ? AppColors.primary : AppColors.greyColor2,
-                                  decoration: feature.isAvailable ? null : TextDecoration.lineThrough,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-
-                      if (plan.features.length > 3)
-                        Text(
-                          '+${plan.features.length - 3} more',
-                          style: GoogleFonts.poppins(
-                            fontSize: 9,
-                            color: AppColors.appColor,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ...plan.features.take(4).map((feature) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        feature.isAvailable ? Icons.check_circle : Icons.cancel,
+                        color: feature.isAvailable
+                            ? (isPopular ? Colors.white.withOpacity(0.9) : Color(0xFF00D4AA))
+                            : Colors.white.withOpacity(0.3),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          feature.title,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
+                            color: feature.isAvailable
+                                ? Colors.white.withOpacity(0.85)
+                                : Colors.white.withOpacity(0.3),
+                            decoration: feature.isAvailable
+                                ? null
+                                : TextDecoration.lineThrough,
                           ),
                         ),
+                      ),
                     ],
                   ),
-                ),
-
-                // Action Button
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 90,
-                  child: _buildCompactButton(plan),
-                ),
+                )),
+                const SizedBox(height: 16),
+                _buildActionButton(plan, isCurrentPlan, isPurchasing, isPopular),
               ],
             ),
           ),
-
-          // Popular Badge
-          if (plan.isPopular)
+          if (plan.originalPrice != null && plan.price != null)
             Positioned(
-              top: 0,
-              right: 0,
+              top: 14,
+              right: 14,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.neonGreen, AppColors.electricBlue],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(8),
-                  ),
+                  color: isPopular
+                      ? Colors.white.withOpacity(0.25)
+                      : Color(0xFFFF6B6B),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'POPULAR',
-                  style: GoogleFonts.poppins(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
+                  '${_calculateSavings(plan.originalPrice!, plan.price!)} OFF',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
@@ -442,53 +397,39 @@ class SubscriptionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactButton(SubscriptionPlan plan) {
-    final isCurrentPlan = controller.isPlanActive(plan.type);
-    final isPurchasing = controller.isPurchasing.value &&
-                        controller.selectedPlan.value?.type == plan.type;
-
+  Widget _buildActionButton(
+    SubscriptionPlan plan,
+    bool isCurrentPlan,
+    bool isPurchasing,
+    bool isPopular,
+  ) {
     if (isCurrentPlan) {
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.appColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.appColor.withOpacity(0.3)),
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 1.5,
+          ),
         ),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check, color: AppColors.appColor, size: 16),
-            const SizedBox(height: 2),
-            Text(
-              'Current',
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: AppColors.appColor,
-              ),
+            Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: 18,
             ),
-          ],
-        ),
-      );
-    }
-
-    if (plan.type == SubscriptionPlanType.free) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.greyColor2.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.arrow_downward, color: AppColors.greyColor2, size: 16),
-            const SizedBox(height: 2),
+            const SizedBox(width: 8),
             Text(
-              'Downgrade',
-              style: GoogleFonts.poppins(
-                fontSize: 9,
-                fontWeight: FontWeight.w500,
-                color: AppColors.greyColor2,
+              'Active Plan',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
               ),
             ),
           ],
@@ -499,34 +440,38 @@ class SubscriptionScreen extends StatelessWidget {
     return ElevatedButton(
       onPressed: isPurchasing ? null : () => controller.purchaseSubscription(plan),
       style: ElevatedButton.styleFrom(
-        backgroundColor: plan.isPopular ? AppColors.neonGreen : AppColors.appColor,
-        foregroundColor: plan.isPopular ? AppColors.primary : Colors.white,
+        backgroundColor: isPopular ? Colors.white : Color(0xFF6C5CE7),
+        foregroundColor: isPopular ? Color(0xFF0A0E27) : Colors.white,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        minimumSize: const Size(double.infinity, 0),
       ),
       child: isPurchasing
           ? SizedBox(
-              width: 12,
-              height: 12,
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: isPopular ? Color(0xFF0A0E27) : Colors.white,
               ),
             )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Platform.isIOS ? Icons.apple : Icons.android,
-                  size: 14,
+                  size: 18,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(width: 8),
                 Text(
-                  'Upgrade',
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                  'Subscribe Now',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ],
@@ -534,281 +479,49 @@ class SubscriptionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureHighlights() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.star_rounded, color: AppColors.neonGreen, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Premium Benefits',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _buildBenefitItem(Icons.public, 'Global Races', 'Premium 2')),
-              Expanded(child: _buildBenefitItem(Icons.leaderboard, 'Leaderboards', 'Premium 1')),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _buildBenefitItem(Icons.analytics, 'Advanced Stats', 'Premium 1')),
-              Expanded(child: _buildBenefitItem(Icons.emoji_events, 'Hall of Fame', 'Premium 2')),
-            ],
-          ),
-        ],
-      ),
-    ).animate()
-      .fadeIn(duration: 600.ms, delay: 800.ms)
-      .slideY(begin: 0.2, end: 0, duration: 600.ms, delay: 800.ms);
+  String _calculateSavings(String originalPrice, String price) {
+    final original = double.tryParse(originalPrice.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+    final current = double.tryParse(price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+    if (original > 0 && current > 0) {
+      final savings = ((original - current) / original * 100).round();
+      return '$savings%';
+    }
+    return '0%';
   }
 
-  Widget _buildBenefitItem(IconData icon, String title, String requiredPlan) {
+  Widget _buildFooter() {
     return Column(
       children: [
-        Icon(icon, color: AppColors.appColor, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        Text(
-          requiredPlan,
-          style: GoogleFonts.poppins(
-            fontSize: 10,
-            color: AppColors.greyColor2,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeaturesComparison() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.compare_arrows, color: AppColors.appColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Feature Comparison',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildComparisonTable(),
-        ],
-      ),
-    ).animate()
-      .fadeIn(duration: 600.ms, delay: 900.ms)
-      .slideY(begin: 0.2, end: 0, duration: 600.ms, delay: 900.ms);
-  }
-
-  Widget _buildComparisonTable() {
-    final features = [
-      'Race Access',
-      'Join Races',
-      'Create Races',
-      'Marathons',
-      'Statistics',
-      'Heart Rate Zones',
-      'Leaderboards',
-      'Hall of Fame',
-      'Group Chat',
-      'Global Features',
-    ];
-
-    final plans = SubscriptionPlan.getAllPlans();
-
-    return Column(
-      children: [
-        // Header row
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              flex: 2,
-              child: Text(
-                'Feature',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
+            Icon(
+              Icons.lock_rounded,
+              color: Colors.white.withOpacity(0.4),
+              size: 14,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Secure payment via ${Platform.isIOS ? 'App Store' : 'Google Play'}',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withOpacity(0.4),
               ),
             ),
-            ...plans.map((plan) => Expanded(
-              child: Column(
-                children: [
-                  Text(
-                    plan.emoji,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                  Text(
-                    plan.name,
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )),
           ],
         ),
-        const SizedBox(height: 12),
-        Container(
-          height: 1,
-          color: Colors.grey.withOpacity(0.2),
-        ),
         const SizedBox(height: 8),
-
-        // Feature rows
-        ...features.map((feature) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Text(
-                  feature,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.greyColor2,
-                  ),
-                ),
-              ),
-              ...plans.map((plan) {
-                final hasFeature = _planHasFeature(plan, feature);
-                return Expanded(
-                  child: Center(
-                    child: Icon(
-                      hasFeature ? Icons.check_circle : Icons.cancel,
-                      color: hasFeature ? AppColors.greenColor : Colors.red,
-                      size: 18,
-                    ),
-                  ),
-                );
-              }),
-            ],
+        Text(
+          'Cancel anytime • No hidden fees',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.35),
           ),
-        )),
+        ),
       ],
-    );
-  }
-
-  bool _planHasFeature(SubscriptionPlan plan, String feature) {
-    // Simplified feature mapping - in real app, this would be more sophisticated
-    switch (feature) {
-      case 'Race Access':
-        return true;
-      case 'Join Races':
-        return true;
-      case 'Create Races':
-        return true;
-      case 'Marathons':
-        return plan.type != SubscriptionPlanType.free;
-      case 'Statistics':
-        return true;
-      case 'Heart Rate Zones':
-        return plan.type != SubscriptionPlanType.free;
-      case 'Leaderboards':
-        return plan.type != SubscriptionPlanType.free;
-      case 'Hall of Fame':
-        return plan.type == SubscriptionPlanType.premium2;
-      case 'Group Chat':
-        return plan.type == SubscriptionPlanType.premium2;
-      case 'Global Features':
-        return plan.type == SubscriptionPlanType.premium2;
-      default:
-        return false;
-    }
-  }
-
-  Widget _buildBottomInfo() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.lightBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Platform.isIOS ? Icons.apple : Icons.android,
-                color: AppColors.appColor,
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Secure ${Platform.isIOS ? 'App Store' : 'Google Play'} Purchase',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Cancel anytime in your device settings',
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              color: AppColors.greyColor2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     ).animate()
-      .fadeIn(duration: 400.ms, delay: 1000.ms);
+      .fadeIn(duration: 400.ms, delay: 550.ms);
   }
 }
