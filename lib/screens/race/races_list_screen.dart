@@ -337,11 +337,11 @@ class _RacesListScreenState extends State<RacesListScreen>
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Color(0xff5B8AFF), // Brighter blue (less saturated, lighter)
+                color: Color(0xff4A73FF), // Darker, richer blue
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0xff5B8AFF).withOpacity(0.3),
+                    color: Color(0xff4A73FF).withOpacity(0.3),
                     blurRadius: 8,
                     offset: Offset(0, 2),
                   ),
