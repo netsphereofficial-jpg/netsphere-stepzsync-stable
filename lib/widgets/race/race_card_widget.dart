@@ -761,10 +761,13 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
                     SizedBox(width: 4),
                     GestureDetector(
                       onTap: () => _showTimeToFinishInfo(),
-                      child: Icon(
-                        Icons.info_outline,
-                        size: 12,
-                        color: AppColors.appColor,
+                      child: Container(
+                        padding: EdgeInsets.all(2), // Add padding for easier tap
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 16, // Increased from 12 to 16
+                          color: AppColors.appColor,
+                        ),
                       ),
                     ),
                   ],
