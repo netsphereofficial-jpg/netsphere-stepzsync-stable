@@ -376,6 +376,20 @@ async function sendRaceWon(userId, raceData, winnerData) {
   try {
     console.log(`📤 Sending race won notification to user: ${userId}`);
 
+    // ✅ VALIDATE: Verify race exists and is in valid state for winner notification
+    const raceDoc = await db.collection('races').doc(raceData.id).get();
+    if (!raceDoc.exists) {
+      console.log(`⏹️ Race ${raceData.id} not found for winner notification`);
+      return { success: false, error: 'Race not found' };
+    }
+
+    const raceStatus = raceDoc.data()?.statusId;
+    // Allow COMPLETED (4) or ENDING (6) states for winner notification
+    if (raceStatus !== STATUS_COMPLETED && raceStatus !== STATUS_ENDING) {
+      console.log(`⏹️ Race ${raceData.id} in invalid state for winner notification (statusId: ${raceStatus})`);
+      return { success: false, error: 'Invalid race state for winner notification' };
+    }
+
     const notification = {
       title: '🏆 Victory! 🏆',
       body: `Congratulations! You won "${raceData.title}"!`,
@@ -929,6 +943,19 @@ async function sendRaceCancelledNotification(raceId, raceTitle, cancellationReas
   try {
     console.log(`📤 Sending race cancelled notifications for race: ${raceId}`);
 
+    // ✅ VALIDATE: Verify race is actually cancelled
+    const raceDoc = await db.collection('races').doc(raceId).get();
+    if (!raceDoc.exists) {
+      console.error(`❌ Race ${raceId} not found`);
+      return { success: false, error: 'Race not found' };
+    }
+
+    const raceStatus = raceDoc.data()?.statusId;
+    if (raceStatus !== STATUS_CANCELLED) {
+      console.error(`❌ Race ${raceId} is not cancelled (statusId: ${raceStatus})`);
+      return { success: false, error: 'Race is not cancelled' };
+    }
+
     // Get all participants
     const participantsSnapshot = await db.collection('races').doc(raceId).collection('participants').get();
 
@@ -999,6 +1026,13 @@ async function sendProximityAlertNotification(
 ) {
   try {
     console.log(`📤 Sending proximity alert: ${chaserName} is ${distanceGap}m behind leader`);
+
+    // ✅ VALIDATE: Check if race is still active
+    const active = await isRaceActive(raceId);
+    if (!active) {
+      console.log(`⏭️ Skipping proximity alert - race ${raceId} is not active`);
+      return { success: true, message: 'Race is not active' };
+    }
 
     const notification = {
       title: '🔥 Opponent Approaching!',
