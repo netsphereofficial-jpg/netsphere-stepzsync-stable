@@ -444,17 +444,17 @@ class CreateRaceController extends GetxController {
 
   String getStoppingTimeGuidance() {
     if (routeDistance.value.isEmpty)
-      return 'Timer starts after the first participant finishes.';
+      return 'Time to finish starts counting after the first participant completes the race.';
 
     final distance = double.tryParse(routeDistance.value) ?? 0.0;
     if (distance < 0.5) {
-      return 'Very short distance - 5 minutes for a quick sprint!';
+      return 'Very short distance - 5 minutes gives others time to finish after the first person!';
     } else if (distance < 2) {
-      return 'Short distance - 1 hour should be plenty for everyone to finish!';
+      return 'Short distance - 1 hour gives everyone time to finish after the first person!';
     } else if (distance < 10) {
-      return 'Good distance - 12 hours gives everyone a fair chance.';
+      return 'Good distance - 12 hours gives everyone time to finish after the first person.';
     } else {
-      return 'Long distance - 24 hours ensures no one gets left behind.';
+      return 'Long distance - 24 hours ensures everyone can finish after the first person.';
     }
   }
 

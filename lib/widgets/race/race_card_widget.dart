@@ -605,11 +605,12 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
                       '${widget.race.joinedParticipants ?? 0}/${widget.race.maxParticipants ?? 0}',
                 ),
                 SizedBox(height: 8),
-                _buildInfoRow(
+                _buildInfoRowWithInfo(
                   icon: isMarathon ? Icons.all_inclusive : IconPaths.timerIcon,
-                  label: isMarathon ? 'Duration' : 'Duration',
+                  label: isMarathon ? 'Duration' : 'Time to Finish',
                   value: isMarathon ? 'No limit' : '${widget.race.durationHrs ?? 24} hours',
                   isIcon: isMarathon,
+                  showInfo: !isMarathon, // Only show info for non-marathon races
                 ),
               ],
             ),
@@ -711,6 +712,189 @@ class _RaceCardWidgetState extends State<RaceCardWidget>
           ),
         ),
       ],
+    );
+  }
+
+  /// Build info row with optional info icon
+  Widget _buildInfoRowWithInfo({
+    required dynamic icon,
+    required String label,
+    required String value,
+    bool isIcon = false,
+    bool showInfo = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isIcon)
+          Icon(
+            icon as IconData,
+            size: 14,
+            color: AppColors.appColor.withValues(alpha: 0.7),
+          )
+        else
+          SvgPicture.asset(
+            icon as String,
+            width: 14,
+            height: 14,
+            colorFilter: ColorFilter.mode(
+              AppColors.appColor.withValues(alpha: 0.7),
+              BlendMode.srcIn,
+            ),
+          ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (showInfo) ...[
+                    SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => _showTimeToFinishInfo(),
+                      child: Icon(
+                        Icons.info_outline,
+                        size: 12,
+                        color: AppColors.appColor,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Show Time to Finish info dialog
+  void _showTimeToFinishInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: AppColors.appColor,
+              size: 24,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Time to Finish',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Here\'s how it works:',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 12),
+            _buildInfoStep('1️⃣', 'Race starts'),
+            _buildInfoStep('2️⃣', 'First person finishes'),
+            _buildInfoStep('3️⃣', 'Timer starts counting'),
+            _buildInfoStep('4️⃣', 'Others must finish before time runs out'),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.appColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.appColor.withOpacity(0.3),
+                ),
+              ),
+              child: Text(
+                '💡 Example: If set to 1 hour, everyone has 1 hour after the first finisher.',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.appColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'Got it!',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build info step row
+  Widget _buildInfoStep(String emoji, String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            emoji,
+            style: TextStyle(fontSize: 16),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
