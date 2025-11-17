@@ -1676,3 +1676,18 @@ exports.initializeRaceBaseline = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError('internal', `Failed to initialize baseline: ${error.message}`);
   }
 });
+
+// ============================================================================
+// SUBSCRIPTION VALIDATION FUNCTIONS
+// ============================================================================
+
+// Purchase validation functions
+const purchaseValidation = require('./subscriptions/triggers/purchaseValidation');
+exports.validateAppleReceipt = purchaseValidation.validateAppleReceipt;
+exports.validateGooglePlayPurchase = purchaseValidation.validateGooglePlayPurchase;
+exports.restorePurchases = purchaseValidation.restorePurchases;
+
+// Scheduled validation functions
+const scheduledValidation = require('./subscriptions/triggers/scheduledValidation');
+exports.validateAllSubscriptions = scheduledValidation.validateAllSubscriptions;
+exports.notifyExpiringSubscriptions = scheduledValidation.notifyExpiringSubscriptions;

@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ============================================================================
-    // HEALTH BASELINES - Server-Side Step Tracking (NEW)
+    // HEALTH BASELINES - Server-Side Step Tracking
     // ============================================================================
     // Users can only read their own baselines
     // Only Cloud Functions can write (enforced by Functions running with admin privileges)
@@ -13,6 +13,26 @@ service cloud.firestore {
       // Only Cloud Functions can write (they use admin SDK)
       // Regular clients should NOT be able to modify baselines directly
       allow write: if false;
+    }
+
+    // ============================================================================
+    // USER PROFILES - Subscription Security
+    // ============================================================================
+    match /user_profiles/{userId} {
+      // Users can read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can update their profile EXCEPT subscription data
+      // Subscription data can only be written by Cloud Functions
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['subscription', 'subscriptionHistory']);
+
+      // Users can create their profile (initial setup)
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Users cannot delete their profile directly
+      allow delete: if false;
     }
 
     // Default: Allow authenticated users for other collections

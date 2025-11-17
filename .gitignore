@@ -52,3 +52,4 @@ ADMIN_CREDENTIALS.md
 **/GoogleService-Info.plist
 .env
 .env.*
+*.apk

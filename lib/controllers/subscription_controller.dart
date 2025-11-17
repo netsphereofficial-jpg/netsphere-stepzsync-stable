@@ -8,6 +8,7 @@ import '../models/subscription_models.dart';
 import '../services/payment_service.dart';
 import '../services/firebase_subscription_service.dart';
 import '../services/firebase_service.dart';
+import '../services/subscription_validation_service.dart';
 import '../core/utils/snackbar_utils.dart';
 
 class SubscriptionController extends GetxController {
@@ -24,6 +25,7 @@ class SubscriptionController extends GetxController {
   late PaymentService _paymentService;
   final FirebaseSubscriptionService _firebaseService = Get.find<FirebaseSubscriptionService>();
   final FirebaseService _firebaseCore = FirebaseService();
+  final SubscriptionValidationService _validationService = SubscriptionValidationService();
 
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   StreamSubscription<UserSubscription>? _subscriptionStreamSubscription;
@@ -218,29 +220,49 @@ class SubscriptionController extends GetxController {
         // Purchase successful
         debugPrint('Purchase successful: ${purchase.productID}');
 
-        // Find the purchased plan
-        final purchasedPlan = SubscriptionPlan.getAllPlans()
-            .cast<SubscriptionPlan?>()
-            .firstWhere(
-              (plan) => plan?.appleProductId == purchase.productID ||
-                        plan?.googlePlayProductId == purchase.productID,
-              orElse: () => null,
-            );
+        try {
+          // Validate purchase with server
+          debugPrint('🔐 Validating purchase with server...');
+          final validationResult = await _validationService.validatePurchase(purchase);
 
-        if (purchasedPlan != null) {
-          // Save subscription to Firebase
-          await _saveSubscriptionToFirebase(purchase, purchasedPlan);
+          if (validationResult['success'] == true) {
+            debugPrint('✅ Server validation successful');
 
-          // Show success message
-          SnackbarUtils.showSuccess(
-            'Purchase Successful!',
-            'Welcome to ${purchasedPlan.name}! Your premium features are now active.',
-          );
+            // Get plan name from server response
+            final subscription = validationResult['subscription'];
+            final planType = subscription['planType'];
 
-          // Navigate back if we're in the subscription screen
-          if (Get.currentRoute.contains('subscription')) {
-            Get.back();
+            // Find the purchased plan
+            final purchasedPlan = SubscriptionPlan.getAllPlans()
+                .cast<SubscriptionPlan?>()
+                .firstWhere(
+                  (plan) => plan?.type.toString().split('.').last == planType,
+                  orElse: () => null,
+                );
+
+            if (purchasedPlan != null) {
+              // Show success message
+              SnackbarUtils.showSuccess(
+                'Purchase Successful!',
+                'Welcome to ${purchasedPlan.name}! Your premium features are now active.',
+              );
+
+              // Navigate back if we're in the subscription screen
+              if (Get.currentRoute.contains('subscription')) {
+                Get.back();
+              }
+            }
+          } else {
+            throw Exception('Server validation returned success=false');
           }
+        } catch (e) {
+          debugPrint('❌ Server validation failed: $e');
+
+          // Show error to user
+          SnackbarUtils.showError(
+            'Validation Error',
+            'Purchase completed but validation failed. Your subscription will be activated shortly.',
+          );
         }
 
         // Complete the purchase (required for both platforms)
@@ -562,51 +584,11 @@ class SubscriptionController extends GetxController {
   }
 
   /// Check if user has premium access
-  /// TODO: REMOVE THIS OVERRIDE AFTER TESTING - ALWAYS RETURNS TRUE FOR TESTING
-  bool get hasPremiumAccess => true; // Temporarily always true for testing
-  // bool get hasPremiumAccess => currentSubscription.value.isPremium; // Original code
+  bool get hasPremiumAccess => currentSubscription.value.isPremium;
 
-  /// Save successful purchase to Firebase
-  Future<void> _saveSubscriptionToFirebase(PurchaseDetails purchase, SubscriptionPlan plan) async {
-    try {
-      if (_currentUserId == null) {
-        debugPrint('⚠️ Cannot save subscription: No authenticated user');
-        return;
-      }
-
-      // Calculate subscription dates
-      final now = DateTime.now();
-      final expiryDate = now.add(const Duration(days: 30)); // Monthly subscription
-
-      // Create subscription with features based on plan
-      final subscription = _createSubscriptionFromPlan(
-        plan: plan,
-        purchaseDate: now,
-        expiryDate: expiryDate,
-        transactionId: purchase.purchaseID ?? purchase.verificationData.localVerificationData,
-        originalTransactionId: Platform.isIOS ? purchase.purchaseID : null,
-        purchaseToken: Platform.isAndroid ? purchase.purchaseID : null,
-      );
-
-      // Save to Firebase
-      await _firebaseService.saveSubscription(
-        userId: _currentUserId!,
-        subscription: subscription,
-        transactionId: purchase.purchaseID ?? '',
-        platform: Platform.isIOS ? 'ios' : 'android',
-        additionalData: {
-          'productId': purchase.productID,
-          'verificationData': purchase.verificationData.localVerificationData,
-        },
-      );
-
-      debugPrint('✅ Subscription saved to Firebase successfully');
-
-    } catch (e) {
-      debugPrint('❌ Failed to save subscription to Firebase: $e');
-      // Don't throw - the purchase was successful, Firebase sync can be retried
-    }
-  }
+  // NOTE: Subscription saving is now handled by Cloud Functions for security
+  // The _saveSubscriptionToFirebase method has been removed
+  // Server-side validation ensures subscriptions cannot be faked
 
   /// Create UserSubscription from SubscriptionPlan with features
   UserSubscription _createSubscriptionFromPlan({
@@ -695,20 +677,16 @@ class SubscriptionController extends GetxController {
   }
 
   /// Feature access methods
-  /// TODO: REMOVE THIS OVERRIDE AFTER TESTING - ALWAYS RETURNS TRUE FOR TESTING
   bool hasFeatureAccess(String featureKey) {
-    return true; // Temporarily always true for testing
-    // return currentSubscription.value.hasFeature(featureKey); // Original code
+    return currentSubscription.value.hasFeature(featureKey);
   }
 
   T? getFeature<T>(String featureKey) {
     return currentSubscription.value.getFeature<T>(featureKey);
   }
 
-  /// TODO: REMOVE THIS OVERRIDE AFTER TESTING - ALWAYS RETURNS 999 FOR TESTING
   int getFeatureLimit(String featureKey) {
-    return 999; // Temporarily unlimited for testing
-    // return currentSubscription.value.getFeature<int>(featureKey) ?? 0; // Original code
+    return currentSubscription.value.getFeature<int>(featureKey) ?? 0;
   }
 
   /// Check specific features
