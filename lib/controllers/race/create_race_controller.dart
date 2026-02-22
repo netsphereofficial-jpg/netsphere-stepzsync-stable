@@ -12,6 +12,7 @@ import '../../core/models/race_data_model.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../screens/active_races/active_races_screen.dart';
 import '../../screens/home/homepage_screen/controllers/homepage_data_service.dart';
+import '../../services/analytics_service.dart';
 import '../../services/auth/firebase_auth_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/health_sync_service.dart';
@@ -1051,6 +1052,9 @@ class CreateRaceController extends GetxController {
       log(
         'Creator auto-joined as participant with comprehensive data structure',
       );
+
+      // Log analytics: race created
+      AnalyticsService().logSchedule();
 
       // 🎁 Award XP for creating and joining the race
       try {

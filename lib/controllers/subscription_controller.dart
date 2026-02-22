@@ -9,6 +9,7 @@ import '../services/payment_service.dart';
 import '../services/firebase_subscription_service.dart';
 import '../services/firebase_service.dart';
 import '../services/subscription_validation_service.dart';
+import '../services/analytics_service.dart';
 import '../core/utils/snackbar_utils.dart';
 
 class SubscriptionController extends GetxController {
@@ -241,6 +242,15 @@ class SubscriptionController extends GetxController {
                 );
 
             if (purchasedPlan != null) {
+              // Log analytics: purchase + subscribe
+              final analytics = AnalyticsService();
+              final purchasePrice = double.tryParse(
+                (purchasedPlan.price ?? '0').replaceAll(RegExp(r'[^\d.]'), ''),
+              ) ?? 0.0;
+              final purchasePlanId = purchasedPlan.type.toString().split('.').last;
+              analytics.logPurchase(planId: purchasePlanId, price: purchasePrice);
+              analytics.logSubscribe(planId: purchasePlanId, price: purchasePrice);
+
               // Show success message
               SnackbarUtils.showSuccess(
                 'Purchase Successful!',
@@ -334,6 +344,13 @@ class SubscriptionController extends GetxController {
           return;
         }
       }
+
+      // Log analytics: initiate checkout
+      final planIdStr = plan.type.toString().split('.').last;
+      final price = double.tryParse(
+        (plan.price ?? '0').replaceAll(RegExp(r'[^\d.]'), ''),
+      ) ?? 0.0;
+      AnalyticsService().logInitiateCheckout(planId: planIdStr, price: price);
 
       // Process the purchase (result will come through the stream)
       final result = await _paymentService.purchaseSubscription(plan);

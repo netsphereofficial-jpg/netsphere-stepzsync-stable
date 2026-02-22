@@ -92,6 +92,7 @@ import 'package:stepzsync/services/local_notification_service.dart';
 import 'package:stepzsync/services/background_step_sync_service.dart';
 import 'package:stepzsync/services/race_step_sync_service.dart';
 import 'package:stepzsync/services/admob_service.dart';
+import 'package:stepzsync/services/analytics_service.dart';
 import 'package:stepzsync/controllers/race/race_map_controller.dart';
 
 void main() async {
@@ -141,6 +142,9 @@ void main() async {
     // Setup dependency injection (fast, non-blocking)
     // StepTrackingService will request permission internally before starting pedometer
     DependencyInjection.setup();
+
+    // Initialize analytics (Firebase Analytics + Facebook App Events)
+    await AnalyticsService().initialize();
 
     // ✅ DEFERRED: Race monitoring will start after home screen loads
     // This is moved to HomeController to avoid blocking app startup
@@ -379,6 +383,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: "StepzSync",
+      navigatorObservers: [AnalyticsService().observer],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: AppColors.lightColorScheme,

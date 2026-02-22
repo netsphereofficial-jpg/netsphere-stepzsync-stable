@@ -12,6 +12,7 @@ import 'package:stepzsync/screens/profile/profile_screen.dart';
 import '../../screens/home_screen/home_screen.dart';
 import '../../services/profile/profile_service.dart';
 import '../../services/auth_wrapper.dart';
+import '../../services/analytics_service.dart';
 import '../../config/design_system.dart';
 import '../profile/profile_controller.dart';
 import '../../core/utils/common_methods.dart';
@@ -381,6 +382,15 @@ class LoginController extends GetxController {
         final user = userCredential.user!;
         print('✅ Authentication successful - User: ${user.email} (UID: ${user.uid})');
 
+        // Log analytics
+        final analytics = AnalyticsService();
+        analytics.setUserId(user.uid);
+        if (userCredential.additionalUserInfo?.isNewUser == true) {
+          analytics.logCompleteRegistration(method: 'email');
+        } else {
+          analytics.logLogin(method: 'email');
+        }
+
         // Clear auth cache to ensure fresh profile check
         print('🗑️ Clearing auth cache for fresh profile check...');
         AuthWrapper.clearCache();
@@ -551,6 +561,15 @@ class LoginController extends GetxController {
         final user = userCredential.user!;
         print('✅ Google sign-in successful - User: ${user.email}');
 
+        // Log analytics
+        final analytics = AnalyticsService();
+        analytics.setUserId(user.uid);
+        if (userCredential.additionalUserInfo?.isNewUser == true) {
+          analytics.logCompleteRegistration(method: 'google');
+        } else {
+          analytics.logLogin(method: 'google');
+        }
+
         // Clear auth cache
         AuthWrapper.clearCache();
 
@@ -712,6 +731,15 @@ class LoginController extends GetxController {
       if (userCredential.user != null) {
         final user = userCredential.user!;
         print('✅ Apple sign-in successful - User: ${user.email}');
+
+        // Log analytics
+        final analytics = AnalyticsService();
+        analytics.setUserId(user.uid);
+        if (userCredential.additionalUserInfo?.isNewUser == true) {
+          analytics.logCompleteRegistration(method: 'apple');
+        } else {
+          analytics.logLogin(method: 'apple');
+        }
 
         // Update display name if new user
         if (userCredential.additionalUserInfo?.isNewUser == true) {

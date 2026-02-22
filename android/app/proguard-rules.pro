@@ -63,6 +63,10 @@
 -keep class androidx.activity.result.** { *; }
 -dontwarn androidx.activity.result.**
 
+## Facebook SDK
+-keep class com.facebook.** { *; }
+-dontwarn com.facebook.**
+
 ## General Android
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile

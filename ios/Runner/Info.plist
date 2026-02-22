@@ -39,6 +39,12 @@
 					<string>app-1-1061746314202-ios-e762f516999c770008cee3</string>
 				</array>
 			</dict>
+			<dict>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>fb913463964511335</string>
+				</array>
+			</dict>
 		</array>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
@@ -64,6 +70,21 @@
 		<string>StepzSync needs access to your photo library to select profile pictures and images for your fitness journey.</string>
 		<key>NSUserNotificationsUsageDescription</key>
 		<string>StepzSync sends you motivational notifications and fitness goal reminders to keep you on track.</string>
+		<key>FacebookAppID</key>
+		<string>913463964511335</string>
+		<key>FacebookClientToken</key>
+		<string>5b4740b37c171f750ead16fb85cb4a7b</string>
+		<key>FacebookDisplayName</key>
+		<string>StepzSync</string>
+		<key>FacebookAutoLogAppEventsEnabled</key>
+		<true/>
+		<key>FacebookAdvertiserIDCollectionEnabled</key>
+		<true/>
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>fbapi</string>
+			<string>fb-messenger-share-api</string>
+		</array>
 		<key>FirebaseAppDelegateProxyEnabled</key>
 		<false/>
 		<key>GADApplicationIdentifier</key>

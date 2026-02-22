@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 
 import '../../core/models/race_data_model.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../services/analytics_service.dart';
 import '../../services/pending_requests_service.dart';
 import '../../services/race_invite_service.dart';
 import '../../services/race_service.dart';
@@ -77,6 +78,11 @@ class RacesListController extends GetxController {
       searchQuery.value = searchController.text;
     });
     ever(searchQuery, (_) => _applyFilters());
+    debounce(searchQuery, (query) {
+      if (query.isNotEmpty) {
+        AnalyticsService().logSearch(query: query);
+      }
+    }, time: const Duration(milliseconds: 800));
 
     // Listen to filter changes
     ever(selectedRaceType, (_) => _applyFilters());

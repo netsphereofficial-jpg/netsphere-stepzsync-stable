@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'analytics_service.dart';
 import 'preferences_service.dart';
 import 'firebase_service.dart';
 import 'firebase_subscription_service.dart';
@@ -21,6 +22,10 @@ class DependencyInjection {
     // Register Firebase service as immediate singleton
     // Firebase is already initialized at this point
     Get.put<FirebaseService>(FirebaseService(), permanent: true);
+
+    // Register AnalyticsService as immediate permanent singleton
+    // Logs events to both Firebase Analytics and Facebook App Events
+    Get.put<AnalyticsService>(AnalyticsService(), permanent: true);
 
     // ✅ Register CacheService for non-critical data caching (performance optimization)
     // SAFE: Never caches real-time race data, only browsing/viewing data
