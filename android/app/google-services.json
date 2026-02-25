@@ -1,0 +1,115 @@
+{
+  "project_info": {
+    "project_number": "1061746314202",
+    "firebase_url": "https://stepzsync-750f9-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "stepzsync-750f9",
+    "storage_bucket": "stepzsync-750f9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061746314202:android:d403cb0f9dedaa0008cee3",
+        "android_client_info": {
+          "package_name": "com.health.stepzsync.stepzsync"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1061746314202-20o786u18f9j1kj108521lv7ruq8f93f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.health.stepzsync.stepzsync",
+            "certificate_hash": "d9a988b0a775b45ceaaa4b86d4e376bd128ae8d3"
+          }
+        },
+        {
+          "client_id": "1061746314202-4oargr7uf5fpjd4n42gs8nghopi65l2u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.health.stepzsync.stepzsync",
+            "certificate_hash": "112b348d95e6b8a8f1c52c0e12e4a82ca38871e0"
+          }
+        },
+        {
+          "client_id": "1061746314202-4dsp29nq0m2sg3u0majjct0mgb1tt8f5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCn5oi2CaD6tGdnBF4ujI_gtXXgqvcGtPE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1061746314202-4dsp29nq0m2sg3u0majjct0mgb1tt8f5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1061746314202-lhk406odv08ulslum6seto95ml9uhu61.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.netsphere.stepzsync"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061746314202:android:9de59a461e7da3ce08cee3",
+        "android_client_info": {
+          "package_name": "com.netsphere.stepzsync"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1061746314202-cuhsg0r3euaq9kvjlqnsb7g5r14jmudv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.netsphere.stepzsync",
+            "certificate_hash": "112b348d95e6b8a8f1c52c0e12e4a82ca38871e0"
+          }
+        },
+        {
+          "client_id": "1061746314202-kvq5egtld00bjaqeb6q55h0i8ql7g80t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.netsphere.stepzsync",
+            "certificate_hash": "d9a988b0a775b45ceaaa4b86d4e376bd128ae8d3"
+          }
+        },
+        {
+          "client_id": "1061746314202-4dsp29nq0m2sg3u0majjct0mgb1tt8f5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCn5oi2CaD6tGdnBF4ujI_gtXXgqvcGtPE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1061746314202-4dsp29nq0m2sg3u0majjct0mgb1tt8f5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1061746314202-lhk406odv08ulslum6seto95ml9uhu61.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.netsphere.stepzsync"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

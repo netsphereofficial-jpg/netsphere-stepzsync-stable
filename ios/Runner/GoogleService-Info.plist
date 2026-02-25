@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>1061746314202-nsu64i933f87fe5eh5fffkipk1m6p5ep.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1061746314202-nsu64i933f87fe5eh5fffkipk1m6p5ep</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>1061746314202-20o786u18f9j1kj108521lv7ruq8f93f.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD2DmimsS1ObB85DKdbJ7Wfc6eomBRISfY</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1061746314202</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.health.stepzsync.stepzsync</string>
+	<key>PROJECT_ID</key>
+	<string>stepzsync-750f9</string>
+	<key>STORAGE_BUCKET</key>
+	<string>stepzsync-750f9.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<true></true>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<true></true>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1061746314202:ios:e762f516999c770008cee3</string>
+	<key>DATABASE_URL</key>
+	<string>https://stepzsync-750f9-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+</dict>
+</plist>
