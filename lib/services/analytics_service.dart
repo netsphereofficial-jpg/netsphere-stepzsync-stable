@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:facebook_app_events/facebook_app_events.dart';
 import 'package:flutter/foundation.dart';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 
 /// Unified analytics service that logs events to both Firebase Analytics
 /// and Facebook App Events for ad performance tracking.
@@ -21,7 +23,15 @@ class AnalyticsService {
   Future<void> initialize() async {
     if (_initialized) return;
     try {
+      // Request ATT permission on iOS before enabling analytics
+      if (Platform.isIOS) {
+        final status =
+            await AppTrackingTransparency.requestTrackingAuthorization();
+        debugPrint('[Analytics] ATT status: $status');
+      }
+
       await _firebaseAnalytics.setAnalyticsCollectionEnabled(true);
+      await _firebaseAnalytics.logAppOpen();
       _initialized = true;
       debugPrint('[Analytics] Initialized');
     } catch (e) {

@@ -10,6 +10,7 @@ import '../../../config/app_colors.dart';
 import '../../../core/models/race_data_model.dart';
 import '../../../screens/race_map/race_map_screen.dart';
 import '../../../services/race_bot_service.dart';
+import '../../../services/race_service.dart';
 import '../../../widgets/common/custom_app_bar.dart';
 
 class QuickRaceWaitingRoomScreen extends StatefulWidget {
@@ -205,6 +206,20 @@ class _QuickRaceWaitingRoomScreenState extends State<QuickRaceWaitingRoomScreen>
     }
   }
 
+  void _leaveRace() {
+    log('[WAITING_ROOM] User leaving race: ${widget.raceId}');
+
+    // Cancel timers and subscriptions immediately
+    _countdownTimer?.cancel();
+    _participantsSubscription?.cancel();
+
+    // Fire-and-forget: clean up participant from Firebase
+    RaceService.leaveRace(widget.raceId);
+
+    // Navigate back immediately
+    Get.back();
+  }
+
   void _navigateToRaceMap() {
     if (_hasNavigated) return;
     _hasNavigated = true;
@@ -244,12 +259,16 @@ class _QuickRaceWaitingRoomScreenState extends State<QuickRaceWaitingRoomScreen>
     final progress = filledSlots / widget.maxParticipants;
 
     return PopScope(
-      canPop: false, // Prevent back navigation during waiting
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leaveRace();
+      },
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
         appBar: CustomAppBar(
           title: "Finding Racers...",
-          isBack: true, // Disable back button
+          isBack: true,
+          onBackClick: _leaveRace,
         ),
         body: SafeArea(
           child: Padding(
