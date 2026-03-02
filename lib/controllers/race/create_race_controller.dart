@@ -896,13 +896,23 @@ class CreateRaceController extends GetxController {
 
       print('✅ [CREATE_RACE] Creator baseline captured: $baselineSteps steps, ${baselineDistance.toStringAsFixed(2)} km, $baselineCalories kcal');
 
+      // Fetch user name from Firestore (consistent with join logic and quick_race_controller)
+      final userDoc = await _firebaseService.firestore
+          .collection('user_profiles')
+          .doc(currentUser.uid)
+          .get();
+      final userData = userDoc.data() ?? {};
+      final userName = userData['fullName'] ??
+          userData['firstName'] ??
+          userData['displayName'] ??
+          currentUser.displayName ??
+          currentUser.email?.split('@')[0] ??
+          'User';
+
       // Create participant for the race creator using new model
       final creatorParticipant = Participant(
         userId: currentUser.uid,
-        userName:
-            currentUser.displayName ??
-            currentUser.email?.split('@')[0] ??
-            'User',
+        userName: userName,
         distance: 0.0,
         remainingDistance: distance,
         rank: 1,
@@ -1000,10 +1010,7 @@ class CreateRaceController extends GetxController {
         durationMins: durationMins,
         genderPreferenceId: genderPreferenceId,
         organizerUserId: currentUser.uid,
-        organizerName:
-            currentUser.displayName ??
-            currentUser.email?.split('@')[0] ??
-            'User',
+        organizerName: userName,
         totalDistance: distance,
         statusId: formattedScheduleTimeDisplay.isNotEmpty ? 1 : 0,
         // statusId: 1 = Scheduled (has schedule time), statusId: 0 = Created (no schedule)

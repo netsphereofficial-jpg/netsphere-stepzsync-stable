@@ -30,7 +30,7 @@ class RaceService {
 
   // Collection reference
   static CollectionReference get _racesCollection => _firestore.collection('races');
-  static CollectionReference get _usersCollection => _firestore.collection('users_profile');
+  static CollectionReference get _usersCollection => _firestore.collection('user_profiles');
 
   /// Get count of users in a specific city
   static Future<int> getUserCountByCity(String city) async {

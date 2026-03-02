@@ -616,19 +616,19 @@ class FirebaseService {
   }
 
   /// Robust user profile fetcher with multiple fallbacks
-  /// Tries: 1) users_profile collection, 2) Firebase Auth, 3) Generate from userId
+  /// Tries: 1) user_profiles collection, 2) Firebase Auth, 3) Generate from userId
   static Future<Map<String, dynamic>> getUserProfileWithFallback(String userId) async {
     final firestore = FirebaseFirestore.instance;
     final auth = FirebaseAuth.instance;
 
     try {
-      // 1. Try users_profile collection
-      final userDoc = await firestore.collection('users_profile').doc(userId).get();
+      // 1. Try user_profiles collection
+      final userDoc = await firestore.collection('user_profiles').doc(userId).get();
       if (userDoc.exists) {
         final data = userDoc.data();
-        if (data != null && (data['username'] != null || data['displayName'] != null || data['fullName'] != null)) {
-          // Priority: username > displayName > fullName
-          final displayName = data['username'] ?? data['displayName'] ?? data['fullName'] ?? '';
+        if (data != null && (data['fullName'] != null || data['username'] != null || data['displayName'] != null)) {
+          // Priority: fullName > username > displayName
+          final displayName = data['fullName'] ?? data['username'] ?? data['displayName'] ?? '';
           if (displayName.isNotEmpty) {
             log('✅ Found user profile for $userId: $displayName');
             return {
