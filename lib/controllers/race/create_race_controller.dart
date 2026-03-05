@@ -6,11 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/models/race_data_model.dart';
+import '../../core/themes/app_colors.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../models/subscription_models.dart';
 import '../../screens/active_races/active_races_screen.dart';
+import '../../screens/subscription/subscription_screen.dart';
+import '../../services/firebase_subscription_service.dart';
 import '../../screens/home/homepage_screen/controllers/homepage_data_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/auth/firebase_auth_service.dart';
@@ -799,8 +804,25 @@ class CreateRaceController extends GetxController {
     return true; // Always allow
   }
 
-  void showRaceSummaryDialog() {
+  Future<void> showRaceSummaryDialog() async {
     if (!_validateRaceDetails()) return;
+
+    // ✅ FREE TIER CHECK: Enforce race creation limit for free users
+    final subscriptionService = Get.find<FirebaseSubscriptionService>();
+    final currentPlan = subscriptionService.currentSubscription.value.currentPlan;
+    if (currentPlan == SubscriptionPlanType.free) {
+      final limit = FeatureManager.getLimit(FeatureType.createRaces, currentPlan);
+      if (limit != -1) {
+        final currentUser = await FirebaseAuthService.currentUser;
+        if (currentUser != null) {
+          final activeCount = await _getActiveCreatedRaceCount(currentUser.uid);
+          if (activeCount >= limit) {
+            _showCreateRaceLimitDialog(limit);
+            return;
+          }
+        }
+      }
+    }
 
     // Navigate to race summary screen instead of showing dialog
     Get.to(
@@ -810,6 +832,189 @@ class CreateRaceController extends GetxController {
       ),
       transition: Transition.rightToLeft,
       duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  /// Get count of active races created by this user (excludes quick races)
+  Future<int> _getActiveCreatedRaceCount(String userId) async {
+    try {
+      final snapshot = await _firebaseService.firestore
+          .collection('races')
+          .where('organizerUserId', isEqualTo: userId)
+          .where('statusId', whereIn: [0, 1, 3, 6]) // waiting, countdown, active, paused
+          .get();
+      // Filter out quick races (raceTypeId 5) client-side
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        return (data['raceTypeId'] ?? 0) != 5;
+      }).length;
+    } catch (e) {
+      log('Error querying active created race count: $e');
+      return 0;
+    }
+  }
+
+  /// Show dialog when race creation limit is reached
+  void _showCreateRaceLimitDialog(int limit) {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.flag, color: Colors.orange, size: 28),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Race Limit Reached',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Free users can have $limit active race${limit == 1 ? '' : 's'} at a time. '
+              'Finish or wait for your current race to end, or upgrade for more races!',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Maybe Later',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.to(() => SubscriptionScreen());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Upgrade Now',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show paywall dialog for free users trying to create races
+  void _showCreateRacePaywall() {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.workspace_premium, color: Colors.amber, size: 28),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Premium Feature',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Race creation is a premium feature. Upgrade to unlock:',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 12),
+            _buildBenefitRow(Icons.flag, 'Create unlimited races'),
+            _buildBenefitRow(Icons.category, 'All race types'),
+            _buildBenefitRow(Icons.directions_run, 'Marathons'),
+            _buildBenefitRow(Icons.bar_chart, 'Advanced statistics'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.flash_on, color: Colors.orange, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tip: Quick Races are free! Try them from the home screen.',
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.blue[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Maybe Later',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.to(() => SubscriptionScreen());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Upgrade Now',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenefitRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

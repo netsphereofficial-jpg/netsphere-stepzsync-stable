@@ -181,6 +181,24 @@ class SubscriptionPlan {
     ];
   }
 
+  SubscriptionPlan copyWithPrice(String price) {
+    return SubscriptionPlan(
+      type: type,
+      name: name,
+      subtitle: subtitle,
+      emoji: emoji,
+      price: price,
+      originalPrice: originalPrice,
+      billingPeriod: billingPeriod,
+      badge: badge,
+      features: features,
+      isPopular: isPopular,
+      isCurrent: isCurrent,
+      googlePlayProductId: googlePlayProductId,
+      appleProductId: appleProductId,
+    );
+  }
+
   static SubscriptionPlan getFreePlan() {
     return getAllPlans().firstWhere((plan) => plan.type == SubscriptionPlanType.free);
   }
@@ -224,8 +242,7 @@ class UserSubscription {
   });
 
   bool get isActive => status == SubscriptionStatus.active;
-  // bool get isPremium => currentPlan != SubscriptionPlanType.free && isActive;
-  bool get isPremium => true;
+  bool get isPremium => currentPlan != SubscriptionPlanType.free && isActive;
   bool get isExpiringSoon {
     if (expiryDate == null) return false;
     return expiryDate!.difference(DateTime.now()).inDays <= 7;
@@ -238,7 +255,7 @@ class UserSubscription {
       features: {
         'hasGlobalAccess': false,
         'maxRaces': 3,
-        'maxCreateRaces': 0,
+        'maxCreateRaces': 1,
         'maxQuickRaces': 1,
         'hasFullChat': true,
         'hasLeaderboards': false,

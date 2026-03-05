@@ -105,26 +105,10 @@ class IOSPaymentService extends PaymentService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    try {
-      // Initialize platform-specific features
-      if (Platform.isIOS) {
-        // iOS-specific initialization can be added here
-        debugPrint('Initializing iOS StoreKit features');
-      }
-
-      // Load products
-      await _loadProducts();
-      _isInitialized = true;
-
-      debugPrint('iOS payment service initialized successfully');
-    } catch (e) {
-      debugPrint('Failed to initialize iOS payment service: $e');
-      throw PaymentError(
-        code: 'ios_init_failed',
-        message: 'Failed to initialize iOS payment service',
-        details: e.toString(),
-      );
-    }
+    debugPrint('Initializing iOS StoreKit features');
+    await _loadProducts();
+    _isInitialized = true;
+    debugPrint('iOS payment service initialized successfully (${_products.length} products loaded)');
   }
 
   Future<void> _loadProducts() async {
@@ -140,40 +124,29 @@ class IOSPaymentService extends PaymentService {
 
     debugPrint('🔍 Querying iOS products: $productIds');
 
+    _products = [];
+
     try {
       final ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(productIds);
 
       if (response.error != null) {
         debugPrint('❌ Product query error: ${response.error}');
-        throw PaymentError(
-          code: 'product_query_failed',
-          message: 'Failed to query products from App Store',
-          details: response.error.toString(),
-        );
+      } else {
+        _products = response.productDetails;
       }
 
       if (response.notFoundIDs.isNotEmpty) {
         debugPrint('⚠️ Products not found in App Store Connect: ${response.notFoundIDs}');
-        debugPrint('💡 Make sure these products are created and approved in App Store Connect');
       }
 
-      _products = response.productDetails;
       debugPrint('✅ Loaded ${_products.length} products from App Store');
 
       if (_products.isEmpty) {
-        debugPrint('⚠️ No products loaded. For testing:');
-        debugPrint('1. Create products in App Store Connect with IDs: $productIds');
-        debugPrint('2. Wait for approval (can take 24-48 hours)');
-        debugPrint('3. Test with sandbox user account');
+        debugPrint('⚠️ No products loaded. This is expected in debug/simulator builds.');
+        debugPrint('For purchase testing: use sandbox user account on a real device.');
       }
-
     } catch (e) {
       debugPrint('❌ Failed to load iOS products: $e');
-      throw PaymentError(
-        code: 'product_load_failed',
-        message: 'Failed to load products from App Store',
-        details: e.toString(),
-      );
     }
   }
 
@@ -313,9 +286,19 @@ class IOSPaymentService extends PaymentService {
       await initialize();
     }
 
-    return SubscriptionPlan.getAllPlans()
+    final plans = SubscriptionPlan.getAllPlans()
         .where((plan) => plan.appleProductId != null)
         .toList();
+
+    return plans.map((plan) {
+      final productDetails = _products
+          .cast<ProductDetails?>()
+          .firstWhere((p) => p?.id == plan.appleProductId, orElse: () => null);
+      if (productDetails != null) {
+        return plan.copyWithPrice(productDetails.price);
+      }
+      return plan;
+    }).toList();
   }
 
   @override
@@ -347,75 +330,72 @@ class AndroidPaymentService extends PaymentService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    try {
-      // Initialize platform-specific features
-      if (Platform.isAndroid) {
-        // Android-specific initialization can be added here
-        debugPrint('Initializing Android Google Play Billing features');
-      }
-
-      // Load products
-      await _loadProducts();
-      _isInitialized = true;
-
-      debugPrint('Android payment service initialized successfully');
-    } catch (e) {
-      debugPrint('Failed to initialize Android payment service: $e');
-      throw PaymentError(
-        code: 'android_init_failed',
-        message: 'Failed to initialize Android payment service',
-        details: e.toString(),
-      );
-    }
+    debugPrint('Initializing Android Google Play Billing features');
+    await _loadProducts();
+    _isInitialized = true;
+    debugPrint('Android payment service initialized successfully (${_products.length} products loaded)');
   }
 
   Future<void> _loadProducts() async {
-    final Set<String> productIds = SubscriptionPlan.getAllPlans()
+    final allPlans = SubscriptionPlan.getAllPlans()
         .where((plan) => plan.googlePlayProductId != null)
+        .toList();
+
+    final Set<String> subscriptionIds = allPlans
+        .where((plan) => plan.billingPeriod == '/month' || plan.billingPeriod == '/year')
         .map((plan) => plan.googlePlayProductId!)
         .toSet();
 
-    if (productIds.isEmpty) {
-      debugPrint('⚠️ No Android product IDs configured');
-      return;
+    final Set<String> oneTimeIds = allPlans
+        .where((plan) => plan.billingPeriod == 'one-time')
+        .map((plan) => plan.googlePlayProductId!)
+        .toSet();
+
+    _products = [];
+
+    // Query subscriptions
+    if (subscriptionIds.isNotEmpty) {
+      debugPrint('🔍 Querying Android subscriptions: $subscriptionIds');
+      try {
+        final response = await _inAppPurchase.queryProductDetails(subscriptionIds);
+        if (response.error != null) {
+          debugPrint('❌ Subscription query error: ${response.error}');
+        } else {
+          _products.addAll(response.productDetails);
+          debugPrint('✅ Found ${response.productDetails.length} subscriptions');
+        }
+        if (response.notFoundIDs.isNotEmpty) {
+          debugPrint('⚠️ Subscriptions not found: ${response.notFoundIDs}');
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to query subscriptions: $e');
+      }
     }
 
-    debugPrint('🔍 Querying Android products: $productIds');
-
-    try {
-      final ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(productIds);
-
-      if (response.error != null) {
-        debugPrint('❌ Product query error: ${response.error}');
-        throw PaymentError(
-          code: 'product_query_failed',
-          message: 'Failed to query products from Google Play',
-          details: response.error.toString(),
-        );
+    // Query one-time products
+    if (oneTimeIds.isNotEmpty) {
+      debugPrint('🔍 Querying Android one-time products: $oneTimeIds');
+      try {
+        final response = await _inAppPurchase.queryProductDetails(oneTimeIds);
+        if (response.error != null) {
+          debugPrint('❌ One-time product query error: ${response.error}');
+        } else {
+          _products.addAll(response.productDetails);
+          debugPrint('✅ Found ${response.productDetails.length} one-time products');
+        }
+        if (response.notFoundIDs.isNotEmpty) {
+          debugPrint('⚠️ One-time products not found: ${response.notFoundIDs}');
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to query one-time products: $e');
       }
+    }
 
-      if (response.notFoundIDs.isNotEmpty) {
-        debugPrint('⚠️ Products not found in Google Play Console: ${response.notFoundIDs}');
-        debugPrint('💡 Make sure these products are created and activated in Google Play Console');
-      }
+    debugPrint('✅ Total loaded: ${_products.length} products from Google Play');
 
-      _products = response.productDetails;
-      debugPrint('✅ Loaded ${_products.length} products from Google Play');
-
-      if (_products.isEmpty) {
-        debugPrint('⚠️ No products loaded. For testing:');
-        debugPrint('1. Create products in Google Play Console with IDs: $productIds');
-        debugPrint('2. Activate the products');
-        debugPrint('3. Test with internal testing track');
-      }
-
-    } catch (e) {
-      debugPrint('❌ Failed to load Android products: $e');
-      throw PaymentError(
-        code: 'product_load_failed',
-        message: 'Failed to load products from Google Play',
-        details: e.toString(),
-      );
+    if (_products.isEmpty) {
+      debugPrint('⚠️ No products loaded. This is expected in debug builds.');
+      debugPrint('For purchase testing: build release APK, upload to internal testing track, install on tester device.');
     }
   }
 
@@ -540,7 +520,7 @@ class AndroidPaymentService extends PaymentService {
     try {
       // Redirect to Google Play subscription management
       if (Platform.isAndroid) {
-        const String subscriptionUrl = 'https://play.google.com/store/account/subscriptions?package=com.health.stepzsync.stepzsync';
+        const String subscriptionUrl = 'https://play.google.com/store/account/subscriptions?package=com.netsphere.stepzsync';
         debugPrint('Please direct user to Google Play subscription management');
         // You would use url_launcher to open this URL
       }
@@ -555,9 +535,19 @@ class AndroidPaymentService extends PaymentService {
       await initialize();
     }
 
-    return SubscriptionPlan.getAllPlans()
+    final plans = SubscriptionPlan.getAllPlans()
         .where((plan) => plan.googlePlayProductId != null)
         .toList();
+
+    return plans.map((plan) {
+      final productDetails = _products
+          .cast<ProductDetails?>()
+          .firstWhere((p) => p?.id == plan.googlePlayProductId, orElse: () => null);
+      if (productDetails != null) {
+        return plan.copyWithPrice(productDetails.price);
+      }
+      return plan;
+    }).toList();
   }
 
   @override

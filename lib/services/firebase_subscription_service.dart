@@ -339,7 +339,7 @@ class FeatureManager {
       FeatureType.globalRaces: false,
       FeatureType.countryRaces: true,
       FeatureType.joinRaces: 3,
-      FeatureType.createRaces: 2,
+      FeatureType.createRaces: 1,
       FeatureType.marathons: false,
       FeatureType.advancedStats: false,
       FeatureType.heartRateZones: false,
@@ -347,7 +347,7 @@ class FeatureManager {
       FeatureType.hallOfFame: false,
       FeatureType.groupChat: false,
       FeatureType.quickRaceLimit: 1,
-      FeatureType.canCreateRaces: false,
+      FeatureType.canCreateRaces: true,
       FeatureType.fullChat: true,
     },
     SubscriptionPlanType.premium1: {

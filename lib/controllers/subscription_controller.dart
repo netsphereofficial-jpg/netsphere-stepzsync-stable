@@ -258,7 +258,7 @@ class SubscriptionController extends GetxController {
               );
 
               // Navigate back if we're in the subscription screen
-              if (Get.currentRoute.contains('subscription')) {
+              if (Get.currentRoute.contains('subscription') || Get.currentRoute.contains('free-trial')) {
                 Get.back();
               }
             }
@@ -278,14 +278,35 @@ class SubscriptionController extends GetxController {
         // Complete the purchase (required for both platforms)
         await InAppPurchase.instance.completePurchase(purchase);
 
+      } else if (purchase.status == PurchaseStatus.restored) {
+        // Restored purchase (triggered by restorePurchases())
+        debugPrint('Purchase restored: ${purchase.productID}');
+
+        try {
+          // Validate restored purchase with server
+          debugPrint('🔐 Validating restored purchase with server...');
+          final validationResult = await _validationService.validatePurchase(purchase);
+
+          if (validationResult['success'] == true) {
+            debugPrint('✅ Restored purchase validated');
+          } else {
+            debugPrint('⚠️ Restored purchase validation returned success=false');
+          }
+        } catch (e) {
+          debugPrint('❌ Restored purchase validation failed: $e');
+        }
+
+        // Complete the purchase (required for both platforms)
+        await InAppPurchase.instance.completePurchase(purchase);
+
       } else if (purchase.status == PurchaseStatus.error) {
         // Purchase failed
         debugPrint('Purchase failed: ${purchase.error?.message}');
 
-        // SnackbarUtils.showError(
-        //   'Purchase Failed',
-        //   purchase.error?.message ?? 'Purchase failed. Please try again.',
-        // );
+        SnackbarUtils.showError(
+          'Purchase Failed',
+          purchase.error?.message ?? 'Purchase failed. Please try again.',
+        );
 
       } else if (purchase.status == PurchaseStatus.canceled) {
         // Purchase cancelled
@@ -303,10 +324,10 @@ class SubscriptionController extends GetxController {
 
     } catch (e) {
       debugPrint('Error processing purchase: $e');
-      // SnackbarUtils.showError(
-      //   'Purchase Error',
-      //   'Failed to process purchase: ${e.toString()}',
-      // );
+      SnackbarUtils.showError(
+        'Purchase Error',
+        'Failed to process purchase: ${e.toString()}',
+      );
 
       isPurchasing.value = false;
       selectedPlan.value = null;
@@ -316,10 +337,10 @@ class SubscriptionController extends GetxController {
   /// Handle purchase stream errors
   void _handlePurchaseError(dynamic error) {
     debugPrint('Purchase stream error: $error');
-    // SnackbarUtils.showError(
-    //   'Payment Error',
-    //   'Payment service encountered an error. Please try again.',
-    // );
+    SnackbarUtils.showError(
+      'Payment Error',
+      'Payment service encountered an error. Please try again.',
+    );
 
     isPurchasing.value = false;
     selectedPlan.value = null;
@@ -362,17 +383,17 @@ class SubscriptionController extends GetxController {
       } else if (result.result == PaymentResult.failed) {
         // Immediate failure
         final errorMessage = result.error?.message ?? 'Failed to start purchase process.';
-        // SnackbarUtils.showError('Purchase Failed', errorMessage);
+        SnackbarUtils.showError('Purchase Failed', errorMessage);
 
         isPurchasing.value = false;
         selectedPlan.value = null;
       }
 
     } catch (e) {
-      // SnackbarUtils.showError(
-      //   'Purchase Error',
-      //   'An unexpected error occurred: ${e.toString()}',
-      // );
+      SnackbarUtils.showError(
+        'Purchase Error',
+        'An unexpected error occurred: ${e.toString()}',
+      );
 
       isPurchasing.value = false;
       selectedPlan.value = null;
@@ -385,10 +406,16 @@ class SubscriptionController extends GetxController {
       isRestoring.value = true;
       HapticFeedback.lightImpact();
 
-      final results = await _paymentService.restorePurchases();
+      // Trigger restore — restored purchases arrive via the purchase stream
+      await _paymentService.restorePurchases();
 
-      if (results.isNotEmpty) {
-        await loadCurrentSubscription();
+      // Wait for the stream to process restored purchases
+      await Future.delayed(const Duration(seconds: 3));
+
+      // Reload subscription from Firestore to check if restore succeeded
+      await loadCurrentSubscription();
+
+      if (currentSubscription.value.isPremium) {
         SnackbarUtils.showSuccess(
           'Purchases Restored',
           'Your previous purchases have been restored successfully.',
@@ -401,10 +428,10 @@ class SubscriptionController extends GetxController {
       }
 
     } catch (e) {
-      // SnackbarUtils.showError(
-      //   'Restore Failed',
-      //   'Failed to restore purchases: ${e.toString()}',
-      // );
+      SnackbarUtils.showError(
+        'Restore Failed',
+        'Failed to restore purchases: ${e.toString()}',
+      );
     } finally {
       isRestoring.value = false;
     }
@@ -424,10 +451,10 @@ class SubscriptionController extends GetxController {
       );
 
     } catch (e) {
-      // SnackbarUtils.showError(
-      //   'Error',
-      //   'Failed to open subscription management: ${e.toString()}',
-      // );
+      SnackbarUtils.showError(
+        'Error',
+        'Failed to open subscription management: ${e.toString()}',
+      );
     }
   }
 
@@ -624,7 +651,7 @@ class SubscriptionController extends GetxController {
         features = {
           'hasGlobalAccess': false,
           'maxRaces': 3,
-          'maxCreateRaces': 0,
+          'maxCreateRaces': 1,
           'maxQuickRaces': 1,
           'hasFullChat': true,
           'hasLeaderboards': false,
