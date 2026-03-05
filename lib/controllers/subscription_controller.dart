@@ -544,14 +544,22 @@ class SubscriptionController extends GetxController {
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(result: false),
+            onPressed: () {
+              if (Get.isDialogOpen == true) {
+                Get.back(result: false, closeOverlays: false);
+              }
+            },
             child: Text(
               'Cancel',
               style: TextStyle(color: Colors.grey[600]),
             ),
           ),
           ElevatedButton(
-            onPressed: () => Get.back(result: true),
+            onPressed: () {
+              if (Get.isDialogOpen == true) {
+                Get.back(result: true, closeOverlays: false);
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
@@ -592,14 +600,22 @@ class SubscriptionController extends GetxController {
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(result: false),
+            onPressed: () {
+              if (Get.isDialogOpen == true) {
+                Get.back(result: false, closeOverlays: false);
+              }
+            },
             child: Text(
               'Stay Here',
               style: TextStyle(color: Colors.grey[600]),
             ),
           ),
           ElevatedButton(
-            onPressed: () => Get.back(result: true),
+            onPressed: () {
+              if (Get.isDialogOpen == true) {
+                Get.back(result: true, closeOverlays: false);
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,

@@ -23,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppDesignColors.background,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
             horizontal: AppSpacing.screenHorizontal,
             vertical: AppSpacing.screenVertical,
@@ -194,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ],
 
-                Spacer(),
+                SizedBox(height: 32),
 
                 // Bottom Sign Up Link
                 Center(
