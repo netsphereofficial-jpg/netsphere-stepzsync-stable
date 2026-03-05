@@ -25,7 +25,6 @@ class _FreeTrialScreenState extends State<FreeTrialScreen>
   static const _bg = Color(0xFF0B0F1E);
   static const _cardBg = Color(0xFF141929);
   static const _accent = Color(0xFF6C5CE7);
-  static const _accentLight = Color(0xFF8B7CF6);
   static const _green = Color(0xFF00D68F);
   static const _gold = Color(0xFFFFD93D);
   static const _cardBorder = Color(0xFF1E2440);
@@ -105,9 +104,9 @@ class _FreeTrialScreenState extends State<FreeTrialScreen>
                         const SizedBox(height: 4),
                         _buildHeroSection(),
                         const SizedBox(height: 20),
-                        _buildFeaturesList(),
-                        const SizedBox(height: 20),
                         _buildPlanSelector(plans),
+                        const SizedBox(height: 18),
+                        _buildFeaturesList(),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -248,117 +247,65 @@ class _FreeTrialScreenState extends State<FreeTrialScreen>
 
   Widget _buildFeaturesList() {
     final features = [
-      _FeatureItem(Icons.flash_on_rounded, 'Unlimited Quick Races', 'No cooldown limits'),
-      _FeatureItem(Icons.emoji_events_rounded, 'Create & Join Races', 'Up to 7 active races'),
-      _FeatureItem(Icons.leaderboard_rounded, 'Leaderboards', 'Country-level rankings'),
-      _FeatureItem(Icons.insights_rounded, 'Advanced Statistics', 'Heart-rate zones, filters & more'),
-      _FeatureItem(Icons.directions_run_rounded, 'Marathon Mode', 'Coming soon'),
+      ('Unlimited Quick Races', false),
+      ('Create & Join up to 7 Races', false),
+      ('Country Leaderboards', false),
+      ('Advanced Stats & Heart-Rate Zones', false),
+      ('Full Breathing & Recovery Pack', false),
+      ('Marathon Mode', true),
     ];
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _cardBorder),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'WHAT YOU GET',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: _accentLight,
-                  letterSpacing: 1.5,
+        children: features.asMap().entries.map((entry) {
+          final i = entry.key;
+          final (text, comingSoon) = entry.value;
+          return Padding(
+            padding: EdgeInsets.only(bottom: i < features.length - 1 ? 10 : 0),
+            child: Row(
+              children: [
+                Icon(
+                  comingSoon ? Icons.schedule_rounded : Icons.check_circle_rounded,
+                  size: 17,
+                  color: comingSoon ? _gold.withValues(alpha: 0.7) : _green.withValues(alpha: 0.8),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(height: 1, color: _cardBorder),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...features.asMap().entries.map((entry) {
-            final i = entry.key;
-            final f = entry.value;
-            final isLast = f.subtitle == 'Coming soon';
-            return Padding(
-              padding: EdgeInsets.only(bottom: i < features.length - 1 ? 12 : 0),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: isLast
-                          ? _gold.withValues(alpha: 0.12)
-                          : _accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      f.icon,
-                      size: 18,
-                      color: isLast ? _gold : _accentLight,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: comingSoon
+                          ? Colors.white.withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          f.title,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.9),
-                          ),
-                        ),
-                        Text(
-                          f.subtitle,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: isLast ? _gold.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.4),
-                          ),
-                        ),
-                      ],
+                ),
+                if (comingSoon)
+                  Text(
+                    'SOON',
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: _gold.withValues(alpha: 0.6),
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  if (isLast)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: _gold.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'SOON',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: _gold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    )
-                  else
-                    Icon(Icons.check_circle_rounded, size: 18, color: _green.withValues(alpha: 0.8)),
-                ],
-              ),
-            ).animate()
-              .fadeIn(duration: 300.ms, delay: Duration(milliseconds: 350 + i * 60))
-              .slideX(begin: 0.05, end: 0, duration: 300.ms, delay: Duration(milliseconds: 350 + i * 60));
-          }),
-        ],
+              ],
+            ),
+          ).animate()
+            .fadeIn(duration: 250.ms, delay: Duration(milliseconds: 450 + i * 50));
+        }).toList(),
       ),
     ).animate()
-      .fadeIn(duration: 400.ms, delay: 300.ms);
+      .fadeIn(duration: 300.ms, delay: 400.ms);
   }
 
   Widget _buildPlanSelector(List<SubscriptionPlan> plans) {
@@ -617,11 +564,4 @@ class _FreeTrialScreenState extends State<FreeTrialScreen>
       ),
     );
   }
-}
-
-class _FeatureItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  const _FeatureItem(this.icon, this.title, this.subtitle);
 }
