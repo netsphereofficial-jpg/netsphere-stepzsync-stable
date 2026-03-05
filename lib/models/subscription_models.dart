@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum SubscriptionPlanType {
   free,
   premium1,
-  premium2,
   lifetime,
 }
 
@@ -86,7 +85,8 @@ class SubscriptionPlan {
         features: [
           SubscriptionFeature.limited("City-only races", "City only"),
           SubscriptionFeature.limited("Join races", "Up to 3 races"),
-          SubscriptionFeature.limited("Create races", "Up to 2 races"),
+          SubscriptionFeature.unavailable("No race creation"),
+          SubscriptionFeature.limited("Quick races", "1 active at a time"),
           SubscriptionFeature.unavailable("No marathons"),
           SubscriptionFeature.limited("Basic statistics", "distance, time, HR, calories"),
           SubscriptionFeature.available("Basic BPM tracking"),
@@ -94,21 +94,20 @@ class SubscriptionPlan {
           SubscriptionFeature.available("Basic breathing mode"),
           SubscriptionFeature.available("Basic event notifications"),
           SubscriptionFeature.available("Add/remove/search friends"),
-          SubscriptionFeature.limited("Basic 1-on-1 chat", "no history"),
+          SubscriptionFeature.available("Full 1-on-1 chat"),
+          SubscriptionFeature.available("Quick race chat"),
           SubscriptionFeature.unavailable("No leaderboards"),
           SubscriptionFeature.unavailable("No Hall of Fame"),
           SubscriptionFeature.available("Basic race invites"),
         ],
       ),
 
-      // Premium 1 Plan
+      // Premium 1 Monthly Plan
       SubscriptionPlan(
         type: SubscriptionPlanType.premium1,
         name: "Premium 1",
         subtitle: "Country Access",
         emoji: "⭐",
-        price: "\$9.99",
-        originalPrice: "\$14.99",
         billingPeriod: "/month",
         badge: "POPULAR",
         isPopular: true,
@@ -132,56 +131,51 @@ class SubscriptionPlan {
         ],
       ),
 
-      // Premium 2 Plan
+      // Premium 1 Yearly Plan
       SubscriptionPlan(
-        type: SubscriptionPlanType.premium2,
-        name: "Premium 2",
-        subtitle: "World/Elite Access",
-        emoji: "🏆",
-        price: "\$19.99",
-        originalPrice: "\$29.99",
-        billingPeriod: "/month",
+        type: SubscriptionPlanType.premium1,
+        name: "Premium 1",
+        subtitle: "Country Access (Yearly)",
+        emoji: "⭐",
+        billingPeriod: "/year",
         badge: "BEST VALUE",
-        googlePlayProductId: "premium_2_monthly",
-        appleProductId: "premium_2_monthly",
+        googlePlayProductId: "premium_1_yearly",
+        appleProductId: "premium_1_yearly",
         features: [
-          SubscriptionFeature.available("Global races (worldwide)"),
-          SubscriptionFeature.limited("Join races", "Up to 20 races"),
-          SubscriptionFeature.limited("Create races", "Up to 20 races"),
-          SubscriptionFeature.limited("International marathons", "up to 20"),
-          SubscriptionFeature.available("Advanced statistics + global comparison"),
-          SubscriptionFeature.available("Full heart-rate analysis + effort scoring"),
-          SubscriptionFeature.available("Global calorie & effort benchmarks"),
-          SubscriptionFeature.available("Elite breathing pack + custom rhythms"),
-          SubscriptionFeature.available("Advanced scheduling + marathon reminders"),
-          SubscriptionFeature.available("Full friend insights + global challenge history"),
-          SubscriptionFeature.available("Advanced chat (group chat, delete/archive, history)"),
-          SubscriptionFeature.available("Global/regional/age-group leaderboards"),
-          SubscriptionFeature.available("Hall of Fame (badges & achievements showcase)"),
-          SubscriptionFeature.available("Exclusive global invites + team battles"),
+          SubscriptionFeature.limited("City + Country races", "Country level"),
+          SubscriptionFeature.limited("Join races", "Up to 7 races"),
+          SubscriptionFeature.limited("Create races", "Up to 7 races"),
+          SubscriptionFeature.available("Local/Country marathons"),
+          SubscriptionFeature.available("Advanced statistics + filters"),
+          SubscriptionFeature.available("Heart-rate zones + recovery insights"),
+          SubscriptionFeature.available("Detailed calorie & effort analysis"),
+          SubscriptionFeature.available("Full breathing pack (relax, focus, recovery)"),
+          SubscriptionFeature.available("Custom reminders (hydration, pacing, countdowns)"),
+          SubscriptionFeature.available("Compare stats with friends locally"),
+          SubscriptionFeature.available("Same chat as free"),
+          SubscriptionFeature.available("Local/Country leaderboards"),
+          SubscriptionFeature.unavailable("No Hall of Fame"),
+          SubscriptionFeature.available("Country-level race invites"),
         ],
       ),
 
-      // Lifetime Plan - Christmas Special
+      // Lifetime Plan
       SubscriptionPlan(
         type: SubscriptionPlanType.lifetime,
         name: "Lifetime Premium",
         subtitle: "One-Time Payment",
         emoji: "⭐",
-        price: "\$299",
-        originalPrice: "\$600",
         billingPeriod: "one-time",
-        badge: "CHRISTMAS SPECIAL",
-        googlePlayProductId: "lifetime_premium",
-        appleProductId: "lifetime_premium",
+        badge: "LIFETIME",
+        googlePlayProductId: "premium_lifetime_onetime",
+        appleProductId: "premium_lifetime_onetime",
         features: [
-          SubscriptionFeature.available("🌍 All Premium 2 features"),
-          SubscriptionFeature.available("♾️ Lifetime access - pay once, use forever"),
-          SubscriptionFeature.available("🎄 50% OFF Christmas Special"),
-          SubscriptionFeature.available("🚫 No monthly fees ever"),
-          SubscriptionFeature.available("⚡ Priority customer support"),
-          SubscriptionFeature.available("🎁 Exclusive lifetime member badge"),
-          SubscriptionFeature.available("🔓 All future premium features included"),
+          SubscriptionFeature.available("All Premium features"),
+          SubscriptionFeature.available("Lifetime access - pay once, use forever"),
+          SubscriptionFeature.available("No monthly fees ever"),
+          SubscriptionFeature.available("Priority customer support"),
+          SubscriptionFeature.available("Exclusive lifetime member badge"),
+          SubscriptionFeature.available("All future premium features included"),
         ],
       ),
     ];
@@ -193,10 +187,6 @@ class SubscriptionPlan {
 
   static SubscriptionPlan getPremium1Plan() {
     return getAllPlans().firstWhere((plan) => plan.type == SubscriptionPlanType.premium1);
-  }
-
-  static SubscriptionPlan getPremium2Plan() {
-    return getAllPlans().firstWhere((plan) => plan.type == SubscriptionPlanType.premium2);
   }
 
   static SubscriptionPlan getLifetimePlan() {
@@ -214,6 +204,7 @@ class UserSubscription {
   final String? purchaseToken;
   final String? platform;
   final bool autoRenew;
+  final bool isTrialPeriod;
   final DateTime? lastValidated;
   final Map<String, dynamic> features;
 
@@ -227,6 +218,7 @@ class UserSubscription {
     this.purchaseToken,
     this.platform,
     this.autoRenew = false,
+    this.isTrialPeriod = false,
     this.lastValidated,
     this.features = const {},
   });
@@ -246,6 +238,9 @@ class UserSubscription {
       features: {
         'hasGlobalAccess': false,
         'maxRaces': 3,
+        'maxCreateRaces': 0,
+        'maxQuickRaces': 1,
+        'hasFullChat': true,
         'hasLeaderboards': false,
         'hasHallOfFame': false,
         'hasAdvancedStats': false,
@@ -268,6 +263,7 @@ class UserSubscription {
       purchaseToken: map['purchaseToken'] as String?,
       platform: map['platform'] as String?,
       autoRenew: map['autoRenew'] as bool? ?? false,
+      isTrialPeriod: map['isTrialPeriod'] as bool? ?? false,
       lastValidated: _parseTimestamp(map['lastValidated']),
       features: Map<String, dynamic>.from(map['features'] as Map? ?? {}),
     );
@@ -285,6 +281,7 @@ class UserSubscription {
       'purchaseToken': purchaseToken,
       'platform': platform,
       'autoRenew': autoRenew,
+      'isTrialPeriod': isTrialPeriod,
       'lastValidated': lastValidated != null ? Timestamp.fromDate(lastValidated!) : null,
       'features': features,
       'lastUpdated': FieldValue.serverTimestamp(),
@@ -296,8 +293,6 @@ class UserSubscription {
     switch (planType) {
       case 'premium1':
         return SubscriptionPlanType.premium1;
-      case 'premium2':
-        return SubscriptionPlanType.premium2;
       case 'lifetime':
         return SubscriptionPlanType.lifetime;
       case 'free':
@@ -343,6 +338,7 @@ class UserSubscription {
     String? purchaseToken,
     String? platform,
     bool? autoRenew,
+    bool? isTrialPeriod,
     DateTime? lastValidated,
     Map<String, dynamic>? features,
   }) {
@@ -356,6 +352,7 @@ class UserSubscription {
       purchaseToken: purchaseToken ?? this.purchaseToken,
       platform: platform ?? this.platform,
       autoRenew: autoRenew ?? this.autoRenew,
+      isTrialPeriod: isTrialPeriod ?? this.isTrialPeriod,
       lastValidated: lastValidated ?? this.lastValidated,
       features: features ?? this.features,
     );

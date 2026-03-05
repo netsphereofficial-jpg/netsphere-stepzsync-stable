@@ -47,6 +47,24 @@
       ]
     },
     {
+      "collectionGroup": "races",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "raceTypeId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "organizerUserId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [

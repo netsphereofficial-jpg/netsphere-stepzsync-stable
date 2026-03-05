@@ -74,6 +74,7 @@ exports.validateAppleReceipt = functions.https.onCall(async (data, context) => {
       originalTransactionId: validationResult.originalTransactionId,
       platform: 'ios',
       autoRenew: validationResult.autoRenew,
+      isTrialPeriod: validationResult.isTrialPeriod || false,
       lastValidated: admin.firestore.FieldValue.serverTimestamp(),
       features,
     };
@@ -84,7 +85,7 @@ exports.validateAppleReceipt = functions.https.onCall(async (data, context) => {
       {
         subscription: subscriptionData,
         subscriptionHistory: admin.firestore.FieldValue.arrayUnion({
-          action: 'purchased',
+          action: validationResult.isTrialPeriod ? 'trial_started' : 'purchased',
           plan: planType,
           transactionId: validationResult.transactionId,
           timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -151,21 +152,37 @@ exports.validateGooglePlayPurchase = functions.https.onCall(async (data, context
     // Parse service account JSON
     const serviceAccount = JSON.parse(serviceAccountJson);
 
-    // Validate purchase with Google Play
-    const validationResult = await googleValidator.validateGooglePlayPurchase(
-      packageName,
-      productId,
-      purchaseToken,
-      serviceAccount
-    );
-
-    // Acknowledge purchase (required for new purchases)
-    await googleValidator.acknowledgeGooglePlayPurchase(
-      packageName,
-      productId,
-      purchaseToken,
-      serviceAccount
-    );
+    // Route to correct validator based on product type
+    let validationResult;
+    if (googleValidator.isOneTimePurchase(productId)) {
+      // Lifetime / one-time in-app product
+      validationResult = await googleValidator.validateGooglePlayProduct(
+        packageName,
+        productId,
+        purchaseToken,
+        serviceAccount
+      );
+      await googleValidator.acknowledgeGooglePlayProduct(
+        packageName,
+        productId,
+        purchaseToken,
+        serviceAccount
+      );
+    } else {
+      // Auto-renewing subscription
+      validationResult = await googleValidator.validateGooglePlayPurchase(
+        packageName,
+        productId,
+        purchaseToken,
+        serviceAccount
+      );
+      await googleValidator.acknowledgeGooglePlayPurchase(
+        packageName,
+        productId,
+        purchaseToken,
+        serviceAccount
+      );
+    }
 
     // Map product ID to plan type
     const planType = googleValidator.getSubscriptionPlanFromProductId(productId);
@@ -187,6 +204,7 @@ exports.validateGooglePlayPurchase = functions.https.onCall(async (data, context
       purchaseToken: validationResult.purchaseToken,
       platform: 'android',
       autoRenew: validationResult.autoRenew,
+      isTrialPeriod: validationResult.isTrialPeriod || false,
       lastValidated: admin.firestore.FieldValue.serverTimestamp(),
       features,
     };
@@ -197,7 +215,7 @@ exports.validateGooglePlayPurchase = functions.https.onCall(async (data, context
       {
         subscription: subscriptionData,
         subscriptionHistory: admin.firestore.FieldValue.arrayUnion({
-          action: 'purchased',
+          action: validationResult.isTrialPeriod ? 'trial_started' : 'purchased',
           plan: planType,
           transactionId: validationResult.orderId,
           timestamp: admin.firestore.FieldValue.serverTimestamp(),

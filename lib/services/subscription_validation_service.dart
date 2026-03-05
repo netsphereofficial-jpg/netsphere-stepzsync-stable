@@ -127,7 +127,7 @@ class SubscriptionValidationService {
       final purchaseToken = purchase.verificationData.serverVerificationData;
       final productId = purchase.productID;
       // You'll need to configure your package name
-      const packageName = 'com.stepzsync.app'; // TODO: Update with your actual package name
+      const packageName = 'com.health.stepzsync.stepzsync';
 
       return await validateGooglePlayPurchase(
         productId: productId,

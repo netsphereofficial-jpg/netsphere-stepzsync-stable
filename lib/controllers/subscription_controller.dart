@@ -624,7 +624,9 @@ class SubscriptionController extends GetxController {
         features = {
           'hasGlobalAccess': false,
           'maxRaces': 3,
-          'maxCreateRaces': 2,
+          'maxCreateRaces': 0,
+          'maxQuickRaces': 1,
+          'hasFullChat': true,
           'hasLeaderboards': false,
           'hasHallOfFame': false,
           'hasAdvancedStats': false,
@@ -645,20 +647,6 @@ class SubscriptionController extends GetxController {
           'hasHeartRateZones': true,
           'hasMarathons': true,
           'hasGroupChat': false,
-        };
-        break;
-
-      case SubscriptionPlanType.premium2:
-        features = {
-          'hasGlobalAccess': true,
-          'maxRaces': 20,
-          'maxCreateRaces': 20,
-          'hasLeaderboards': true,
-          'hasHallOfFame': true,
-          'hasAdvancedStats': true,
-          'hasHeartRateZones': true,
-          'hasMarathons': true,
-          'hasGroupChat': true,
         };
         break;
 
@@ -717,6 +705,10 @@ class SubscriptionController extends GetxController {
 
   int get maxRaces => getFeatureLimit('maxRaces');
   int get maxCreateRaces => getFeatureLimit('maxCreateRaces');
+  int get quickRaceLimit => getFeatureLimit('maxQuickRaces');
+
+  bool get isFreePlan => currentSubscription.value.currentPlan == SubscriptionPlanType.free;
+  bool get canCreateRaces => !isFreePlan || hasFeatureAccess('canCreateRaces');
 
   /// Get the display name for the current subscription
   String get currentPlanDisplayName {
@@ -725,8 +717,6 @@ class SubscriptionController extends GetxController {
         return 'Free Plan';
       case SubscriptionPlanType.premium1:
         return 'Premium 1';
-      case SubscriptionPlanType.premium2:
-        return 'Premium 2';
       case SubscriptionPlanType.lifetime:
         return 'Lifetime Premium';
     }

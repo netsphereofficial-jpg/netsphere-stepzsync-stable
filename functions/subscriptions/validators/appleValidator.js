@@ -133,8 +133,8 @@ async function validateAppleReceipt(receiptData, sharedSecret, isProduction = tr
 function getSubscriptionPlanFromProductId(productId) {
   const planMap = {
     'premium_1_monthly': 'premium1',
-    'premium_2_monthly': 'premium2',
-    'lifetime_premium': 'lifetime',
+    'premium_1_yearly': 'premium1',
+    'premium_lifetime_onetime': 'lifetime',
   };
 
   return planMap[productId] || 'free';

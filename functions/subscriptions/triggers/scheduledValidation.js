@@ -128,7 +128,7 @@ async function validateUserSubscription(userDoc) {
       }
 
       const serviceAccount = JSON.parse(serviceAccountJson);
-      const packageName = config.android?.package_name || 'com.stepzsync.app';
+      const packageName = config.android?.package_name || 'com.netsphere.stepzsync';
       const productId = getProductIdFromPlan(currentPlan);
 
       validationResult = await googleValidator.validateGooglePlayPurchase(
@@ -215,8 +215,7 @@ async function updateSubscriptionData(userId, data) {
 function getProductIdFromPlan(planType) {
   const planMap = {
     premium1: 'premium_1_monthly',
-    premium2: 'premium_2_monthly',
-    lifetime: 'lifetime_premium',
+    lifetime: 'premium_lifetime_onetime',
   };
   return planMap[planType] || '';
 }

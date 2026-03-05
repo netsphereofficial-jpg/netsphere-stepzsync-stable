@@ -346,6 +346,9 @@ class FeatureManager {
       FeatureType.leaderboards: false,
       FeatureType.hallOfFame: false,
       FeatureType.groupChat: false,
+      FeatureType.quickRaceLimit: 1,
+      FeatureType.canCreateRaces: false,
+      FeatureType.fullChat: true,
     },
     SubscriptionPlanType.premium1: {
       FeatureType.globalRaces: false,
@@ -358,18 +361,9 @@ class FeatureManager {
       FeatureType.leaderboards: true,
       FeatureType.hallOfFame: false,
       FeatureType.groupChat: false,
-    },
-    SubscriptionPlanType.premium2: {
-      FeatureType.globalRaces: true,
-      FeatureType.countryRaces: true,
-      FeatureType.joinRaces: 20,
-      FeatureType.createRaces: 20,
-      FeatureType.marathons: true,
-      FeatureType.advancedStats: true,
-      FeatureType.heartRateZones: true,
-      FeatureType.leaderboards: true,
-      FeatureType.hallOfFame: true,
-      FeatureType.groupChat: true,
+      FeatureType.quickRaceLimit: -1,
+      FeatureType.canCreateRaces: true,
+      FeatureType.fullChat: true,
     },
   };
 
@@ -406,6 +400,9 @@ enum FeatureType {
   leaderboards,
   hallOfFame,
   groupChat,
+  quickRaceLimit,    // max concurrent active quick races (int, -1 = unlimited)
+  canCreateRaces,    // can create non-quick races (bool)
+  fullChat,          // full chat access with history (bool)
 }
 
 /// Subscription history entry model

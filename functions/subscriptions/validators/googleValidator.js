@@ -104,6 +104,7 @@ async function validateGooglePlayPurchase(
       userCancellationTime: purchase.userCancellationTimeMillis
         ? new Date(parseInt(purchase.userCancellationTimeMillis)).toISOString()
         : null,
+      isTrialPeriod: paymentState === 2,
       paymentState: getPaymentState(paymentState),
       priceAmountMicros: purchase.priceAmountMicros,
       priceCurrencyCode: purchase.priceCurrencyCode,
@@ -195,8 +196,8 @@ function getPaymentState(code) {
 function getSubscriptionPlanFromProductId(productId) {
   const planMap = {
     'premium_1_monthly': 'premium1',
-    'premium_2_monthly': 'premium2',
-    'lifetime_premium': 'lifetime',
+    'premium_1_yearly': 'premium1',
+    'premium_lifetime_onetime': 'lifetime',
   };
 
   return planMap[productId] || 'free';
@@ -256,9 +257,130 @@ function getFeaturesForPlan(planType) {
   return features[planType] || features.free;
 }
 
+/**
+ * Check if a product ID is a one-time (non-subscription) purchase
+ */
+function isOneTimePurchase(productId) {
+  return productId === 'premium_lifetime_onetime';
+}
+
+/**
+ * Validate a Google Play one-time in-app product purchase
+ * Used for premium_lifetime_onetime and other non-subscription products
+ */
+async function validateGooglePlayProduct(
+  packageName,
+  productId,
+  purchaseToken,
+  serviceAccountKey
+) {
+  try {
+    console.log('🤖 Validating Google Play in-app product...', { packageName, productId });
+
+    const androidPublisher = getPlayDeveloperClient(serviceAccountKey);
+
+    const response = await androidPublisher.purchases.products.get({
+      packageName,
+      productId,
+      token: purchaseToken,
+    });
+
+    const purchase = response.data;
+
+    // purchaseState: 0=purchased, 1=canceled, 2=pending
+    const purchaseState = purchase.purchaseState;
+    let status = 'active';
+    if (purchaseState === 1) {
+      status = 'cancelled';
+    } else if (purchaseState === 2) {
+      status = 'pending';
+    }
+
+    const purchaseTimeMillis = parseInt(purchase.purchaseTimeMillis);
+    const purchaseDate = new Date(purchaseTimeMillis);
+
+    // Lifetime products don't expire — set expiry far in the future
+    const expiryDate = new Date('2099-12-31T23:59:59Z');
+
+    console.log('✅ Google Play in-app product validated successfully', {
+      productId,
+      status,
+      orderId: purchase.orderId,
+    });
+
+    return {
+      success: true,
+      platform: 'android',
+      productId,
+      purchaseToken,
+      orderId: purchase.orderId,
+      purchaseDate: purchaseDate.toISOString(),
+      expiryDate: expiryDate.toISOString(),
+      status,
+      autoRenew: false, // One-time purchase, never renews
+      cancelReason: null,
+      userCancellationTime: null,
+      paymentState: purchaseState === 0 ? 'Received' : 'Pending',
+      consumptionState: purchase.consumptionState,
+      developerPayload: purchase.developerPayload,
+    };
+  } catch (error) {
+    console.error('❌ Google Play product validation error:', error.message);
+
+    if (error.code === 404) {
+      throw new functions.https.HttpsError(
+        'not-found',
+        'Purchase not found or already consumed'
+      );
+    }
+
+    if (error.code === 401 || error.code === 403) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Invalid service account credentials or permissions'
+      );
+    }
+
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      `Failed to validate Google Play product: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Acknowledge a Google Play in-app product purchase
+ * Required for new purchases to prevent refunds
+ */
+async function acknowledgeGooglePlayProduct(
+  packageName,
+  productId,
+  purchaseToken,
+  serviceAccountKey
+) {
+  try {
+    const androidPublisher = getPlayDeveloperClient(serviceAccountKey);
+
+    await androidPublisher.purchases.products.acknowledge({
+      packageName,
+      productId,
+      token: purchaseToken,
+    });
+
+    console.log('✅ Google Play in-app product acknowledged');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to acknowledge product:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   validateGooglePlayPurchase,
+  validateGooglePlayProduct,
   acknowledgeGooglePlayPurchase,
+  acknowledgeGooglePlayProduct,
+  isOneTimePurchase,
   getSubscriptionPlanFromProductId,
   getFeaturesForPlan,
 };

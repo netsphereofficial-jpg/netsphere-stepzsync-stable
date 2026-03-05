@@ -540,7 +540,7 @@ class AndroidPaymentService extends PaymentService {
     try {
       // Redirect to Google Play subscription management
       if (Platform.isAndroid) {
-        const String subscriptionUrl = 'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME&showAllReviews=true';
+        const String subscriptionUrl = 'https://play.google.com/store/account/subscriptions?package=com.health.stepzsync.stepzsync';
         debugPrint('Please direct user to Google Play subscription management');
         // You would use url_launcher to open this URL
       }
