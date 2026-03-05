@@ -173,9 +173,14 @@ class SubscriptionScreen extends StatelessWidget {
   }
 
   Widget _buildCompactPlans() {
-    final plans = SubscriptionPlan.getAllPlans()
+    final storePlans = controller.availablePlans
         .where((plan) => plan.type != SubscriptionPlanType.free)
         .toList();
+    final plans = storePlans.isNotEmpty
+        ? storePlans
+        : SubscriptionPlan.getAllPlans()
+            .where((plan) => plan.type != SubscriptionPlanType.free)
+            .toList();
 
     return Column(
       children: plans.asMap().entries.map((entry) {
